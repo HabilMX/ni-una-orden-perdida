@@ -1,10 +1,15 @@
 # Rutas en YAML, en su forma canónica
 
-> **Dónde muerde:** lección 01 en adelante.
+> **Dónde aparece:** lección 01 en adelante.
+
+## El problema
+
+Si cada ruta se escribe a su manera, leer la de otro cuesta, y Camel acepta formas que su propio validador marca.
 
 ## Qué decidimos
 
-Todas las rutas se escriben en el DSL de YAML de Camel y en su **forma canónica**: cada expresión dice su lenguaje
+Todas las rutas se escriben en el DSL de YAML de Camel (DSL: un lenguaje hecho para una sola tarea, aquí describir
+rutas) y en su **forma canónica**: cada expresión dice su lenguaje
 y su texto por separado (`expression:` → `simple:` → `expression:`), aunque exista una forma corta.
 
 ## Por qué

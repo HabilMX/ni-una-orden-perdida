@@ -1,6 +1,10 @@
 # La orden sale a todos los canales, y el router cuenta lo que pasó
 
-> **Dónde muerde:** lección 10.
+> **Dónde aparece:** lección 10.
+
+## El problema
+
+Si un canal se cae y el router contesta «salió a todos», la tienda cree algo que no pasó.
 
 ## Qué decidimos
 
@@ -32,4 +36,5 @@ que **siempre** deja una línea con lo que dijo su servicio —`{"canal":"erp","
 ## Fuentes
 
 - Multicast en Camel: https://camel.apache.org/components/next/eips/multicast-eip.html
-- Recipient List (EIP): https://www.enterpriseintegrationpatterns.com/patterns/messaging/RecipientList.html
+- En el libro, mandar a una lista fija de destinos es un caso de Recipient List; Camel lo llama Multicast.
+  Recipient List (EIP): https://www.enterpriseintegrationpatterns.com/patterns/messaging/RecipientList.html

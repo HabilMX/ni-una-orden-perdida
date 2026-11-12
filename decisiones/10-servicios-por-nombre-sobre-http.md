@@ -1,6 +1,10 @@
 # Los servicios se hablan por nombre, sobre HTTP
 
-> **Dónde muerde:** lección 08.
+> **Dónde aparece:** lección 08.
+
+## El problema
+
+Si un servicio llama a otro por su IP, la llamada se rompe en cuanto el contenedor se recrea.
 
 ## Qué decidimos
 
@@ -28,5 +32,5 @@ ni por `localhost`. En el camino principal de la práctica, los servicios se hab
 
 ## Fuentes
 
-- Message Router (EIP): https://www.enterpriseintegrationpatterns.com/patterns/messaging/MessageRouter.html
-- Message Router en Camel: https://camel.apache.org/components/next/eips/message-router.html
+- Docker Compose, redes (cada servicio se encuentra por su nombre): https://docs.docker.com/compose/how-tos/networking/
+- Kubernetes, DNS de los Services: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/

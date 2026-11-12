@@ -1,7 +1,8 @@
 # Decisiones de diseño
 
 Cada decisión de la práctica tiene su ficha, y cada ficha se lee sola, sin haber hecho la lección. Todas tienen la
-misma forma: **qué decidimos, por qué, qué descartamos, qué nos haría reabrirla y sus fuentes**.
+misma forma: **el problema, qué decidimos, por qué, qué descartamos, qué nos haría reabrirla y sus fuentes**.
+Arriba de cada una dice en qué lección aparece.
 
 Una decisión no es una verdad: es la mejor respuesta que encontramos con lo que sabemos hoy. Por eso cada ficha dice
 qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.

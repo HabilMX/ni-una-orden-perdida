@@ -1,6 +1,10 @@
 # En el ERP, todo o nada
 
-> **Dónde muerde:** lección 05.
+> **Dónde aparece:** lección 05.
+
+## El problema
+
+Si el pedido entra al ERP a medias, queda una cabecera sin renglones que engaña a quien la consulta.
 
 ## Qué decidimos
 

@@ -1,10 +1,16 @@
 # CloudEvents en modo binario como sobre
 
-> **Dónde muerde:** lección 08, 09.
+> **Dónde aparece:** lecciones 08 y 09.
+
+## El problema
+
+Si cada servicio inventa su propio sobre, ninguno sabe leer al otro y un duplicado no se reconoce.
 
 ## Qué decidimos
 
-Cuando un servicio le pasa la orden a otro, la orden va en el cuerpo tal cual, y el **sobre** va en encabezados
+En modo binario, los datos del evento viajan en encabezados y el cuerpo es la orden tal cual; en modo estructurado,
+todo se envuelve en un solo JSON. Usamos el binario: cuando un servicio le pasa la orden a otro, la orden va en el
+cuerpo tal cual, y el **sobre** va en encabezados
 CloudEvents: `ce-specversion`, `ce-type`, `ce-source`, `ce-subject` (la orden) y `ce-id`. El `ce-id` sale de la llave
 de negocio y del momento (`orden-1003-creada`).
 

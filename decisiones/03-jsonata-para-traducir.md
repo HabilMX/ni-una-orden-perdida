@@ -1,6 +1,10 @@
 # JSONata para traducir entre formatos
 
-> **Dónde muerde:** lección 03.
+> **Dónde aparece:** lección 03.
+
+## El problema
+
+Si la traducción vive mezclada con el flujo, cambiar un campo obliga a tocar la ruta y nadie puede probarla sola.
 
 ## Qué decidimos
 
@@ -26,7 +30,7 @@ vive en un **archivo JSONata**, con versión en su ruta: `mappings/<destino>/<me
 
 ## Qué nos haría reabrirla
 
-- Que el puerto de JSONata que usa Camel deje de mantenerse o se aleje de la especificación.
+- Que la versión de JSONata para Java que usa Camel deje de mantenerse o se aleje de la especificación.
 - Que un destino pida algo que JSONata no exprese.
 
 ## Fuentes

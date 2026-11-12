@@ -1,14 +1,18 @@
 # Cuatro cuidados al dejar un archivo al socio
 
-> **Dónde muerde:** lección 07.
+> **Dónde aparece:** lección 07.
+
+## El problema
+
+Si el socio lee la carpeta mientras escribimos, se lleva un archivo a medias.
 
 ## Qué decidimos
 
-El 850 se deposita en el SFTP del socio con cuatro cuidados:
+El 850 se deposita en el SFTP del socio (SFTP: el envío de archivos cifrado sobre SSH) con cuatro cuidados:
 1. se escribe con **nombre temporal** (`.tmp`) y se renombra al terminar;
 2. el **nombre final es determinístico** (`850-<orden>.edi`);
 3. **no se sobrescribe** uno que ya está: si existe, falla;
-4. solo se conecta si el servidor presenta **la llave anotada en `known_hosts`**.
+4. solo se conecta si el servidor presenta **la llave anotada en `known_hosts`** (la lista de servidores en los que confías, cada uno con su huella).
 
 ## Por qué
 
@@ -27,7 +31,7 @@ El 850 se deposita en el SFTP del socio con cuatro cuidados:
 
 ## Qué nos haría reabrirla
 
-- Que el socio pida otro mecanismo (AS2, una API): los cuidados cambian de forma, pero no de intención.
+- Que el socio pida otro mecanismo (AS2, que es otro protocolo de envío de documentos entre empresas, o una API): los cuidados cambian de forma, pero no de intención.
 
 ## Fuentes
 

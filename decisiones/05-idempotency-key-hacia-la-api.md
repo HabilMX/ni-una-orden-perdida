@@ -1,10 +1,15 @@
 # La API recibe una llave de idempotencia
 
-> **Dónde muerde:** lección 02.
+> **Dónde aparece:** lección 02.
+
+## El problema
+
+Si la red se corta después de que la API guardó el pedido, reenviarlo sin cuidado crea un pedido duplicado.
 
 ## Qué decidimos
 
-Cada pedido que mandamos a la API lleva el encabezado `Idempotency-Key` con el número de la orden. La API demo no es
+Una operación es *idempotente* si hacerla dos veces deja lo mismo que hacerla una: si la tienda reenvía el pedido, la
+API no crea un segundo. Para lograrlo, cada pedido que mandamos a la API lleva el encabezado `Idempotency-Key` con el número de la orden. La API demo no es
 permisiva: sin llave contesta 400; con la misma llave y el mismo contenido contesta 200 sin duplicar; con la misma
 llave y **otro** contenido contesta 409.
 

@@ -1,10 +1,15 @@
 # El EDI se arma con una plantilla sin lógica
 
-> **Dónde muerde:** lección 06.
+> **Dónde aparece:** lección 06.
+
+## El problema
+
+Si la plantilla del EDI calcula, el cálculo se esconde en un lugar sin pruebas y el socio recibe un documento mal armado.
 
 ## Qué decidimos
 
-El X12 850 se escribe con una **plantilla Mustache** que solo acomoda datos. Todo cálculo —rellenos de ancho fijo,
+El 850 es la orden de compra en X12, el formato de intercambio electrónico de documentos (EDI) que usan muchas
+cadenas para hablar con sus proveedores. Se escribe con una **plantilla Mustache** que solo acomoda datos. Todo cálculo —rellenos de ancho fijo,
 fechas, decimales, la cuenta de segmentos, limpiar los separadores dentro de un dato— lo hace antes el mapeo JSONata.
 Regla de una línea: **la plantilla no rellena, no cuenta y no decide.**
 
@@ -21,7 +26,7 @@ Regla de una línea: **la plantilla no rellena, no cuenta y no decide.**
 |---|---|
 | FreeMarker u otra plantilla con lógica | Invita a meter el relleno, y luego las reglas de negocio, en la plantilla |
 | Armar todo el texto en JSONata | Funciona, pero el resultado ya no se parece al documento |
-| Una biblioteca de EDI | Es lo que sigue en producción con muchos socios; aquí pediría Java |
+| Una biblioteca de EDI | Es lo que conviene cuando una integración real trabaja con muchos socios; aquí pediría Java |
 
 ## Qué nos haría reabrirla
 

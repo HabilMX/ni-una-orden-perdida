@@ -1,6 +1,10 @@
 # Sin casos dorados no hay mapeo
 
-> **Dónde muerde:** lección 03 en adelante.
+> **Dónde aparece:** lección 03 en adelante.
+
+## El problema
+
+Un mapeo que «se ve bien» puede mandar un total con un centavo de más, y nadie lo nota hasta que el destino reclama.
 
 ## Qué decidimos
 

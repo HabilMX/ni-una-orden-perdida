@@ -1,6 +1,10 @@
 # Quién recibe qué se decide por el contenido, en un solo lugar
 
-> **Dónde muerde:** lección 11.
+> **Dónde aparece:** lección 11.
+
+## El problema
+
+Si la regla de quién recibe qué está repartida en varios lugares, cambiarla es buscarla por todas partes.
 
 ## Qué decidimos
 
@@ -12,7 +16,7 @@ Si la orden no le toca, el canal contesta `{"canal":"socio","resultado":"no apli
 
 - **Decidir por el contenido** es el patrón cuando el destino depende de algo de la orden.
 - **Una regla en un solo lugar** se cambia sin buscarla por todas partes; el siguiente paso es sacarla a configuración
-  (ejercicio 11.3).
+  (el ejercicio de la lección 11, «la regla fuera de la ruta»).
 - **«No aplica» no es silencio:** quien lee la respuesta sabe que se decidió no mandarla, no que se olvidó.
 
 ## Qué descartamos
