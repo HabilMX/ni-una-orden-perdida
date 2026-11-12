@@ -4,7 +4,8 @@ CREATE TABLE pedido_cabecera (
   tienda       VARCHAR(10) NOT NULL,
   fecha        DATETIME NOT NULL,
   total        DECIMAL(12,2) NOT NULL,
-  estatus      VARCHAR(20) NOT NULL DEFAULT 'RECIBIDO'
+  estatus      VARCHAR(20) NOT NULL DEFAULT 'RECIBIDO',
+  correlacion  VARCHAR(64) NULL     -- el hilo de la integración que lo trajo (lección 09); vacío si nadie lo mandó
 );
 
 CREATE TABLE pedido_detalle (
