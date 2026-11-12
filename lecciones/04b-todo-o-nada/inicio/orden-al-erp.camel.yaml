@@ -1,0 +1,80 @@
+# La orden llega por HTTP y se registra en el ERP:
+#   POST /ordenes → traducir a filas → insertar cabecera → insertar cada renglón de detalle → llamar registrar_pedido
+#
+# El controlador (driver) de MariaDB, que Camel necesita para hablar con el ERP, viene en dependencias.txt.
+
+# La conexión al ERP. La contraseña es de práctica; en un sistema real llega por variable o por un gestor de secretos.
+- beans:
+    - name: erp
+      type: org.mariadb.jdbc.MariaDbDataSource
+      properties:
+        url: "jdbc:mariadb://erp:3306/erp"
+        user: integracion
+        password: "{{env:ERP_CLAVE:practica}}"
+    # Quien abre, confirma o deshace la transacción sobre esa conexión
+    - name: transacciones
+      type: org.springframework.jdbc.datasource.DataSourceTransactionManager
+      properties:
+        dataSource: "#erp"
+    # La regla «todo o nada» que usa el paso transacted de la ruta
+    - name: todoONada
+      type: org.apache.camel.spring.spi.SpringTransactionPolicy
+      properties:
+        transactionManager: "#transacciones"
+        propagationBehaviorName: PROPAGATION_REQUIRED
+
+- route:
+    id: orden-al-erp
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - to:
+            uri: jsonata:mappings/erp/pedido/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        # De texto JSON a datos (mapas y listas), para poder usar sus campos en el SQL
+        - unmarshal:
+            json: {}
+        # Guardamos las filas en variables: el cuerpo va a cambiar con cada paso
+        - setVariable:
+            name: cabecera
+            simple: "${body[cabecera]}"
+        - setVariable:
+            name: detalle
+            simple: "${body[detalle]}"
+        # TE TOCA: que todo lo de abajo pase dentro de UNA transacción, con la regla todoONada de arriba.
+        #          Si un renglón falla, no debe quedar NADA escrito en el ERP.
+        - log:
+            message: "Registrando en el ERP el pedido ${variable.cabecera[pedido]} con ${variable.detalle.size()} renglones"
+
+        # 1) La cabecera
+        - setBody:
+            simple: "${variable.cabecera}"
+        - to:
+            uri: sql:INSERT INTO pedido_cabecera (pedido, tienda, fecha, total) VALUES (:#pedido, :#tienda, :#fecha, :#total)
+            parameters:
+              dataSource: "#erp"
+
+        # 2) Un INSERT por cada renglón del detalle
+        - split:
+            simple: "${variable.detalle}"
+            steps:
+              - to:
+                  uri: sql:INSERT INTO pedido_detalle (pedido, posicion, sku, cantidad, precio) VALUES (:#pedido, :#posicion, :#sku, :#cantidad, :#precio)
+                  parameters:
+                    dataSource: "#erp"
+
+        # 3) El procedimiento del ERP comprueba que todo cuadre y marca el pedido REGISTRADO
+        - setBody:
+            simple: "${variable.cabecera}"
+        - to:
+            uri: sql:CALL registrar_pedido(:#pedido)
+            parameters:
+              dataSource: "#erp"
+        - setBody:
+            simple: '{"pedido":"${variable.cabecera[pedido]}","erp":"REGISTRADO"}'
+        - log:
+            message: "El ERP registró el pedido ${variable.cabecera[pedido]}"

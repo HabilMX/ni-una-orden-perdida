@@ -1,0 +1,4 @@
+{"cabecera":{"pedido":"1003","tienda":"T-022","fecha":"2026-11-12 12:40:00","total":25.19},
+ "detalle":[{"pedido":"1003","posicion":1,"sku":"SKU-0100","cantidad":3,"precio":0.1},
+            {"pedido":"1003","posicion":2,"sku":"SKU-0101","cantidad":7,"precio":0.7},
+            {"pedido":"1003","posicion":3,"sku":"SKU-0102","cantidad":1,"precio":19.99}]}

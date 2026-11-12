@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Comprueba la lección 04b: una orden con un renglón inválido no deja NADA en el ERP; una buena sí queda completa.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+SQL() { docker compose -f "$RAIZ/infra/compose.yaml" exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+
+"$RAIZ/herramientas/probar-mapeo" "$DONDE/mappings/erp/pedido/v1" >/dev/null && si "El mapeo al ERP pasa sus casos dorados" || no "El mapeo al ERP no pasa sus casos dorados"
+
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: detén la ruta que dejaste corriendo (Ctrl+C) y vuelve a intentar"; exit 1
+fi
+# El ERP de práctica empieza vacío en cada comprobación
+SQL "DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP: ¿corriste la 00?"; exit 1; }
+
+LOG=$(mktemp); cd "$DONDE"
+"$RAIZ/herramientas/camel" run orden-al-erp.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
+PID=$!
+for i in $(seq 1 60); do grep -qE "Started orden-al-erp|Error starting" "$LOG" && break; sleep 2; done
+grep -q "Started orden-al-erp" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+
+c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1004-renglon-invalido.json")
+[ "$c" != "200" ] && si "La orden 1004 (con un renglón de cantidad 0) fue rechazada ($c)" || no "La orden 1004 se aceptó, y trae un renglón inválido"
+[ "$(SQL "SELECT count(*) FROM pedido_cabecera WHERE pedido='1004'")" = "0" ] && si "No quedó la cabecera de la 1004: se deshizo" || no "Quedó la cabecera de la 1004 sin su detalle completo: falta la transacción"
+[ "$(SQL "SELECT count(*) FROM pedido_detalle WHERE pedido='1004'")" = "0" ] && si "No quedó ningún renglón de la 1004" || no "Quedaron renglones sueltos de la 1004"
+curl -s -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1001.json"
+[ "$(SQL "SELECT count(*) FROM pedido_cabecera WHERE pedido='1001' AND estatus='REGISTRADO'")" = "1" ] \
+  && [ "$(SQL "SELECT count(*) FROM pedido_detalle WHERE pedido='1001'")" = "2" ] \
+  && si "La orden buena 1001 sí quedó completa y REGISTRADO" || no "La orden buena 1001 no quedó completa"
+docker stop $(docker ps -q --filter ancestor=apache/camel-jbang:4.22.1) >/dev/null 2>&1; wait $PID 2>/dev/null
+exit $ok
