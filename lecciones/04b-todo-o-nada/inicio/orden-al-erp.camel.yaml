@@ -41,10 +41,14 @@
         # Guardamos las filas en variables: el cuerpo va a cambiar con cada paso
         - setVariable:
             name: cabecera
-            simple: "${body[cabecera]}"
+            expression:
+              simple:
+                expression: "${body[cabecera]}"
         - setVariable:
             name: detalle
-            simple: "${body[detalle]}"
+            expression:
+              simple:
+                expression: "${body[detalle]}"
         # TE TOCA: que todo lo de abajo pase dentro de UNA transacción, con la regla todoONada de arriba.
         #          Si un renglón falla, no debe quedar NADA escrito en el ERP.
         - log:
@@ -52,7 +56,9 @@
 
         # 1) La cabecera
         - setBody:
-            simple: "${variable.cabecera}"
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
         - to:
             uri: sql:INSERT INTO pedido_cabecera (pedido, tienda, fecha, total) VALUES (:#pedido, :#tienda, :#fecha, :#total)
             parameters:
@@ -60,7 +66,9 @@
 
         # 2) Un INSERT por cada renglón del detalle
         - split:
-            simple: "${variable.detalle}"
+            expression:
+              simple:
+                expression: "${variable.detalle}"
             steps:
               - to:
                   uri: sql:INSERT INTO pedido_detalle (pedido, posicion, sku, cantidad, precio) VALUES (:#pedido, :#posicion, :#sku, :#cantidad, :#precio)
@@ -69,12 +77,16 @@
 
         # 3) El procedimiento del ERP comprueba que todo cuadre y marca el pedido REGISTRADO
         - setBody:
-            simple: "${variable.cabecera}"
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
         - to:
             uri: sql:CALL registrar_pedido(:#pedido)
             parameters:
               dataSource: "#erp"
         - setBody:
-            simple: '{"pedido":"${variable.cabecera[pedido]}","erp":"REGISTRADO"}'
+            expression:
+              simple:
+                expression: '{"pedido":"${variable.cabecera[pedido]}","erp":"REGISTRADO"}'
         - log:
             message: "El ERP registró el pedido ${variable.cabecera[pedido]}"

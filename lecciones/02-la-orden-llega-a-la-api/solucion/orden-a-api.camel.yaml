@@ -11,7 +11,9 @@
         # El id de la orden viaja desde aquí: lo usamos como llave para que un reenvío no duplique el pedido.
         - setHeader:
             name: Idempotency-Key
-            jsonpath: "$.orden"
+            expression:
+              jsonpath:
+                expression: "$.orden"
         - log:
             message: "Recibí la orden ${header.Idempotency-Key}"
         # Traducir el formato de la tienda al de la API (el archivo de mapeo tiene versión: v1).
@@ -25,7 +27,9 @@
             pattern: "CamelHttp*"
         - setHeader:
             name: Content-Type
-            constant: application/json
+            expression:
+              constant:
+                expression: application/json
         - to:
             uri: http://api-pedidos:8080/pedidos
             parameters:

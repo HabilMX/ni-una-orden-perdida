@@ -22,12 +22,16 @@
         - log:
             message: "X12-TIPO ${body[tipo]}"
         - split:
-            simple: "${body[segmentos]}"
+            expression:
+              simple:
+                expression: "${body[segmentos]}"
             steps:
               - log:
                   message: "X12-SEG ${body}"
         - split:
-            simple: "${body[revision]}"
+            expression:
+              simple:
+                expression: "${body[revision]}"
             steps:
               - log:
                   message: "X12-REV ${body[ok]} ${body[que]}"

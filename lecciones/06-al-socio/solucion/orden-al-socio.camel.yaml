@@ -15,7 +15,9 @@
       steps:
         - setVariable:
             name: orden
-            jsonpath: "$.orden"
+            expression:
+              jsonpath:
+                expression: "$.orden"
         - to:
             uri: jsonata:mappings/edi/850/v1/mapeo.jsonata
             parameters:

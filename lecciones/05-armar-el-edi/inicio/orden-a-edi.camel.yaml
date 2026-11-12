@@ -10,7 +10,9 @@
       steps:
         - setVariable:
             name: orden
-            jsonpath: "$.orden"
+            expression:
+              jsonpath:
+                expression: "$.orden"
         # 1) El mapeo CALCULA (rellenos, fechas, precios, cuenta de segmentos, texto limpio)
         - to:
             uri: jsonata:mappings/edi/850/v1/mapeo.jsonata

@@ -12,7 +12,9 @@
       steps:
         - setVariable:
             name: caso
-            simple: "${header.CamelFileParent}"
+            expression:
+              simple:
+                expression: "${header.CamelFileParent}"
         # Lo que entra al mapeo es el texto JSON del caso
         - to:
             uri: "jsonata:file:{{mapeo}}"
@@ -21,7 +23,9 @@
               outputType: JsonString
         - setVariable:
             name: obtenido
-            simple: "${bodyAs(String)}"
+            expression:
+              simple:
+                expression: "${bodyAs(String)}"
         # Normalizar los números para comparar por valor (210 = 210.0)
         - to:
             uri: "jsonata:file:herramientas/normalizar.jsonata"
@@ -30,10 +34,14 @@
               outputType: JsonString
         - setVariable:
             name: obtenidoNormal
-            simple: "${bodyAs(String)}"
+            expression:
+              simple:
+                expression: "${bodyAs(String)}"
         # Traer el esperado del mismo caso y convertir ambos a datos para compararlos sin importar espacios ni orden de llaves
         - pollEnrich:
-            simple: "file:${variable.caso}?fileName=esperado.json&noop=true&idempotent=false"
+            expression:
+              simple:
+                expression: "file:${variable.caso}?fileName=esperado.json&noop=true&idempotent=false"
             timeout: 3000
         # El esperado en una sola línea, para mostrarlo completo si el caso falla
         - to:
@@ -43,7 +51,9 @@
               outputType: JsonString
         - setVariable:
             name: esperadoTexto
-            simple: "${bodyAs(String)}"
+            expression:
+              simple:
+                expression: "${bodyAs(String)}"
         - to:
             uri: "jsonata:file:herramientas/normalizar.jsonata"
             parameters:
@@ -53,14 +63,20 @@
             json: {}
         - setVariable:
             name: esperado
-            simple: "${body}"
+            expression:
+              simple:
+                expression: "${body}"
         - setBody:
-            simple: "${variable.obtenidoNormal}"
+            expression:
+              simple:
+                expression: "${variable.obtenidoNormal}"
         - unmarshal:
             json: {}
         - choice:
             when:
-              - simple: "${body} == ${variable.esperado}"
+              - expression:
+                  simple:
+                    expression: "${body} == ${variable.esperado}"
                 steps:
                   - log:
                       message: "CASO-OK ${variable.caso}"

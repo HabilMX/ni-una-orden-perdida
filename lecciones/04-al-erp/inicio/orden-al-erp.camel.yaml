@@ -30,16 +30,22 @@
         # Guardamos las filas en variables: el cuerpo va a cambiar con cada paso
         - setVariable:
             name: cabecera
-            simple: "${body[cabecera]}"
+            expression:
+              simple:
+                expression: "${body[cabecera]}"
         - setVariable:
             name: detalle
-            simple: "${body[detalle]}"
+            expression:
+              simple:
+                expression: "${body[detalle]}"
         - log:
             message: "Registrando en el ERP el pedido ${variable.cabecera[pedido]} con ${variable.detalle.size()} renglones"
 
         # 1) La cabecera
         - setBody:
-            simple: "${variable.cabecera}"
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
         - to:
             uri: sql:INSERT INTO pedido_cabecera (pedido, tienda, fecha, total) VALUES (:#pedido, :#tienda, :#fecha, :#total)
             parameters:
@@ -53,4 +59,6 @@
         #    Él comprueba que el total cuadre con el detalle y marca el pedido REGISTRADO.
 
         - setBody:
-            simple: '{"pedido":"${variable.cabecera[pedido]}","erp":"REGISTRADO"}'
+            expression:
+              simple:
+                expression: '{"pedido":"${variable.cabecera[pedido]}","erp":"REGISTRADO"}'
