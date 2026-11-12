@@ -229,6 +229,12 @@ Dos errores reales que salieron al construirla, y por qué no llegaron a ti:
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [El EDI se arma con una plantilla sin lógica](../../decisiones/07-mustache-sin-logica-para-el-edi.md)
+
 ## Repaso
 
 1. En un X12, ¿qué separa el `*` y qué separa el `~`?

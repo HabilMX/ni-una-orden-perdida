@@ -208,6 +208,12 @@ ruta sí intentó conectarse y que la rechazó la llave, no otra falla. Las dem�
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [Cuatro cuidados al dejar un archivo al socio](../../decisiones/08-entrega-segura-al-sftp.md)
+
 ## Repaso
 
 1. ¿Por qué el archivo se escribe con un nombre temporal y se renombra al final?

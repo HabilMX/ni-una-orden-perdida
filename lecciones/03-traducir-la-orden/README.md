@@ -188,6 +188,13 @@ distintas.
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [JSONata para traducir entre formatos](../../decisiones/03-jsonata-para-traducir.md)
+- [Sin casos dorados no hay mapeo](../../decisiones/04-casos-dorados.md)
+
 ## Repaso
 
 1. En `"pedido": orden`, ¿qué lado es la API y qué lado es la tienda?

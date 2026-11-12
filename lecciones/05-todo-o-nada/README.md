@@ -149,6 +149,12 @@ Vuelve a consultar el ERP como en el paso 4. Ahora de la 1004 no queda nada: ni 
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [En el ERP, todo o nada](../../decisiones/06-todo-o-nada-en-el-erp.md)
+
 ## Repaso
 
 1. ¿Qué es una transacción, y qué significan confirmar y deshacer?

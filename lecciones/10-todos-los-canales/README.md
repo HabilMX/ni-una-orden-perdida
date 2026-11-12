@@ -224,6 +224,13 @@ distintas.
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [El hilo de correlación viaja con la orden, pero no sale de casa](../../decisiones/12-el-hilo-de-correlacion.md)
+- [La orden sale a todos los canales, y el router cuenta lo que pasó](../../decisiones/13-multicast-que-no-inventa.md)
+
 ## Repaso
 
 1. ¿Qué hace un multicast, y qué cambia con `parallelProcessing: true`?

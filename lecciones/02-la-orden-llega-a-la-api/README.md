@@ -107,14 +107,17 @@ curl -i -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @si
 | La misma orden otra vez | **200**, con `ya_existia` | «Ya lo tenía; no lo dupliqué». La API reconoció la llave |
 | Sin renglones | **422** | «Entendí lo que mandaste, pero no tiene sentido»: un pedido sin partidas no se puede registrar |
 | Sin la llave `Idempotency-Key` | **400** | «Te falta algo obligatorio» |
-| La misma llave con **otro** contenido | **409** | «Conflicto: con esta llave ya me mandaste algo distinto» |
+| La misma llave con **otro** contenido | **422** | «Esta llave ya la usaste con algo distinto». Mira el `type` del cuerpo |
+
+Cuando algo sale mal, la API contesta con un JSON de error de forma estándar (*Problem Details*, el tipo
+`application/problem+json`): trae `type`, `title`, `status` y `detail`. El `type` es el que distingue un 422 de otro.
 
 Las dos últimas no las probaste. **¿Cómo harías para provocar un 400?** Pista: ¿qué línea de la ruta pone la llave?
-¿Y un 409? Pista: ¿qué pasaría si mandas la orden 1001 con otra cantidad? Haz las pruebas y luego devuelve la ruta
-a como estaba.
+¿Y si mandas la orden 1001 con otra cantidad? Te contesta 422, igual que el pedido sin renglones. ¿Cómo distingues
+los dos? Mira el cuerpo de la respuesta. Haz las pruebas y luego devuelve la ruta a como estaba.
 
 ¿Ves por qué la orden sin renglones necesitaba otro número? Con el 1001 habrías tenido la misma llave con otro
-contenido.
+contenido, y el 422 habría sido por la llave, no por los renglones.
 
 **Lo importante del 200:** si la red falla y la tienda reenvía la orden, la API no crea dos pedidos, porque la llave
 le dice que es la misma. Por eso el id de la orden viaja desde la primera estación. En la lección 18 vas a construir
@@ -153,6 +156,12 @@ no prueba que llegó; lo prueba el que lo recibió. Esa idea va a regresar mucha
 | `curl: (7) Failed to connect` | La ruta todavía no arranca: espera la línea `Started` |
 
 ---
+
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [La API recibe una llave de idempotencia](../../decisiones/05-idempotency-key-hacia-la-api.md)
 
 ## Repaso
 

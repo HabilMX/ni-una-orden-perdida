@@ -152,9 +152,16 @@ una vas a volver aquí para ver dónde estás.
 
 *Por qué Camel:* partimos de premisas, no de gustos. Buscamos algo ligero, que escale por servicio, que se defina por
 configuración y que tenga licencia abierta. Al final de la práctica vas a medir tú mismo qué gana y qué cede. El
-detalle está en [`conceptos/por-que-camel.md`](../../conceptos/por-que-camel.md).
+detalle está en la ficha [Apache Camel como motor de integración](../../decisiones/01-apache-camel-como-motor.md).
 
 ---
+
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [Apache Camel como motor de integración](../../decisiones/01-apache-camel-como-motor.md)
+- [Rutas en YAML, en su forma canónica](../../decisiones/02-rutas-en-yaml-canonico.md)
 
 ## Repaso
 
@@ -164,6 +171,7 @@ Sin ver el YAML, contesta:
 2. ¿Qué es la carta en esta ruta, y por qué no está escrita en el YAML?
 3. ¿Qué hace Camel con un archivo que ya leyó?
 4. Si quisieras que la ruta solo tomara archivos `.xml`, ¿qué línea cambiarías?
+5. Pusiste `nota.txt` en `entrada/`. ¿Lo tomó la ruta? ¿Qué parte del YAML lo decidió?
 
 **Siguiente:** en la lección 02, la estación de entrada deja de ser una carpeta: la orden llega por HTTP y sale hacia
 una API.

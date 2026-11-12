@@ -134,6 +134,12 @@ entorno o por un gestor de secretos, y no se guardan en el repositorio.
 
 ---
 
+## Por qué se hizo así
+
+Cada decisión de la práctica tiene su ficha: qué decidimos, por qué, qué descartamos y qué nos haría
+cambiar de idea. Están en [`decisiones/`](../../decisiones/), y cada lección te liga la suya. Hoy todavía no hay
+ninguna: el ambiente es el piso, no una decisión de diseño.
+
 ## Repaso
 
 1. ¿Qué hace cada una de las cuatro piezas en la historia de la tienda?
@@ -141,6 +147,8 @@ entorno o por un gestor de secretos, y no se guardan en el repositorio.
 3. ¿Por qué es bueno que el ERP rechace un pedido que no existe?
 4. ¿Por qué la base de estado usa el puerto 15432 en tu máquina y no el 5432 de siempre? ¿Qué pasaría si usara el 5432
    y tú ya tuvieras un PostgreSQL instalado?
+5. ¿Qué pasa con los datos del ERP cuando apagas el ambiente con `down` y lo vuelves a encender? ¿Por qué
+   conviene eso en una práctica?
 
 **Siguiente:** en la lección 01 corres tu primera ruta de Camel. Todavía no usa estos sistemas: mueve un archivo de
 una carpeta a otra.

@@ -207,6 +207,11 @@ confirma el destino, no tu ruta.
 
 ---
 
+## Por qué se hizo así
+
+Hoy escribiste el pedido en tres pasos sueltos. La ficha que explica por qué eso no basta, y qué se
+decidió, es la de la lección siguiente: [En el ERP, todo o nada](../../decisiones/06-todo-o-nada-en-el-erp.md).
+
 ## Repaso
 
 1. ¿Por qué un pedido ocupa filas en dos tablas, y qué columna las une?

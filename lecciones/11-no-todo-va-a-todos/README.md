@@ -36,7 +36,7 @@ cp -R inicio mio
 
 ## 2. Predice
 
-Abre la carpeta `datos/ordenes/lote-10/` en la raíz de la práctica. Tiene diez órdenes y un `LEEME.md`. Sin correr
+Abre el lote de 10 órdenes, la carpeta `datos/ordenes/lote-10/`, en la raíz de la práctica. Tiene diez órdenes y un `LEEME.md`. Sin correr
 nada, abre las órdenes, mira su campo `"tienda"` y contesta en un papel:
 
 1. ¿Cuántas de las diez son de franquicia (T-501 o T-502)?
@@ -181,6 +181,12 @@ para dejar todo como estaba.
 administra el negocio?
 
 ---
+
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [Quién recibe qué se decide por el contenido, en un solo lugar](../../decisiones/14-quien-recibe-se-decide-en-un-lugar.md)
 
 ## Repaso
 

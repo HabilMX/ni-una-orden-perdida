@@ -210,6 +210,14 @@ con la ruta de la 05, ¿qué carpeta crearías, qué pondrías en ella y qué re
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [Una sola imagen; cada servicio es una carpeta](../../decisiones/09-una-imagen-un-servicio-por-carpeta.md)
+- [Los servicios se hablan por nombre, sobre HTTP](../../decisiones/10-servicios-por-nombre-sobre-http.md)
+- [CloudEvents en modo binario como sobre](../../decisiones/11-cloudevents-como-sobre.md)
+
 ## Repaso
 
 1. ¿Qué hace el router y qué hace int-rest? ¿Por qué conviene separarlos?

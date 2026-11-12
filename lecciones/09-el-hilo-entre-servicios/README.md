@@ -190,6 +190,13 @@ empieza con la hora.
 
 ---
 
+## Por qué se hizo así
+
+Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
+
+- [CloudEvents en modo binario como sobre](../../decisiones/11-cloudevents-como-sobre.md)
+- [El hilo de correlación viaja con la orden, pero no sale de casa](../../decisiones/12-el-hilo-de-correlacion.md)
+
 ## Repaso
 
 1. ¿Qué diferencia hay entre `ce-id` y `ce-correlationid`?
