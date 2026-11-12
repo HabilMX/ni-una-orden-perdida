@@ -7,7 +7,12 @@
 # La versión está fija a propósito: todo el curso usa la misma (Camel 4.22.1, de soporte largo).
 set -euo pipefail
 IMAGEN="apache/camel-jbang:4.22.1"
-exec docker run --rm -it \
+# --network: para que la ruta alcance a los destinos del ambiente por su nombre (api-pedidos, erp…).
+# El volumen de .m2 guarda lo que Camel descarga, para no bajarlo en cada corrida.
+TTY=$([ -t 0 ] && echo "-it" || echo "-i")
+exec docker run --rm $TTY \
+  --network "${CAMEL_RED:-practica-retail_default}" \
   -v "$PWD":/work -w /work \
+  -v practica-retail-m2:/home/ubuntu/.m2 \
   -p "${CAMEL_PUERTO:-8080}:8080" \
   "$IMAGEN" "$@"
