@@ -1,0 +1,41 @@
+# int-rest: el servicio que sabe hablar con la API de pedidos.
+# Recibe la orden del router, la traduce al formato de la API y la entrega. No decide a dónde va: eso es del router.
+- route:
+    id: int-rest
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - log:
+            message: "Recibí del router la orden ${header.ce-subject} (sobre ${header.ce-id}, tipo ${header.ce-type})"
+        # La llave de idempotencia sale del sobre: el id de la orden
+        - setVariable:
+            name: llave
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - to:
+            uri: jsonata:mappings/api/pedido/v2/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Idempotency-Key
+            expression:
+              simple:
+                expression: "${variable.llave}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - to:
+            uri: http://api-pedidos:8080/pedidos
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode} para la orden ${variable.llave}"

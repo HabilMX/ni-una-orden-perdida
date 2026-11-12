@@ -1,0 +1,68 @@
+# El router: recibe la orden de la tienda y decide a qué servicio de integración se la pasa.
+# No sabe nada del formato de la API ni de ningún destino: eso es trabajo de cada int-*.
+#
+#   tienda → POST /ordenes → [orden-router] → POST http://int-rest:8080/integrar → [int-rest] → API
+#
+# Los servicios se llaman por su NOMBRE en el compose (int-rest), no por una dirección IP.
+# La orden viaja dentro de un «sobre» CloudEvents: encabezados ce-* que dicen qué es, de dónde viene y su id.
+- route:
+    id: orden-router
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: tienda
+            expression:
+              jsonpath:
+                expression: "$.tienda"
+        # Limpiar lo que trajo la llamada de entrada antes de hacer la de salida
+        - removeHeaders:
+            pattern: "*"
+        # El sobre CloudEvents (modo binario: los datos van en el cuerpo y el sobre en encabezados)
+        - setHeader:
+            name: ce-specversion
+            expression:
+              constant:
+                expression: "1.0"
+        - setHeader:
+            name: ce-type
+            expression:
+              constant:
+                expression: "mx.tienda.orden.creada"
+        - setHeader:
+            name: ce-source
+            expression:
+              simple:
+                expression: "/tiendas/${variable.tienda}"
+        - setHeader:
+            name: ce-subject
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        # El id es determinístico: la misma orden y el mismo momento dan siempre el mismo id
+        - setHeader:
+            name: ce-id
+            expression:
+              simple:
+                expression: "orden-${variable.orden}-creada"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - log:
+            message: "Orden ${variable.orden}: se la paso a int-rest"
+        - to:
+            uri: http://int-rest:8080/integrar
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "Orden ${variable.orden}: int-rest contestó ${header.CamelHttpResponseCode}"
