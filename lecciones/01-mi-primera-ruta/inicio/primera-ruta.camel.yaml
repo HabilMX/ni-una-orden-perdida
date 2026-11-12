@@ -1,0 +1,17 @@
+# Mi primera ruta: toma cada orden que cae en la carpeta entrada/,
+# la anuncia en el log y la deja en salida/.
+#
+#   estación (from)  →  paso (log)  →  estación (to)
+#   └──────────────── tubería ────────────────┘
+# Lo que viaja por la tubería es la carta: el mensaje (la orden).
+- route:
+    id: primera-ruta
+    from:
+      uri: file:entrada
+      parameters:
+        include: ".*\\.json"
+      steps:
+        - log:
+            message: "Llegó la orden del archivo ${header.CamelFileName}: ${body}"
+        - to:
+            uri: file:salida

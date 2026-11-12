@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Corre la CLI de Camel dentro de su imagen oficial, sobre la carpeta en la que estás.
+# Así no instalas Java ni Camel: solo Docker.
+#
+#   ../../herramientas/camel run mi-ruta.camel.yaml
+#
+# La versión está fija a propósito: todo el curso usa la misma (Camel 4.22.1, de soporte largo).
+set -euo pipefail
+IMAGEN="apache/camel-jbang:4.22.1"
+exec docker run --rm -it \
+  -v "$PWD":/work -w /work \
+  -p "${CAMEL_PUERTO:-8080}:8080" \
+  "$IMAGEN" "$@"

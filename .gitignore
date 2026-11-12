@@ -1,0 +1,7 @@
+# Lo que escribe el alumno y lo que generan las rutas al correr
+lecciones/*/mio/
+lecciones/*/*/entrada/
+lecciones/*/*/salida/
+.camel-jbang/
+.camel-jbang-run/
+*.log
