@@ -5,3 +5,4 @@ lecciones/*/*/salida/
 .camel-jbang/
 .camel-jbang-run/
 *.log
+known_hosts

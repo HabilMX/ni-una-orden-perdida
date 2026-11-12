@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Anota en known_hosts la llave pública del SFTP del socio, en la carpeta donde estás.
+#
+# En la vida real, el socio te manda su llave pública por un canal aparte (correo, portal) y tú la anotas UNA vez.
+# Desde entonces, si un día el servidor presenta otra llave, la conexión se niega: podría ser alguien haciéndose
+# pasar por el socio. Aquí la tomamos directo del contenedor del socio, que hace las veces de «su administrador».
+#
+# Si recreas el ambiente desde cero, el SFTP genera llaves nuevas: vuelve a correr esto.
+set -euo pipefail
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+LLAVE=$(docker compose -f "$RAIZ/infra/compose.yaml" exec -T socio-sftp cat /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $1" "$2}')
+[ -n "$LLAVE" ] || { echo "❌ No pude leer la llave del socio: ¿está arriba el ambiente (lección 00)?"; exit 1; }
+echo "socio-sftp $LLAVE" > known_hosts
+echo "✅ Anoté la llave del socio en $(pwd)/known_hosts"
