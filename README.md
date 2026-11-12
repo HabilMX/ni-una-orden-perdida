@@ -21,6 +21,9 @@ Cada lección vive en `lecciones/NN-…/` con tres cosas: `inicio/` (de donde pa
 `verifica` que mide lo que llegó a cada sistema. Copias `inicio/` a `mio/`, trabajas ahí y corres `./verifica`: sale
 en rojo diciendo qué falta, y en verde cuando lo lograste.
 
+No es un recetario: cada lección abre pidiéndote que predigas qué va a pasar, te hace romper algo a propósito, y
+termina ligando la ficha que explica por qué se hizo así.
+
 ## Temario
 
 Esta práctica está **en construcción**: las lecciones sin liga todavía no salen.
