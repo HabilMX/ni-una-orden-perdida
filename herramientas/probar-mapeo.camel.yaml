@@ -22,17 +22,34 @@
         - setVariable:
             name: obtenido
             simple: "${bodyAs(String)}"
+        # Normalizar los números para comparar por valor (210 = 210.0)
+        - to:
+            uri: "jsonata:file:herramientas/normalizar.jsonata"
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - setVariable:
+            name: obtenidoNormal
+            simple: "${bodyAs(String)}"
         # Traer el esperado del mismo caso y convertir ambos a datos para compararlos sin importar espacios ni orden de llaves
         - pollEnrich:
             simple: "file:${variable.caso}?fileName=esperado.json&noop=true&idempotent=false"
             timeout: 3000
+        - setVariable:
+            name: esperadoTexto
+            simple: "${bodyAs(String)}"
+        - to:
+            uri: "jsonata:file:herramientas/normalizar.jsonata"
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
         - unmarshal:
             json: {}
         - setVariable:
             name: esperado
             simple: "${body}"
         - setBody:
-            simple: "${variable.obtenido}"
+            simple: "${variable.obtenidoNormal}"
         - unmarshal:
             json: {}
         - choice:
@@ -44,4 +61,4 @@
             otherwise:
               steps:
                 - log:
-                    message: "CASO-FALLA ${variable.caso}\n   esperaba: ${variable.esperado}\n   obtuve:   ${variable.obtenido}"
+                    message: "CASO-FALLA ${variable.caso}\n   esperaba: ${variable.esperadoTexto}\n   obtuve:   ${variable.obtenido}"

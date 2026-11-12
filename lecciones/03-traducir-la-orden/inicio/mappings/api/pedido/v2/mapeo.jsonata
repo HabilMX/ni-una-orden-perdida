@@ -1,0 +1,8 @@
+/* Versión 2 del pedido para la API. TE TOCA A TI.
+   Parte de la v1 (../v1/mapeo.jsonata) y agrega:
+     - en cada partida, "importe": cantidad × precio
+     - en el pedido, "total": la suma de los importes
+   Antes de escribir, lee los casos dorados en cases/: dicen exactamente qué debe salir.
+   Pruébalo con:   ../../herramientas/probar-mapeo mio/mappings/api/pedido/v2 */
+{
+}

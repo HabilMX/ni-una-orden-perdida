@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Comprueba la lección 03: el mapeo v2 pasa sus casos dorados y la API acepta el pedido con su total.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+
+echo "— Casos dorados del mapeo v2"
+"$RAIZ/herramientas/probar-mapeo" "$DONDE/mappings/api/pedido/v2" && si "El mapeo v2 pasa todos sus casos dorados" || no "El mapeo v2 no pasa sus casos dorados"
+
+grep -q "mappings/api/pedido/v2/mapeo.jsonata" "$DONDE/orden-a-api.camel.yaml" \
+  && si "La ruta usa la versión 2 del mapeo" || no "La ruta todavía usa otra versión del mapeo (debe apuntar a v2)"
+
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: detén la ruta que dejaste corriendo (Ctrl+C) y vuelve a intentar"; exit 1
+fi
+docker compose -f "$RAIZ/infra/compose.yaml" restart api-pedidos >/dev/null 2>&1
+docker compose -f "$RAIZ/infra/compose.yaml" up -d --wait api-pedidos >/dev/null 2>&1 || { no "La API no levantó: ¿corriste la 00?"; exit 1; }
+
+echo "— De punta a punta, con la orden de los centavos"
+LOG=$(mktemp); cd "$DONDE"
+"$RAIZ/herramientas/camel" run orden-a-api.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
+PID=$!
+for i in $(seq 1 60); do grep -q "Started orden-a-api" "$LOG" && break; sleep 2; done
+grep -q "Started orden-a-api" "$LOG" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1003.json")
+[ "$c" = "201" ] && si "La API aceptó la orden 1003 (201)" || no "La API no aceptó la orden 1003: llegó $c (si es 422, el total no cuadra al centavo)"
+t=$(curl -s localhost:8081/pedidos/1003 | python3 -c "import sys,json; print(json.load(sys.stdin).get('total'))" 2>/dev/null)
+[ "$t" = "25.19" ] && si "El pedido quedó con total 25.19" || no "El pedido quedó con total ${t:-ninguno}, no 25.19"
+docker stop $(docker ps -q --filter ancestor=apache/camel-jbang:4.22.1) >/dev/null 2>&1; wait $PID 2>/dev/null
+exit $ok

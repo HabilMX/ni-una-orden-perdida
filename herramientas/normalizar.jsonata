@@ -1,0 +1,13 @@
+/* Lo usa probar-mapeo: los números ENTEROS se escriben igual (210 y 210.0 quedan como "210"),
+   para que la comparación sea por valor. Los decimales se dejan EXACTOS a propósito:
+   0.30000000000000004 NO es 0.3, y el caso dorado lo tiene que atrapar.
+   (No se usa $string con los decimales porque redondea a 15 cifras y escondería ese error.) */
+(
+  $norm := function($v) {
+    $type($v) = "array"  ? [$map($v, $norm)] :
+    $type($v) = "object" ? $merge($each($v, function($val, $k) { {$k: $norm($val)} })) :
+    $type($v) = "number" and $floor($v) = $v ? $string($v) :
+    $v
+  };
+  $norm($)
+)

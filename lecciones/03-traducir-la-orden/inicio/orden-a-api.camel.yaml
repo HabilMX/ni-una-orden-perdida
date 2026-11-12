@@ -1,0 +1,35 @@
+# La orden llega por HTTP y sale hacia la API de pedidos.
+#
+#   POST /ordenes  →  sacar el id de la orden  →  traducir  →  POST a la API  →  contestar a la tienda
+- route:
+    id: orden-a-api
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # El id de la orden viaja desde aquí: lo usamos como llave para que un reenvío no duplique el pedido.
+        - setHeader:
+            name: Idempotency-Key
+            jsonpath: "$.orden"
+        - log:
+            message: "Recibí la orden ${header.Idempotency-Key}"
+        # Traducir el formato de la tienda al de la API (el archivo de mapeo tiene versión: v1).
+        - to:
+            uri: jsonata:mappings/api/pedido/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString    # la orden llega como texto JSON
+              outputType: JsonString   # y sale como texto JSON, listo para enviarse
+        # Limpiar lo que trajo la llamada de entrada antes de hacer la de salida.
+        - removeHeaders:
+            pattern: "CamelHttp*"
+        - setHeader:
+            name: Content-Type
+            constant: application/json
+        - to:
+            uri: http://api-pedidos:8080/pedidos
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode}: ${body}"
