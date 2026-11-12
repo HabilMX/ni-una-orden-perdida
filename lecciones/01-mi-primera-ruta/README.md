@@ -5,6 +5,11 @@
 
 **Antes de empezar necesitas:** la lección 00 terminada y Docker funcionando. Nada más: no instalas Java ni Camel.
 
+**Qué es Camel, en una frase:** un programa que mueve información de un sistema a otro siguiendo las
+instrucciones que tú le escribes. Esas instrucciones se llaman **ruta**. Hoy la ruta mueve un archivo de una carpeta
+a otra, que es lo más sencillo que existe. En las siguientes lecciones, la misma idea va a mover órdenes de una
+tienda entre sistemas que no se conocen.
+
 ⚠️ **Trabaja dentro de tu carpeta personal** (`~`, por ejemplo `~/practicas/`), nunca en `/tmp`. En Mac con colima,
 Docker solo puede ver las carpetas que están dentro de tu home. Si clonaste el repo en otro lado, la ruta falla con
 «Source file does not exist».
@@ -16,14 +21,16 @@ Docker solo puede ver las carpetas que están dentro de tu home. Si clonaste el 
 Todo lo tuyo va en `mio/`. Es una copia de `inicio/` y git no la sigue, así que ahí puedes romper lo que quieras.
 
 ```bash
-cd lecciones/01-mi-primera-ruta
-cp -R inicio mio
-cd mio
+cd lecciones/01-mi-primera-ruta   # entra a la carpeta de la lección
+cp -R inicio mio                  # copia inicio/ completa (-R: con todo lo de adentro) y la llama mio/
+cd mio                            # entra a tu copia
 ```
 
 ## 2. Lee la ruta y predice
 
-Abre `primera-ruta.camel.yaml`. Sin los comentarios, es esto:
+Abre `primera-ruta.camel.yaml` con tu editor. Está escrita en **YAML**, un formato de texto donde la sangría
+(los espacios al inicio de cada línea) indica qué va dentro de qué, como las carpetas dentro de carpetas. Sin los
+comentarios, es esto:
 
 ```yaml
 - route:
@@ -51,10 +58,13 @@ después):
 Pon una orden en `entrada/` y arranca la ruta:
 
 ```bash
-mkdir -p entrada
-cp ../../../datos/ordenes/orden-1001.json entrada/
+mkdir -p entrada                                     # crea la carpeta entrada/ (si ya existe, no pasa nada)
+cp ../../../datos/ordenes/orden-1001.json entrada/   # copia la orden de ejemplo; ../ sube una carpeta
 ../../../herramientas/camel run primera-ruta.camel.yaml
 ```
+
+La orden es un archivo **JSON**: texto con pares de nombre y valor (`"orden": "1001"`). Ábrelo antes de correr:
+es lo que va a viajar.
 
 La primera vez tarda un poco, porque Docker descarga la imagen de Camel. Cuando veas una línea con
 `Started primera-ruta`, la ruta ya está escuchando. Unos segundos después aparece el anuncio de la orden. Para
@@ -65,8 +75,8 @@ detenerla, oprime `Ctrl+C`.
 Mira tus tres respuestas y revisa las carpetas:
 
 ```bash
-ls salida/
-ls -a entrada/
+ls salida/       # lista lo que hay en salida/
+ls -a entrada/   # -a muestra también lo escondido (lo que empieza con punto)
 ```
 
 - **La pantalla:** el log dice `Llegó la orden del archivo orden-1001.json:` y después la orden completa. `${header.CamelFileName}`
