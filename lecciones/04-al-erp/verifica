@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Comprueba la lección 04: la orden queda en el ERP con su cabecera, su detalle completo y REGISTRADO.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+SQL() { docker compose -f "$RAIZ/infra/compose.yaml" exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+
+"$RAIZ/herramientas/probar-mapeo" "$DONDE/mappings/erp/pedido/v1" >/dev/null && si "El mapeo al ERP pasa sus casos dorados" || no "El mapeo al ERP no pasa sus casos dorados"
+
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: detén la ruta que dejaste corriendo (Ctrl+C) y vuelve a intentar"; exit 1
+fi
+# El ERP de práctica empieza vacío en cada comprobación
+SQL "DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP: ¿corriste la 00?"; exit 1; }
+
+LOG=$(mktemp); cd "$DONDE"
+"$RAIZ/herramientas/camel" run orden-al-erp.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
+PID=$!
+for i in $(seq 1 60); do grep -qE "Started orden-al-erp|Error starting" "$LOG" && break; sleep 2; done
+grep -q "Started orden-al-erp" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+
+for o in 1001 1003; do
+  curl -s -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-$o.json"
+done
+[ "$(SQL "SELECT count(*) FROM pedido_cabecera")" = "2" ] && si "El ERP tiene las 2 cabeceras" || no "El ERP no tiene las 2 cabeceras"
+[ "$(SQL "SELECT count(*) FROM pedido_detalle WHERE pedido='1001'")" = "2" ] && si "El pedido 1001 tiene sus 2 renglones de detalle" || no "Al pedido 1001 le faltan renglones de detalle"
+[ "$(SQL "SELECT count(*) FROM pedido_detalle WHERE pedido='1003'")" = "3" ] && si "El pedido 1003 tiene sus 3 renglones de detalle" || no "Al pedido 1003 le faltan renglones de detalle"
+[ "$(SQL "SELECT count(*) FROM pedido_cabecera WHERE estatus='REGISTRADO'")" = "2" ] \
+  && si "El procedimiento marcó los 2 pedidos REGISTRADO" || no "Hay pedidos sin REGISTRADO: ¿llamaste a registrar_pedido?"
+docker stop $(docker ps -q --filter ancestor=apache/camel-jbang:4.22.1) >/dev/null 2>&1; wait $PID 2>/dev/null
+exit $ok

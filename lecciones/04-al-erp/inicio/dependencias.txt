@@ -1,0 +1,3 @@
+# Piezas extra que Camel descarga para esta lección.
+# El controlador (driver) de MariaDB: sin él, Camel no sabe hablar con la base del ERP.
+org.mariadb.jdbc:mariadb-java-client:3.5.11

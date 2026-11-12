@@ -13,9 +13,16 @@ TTY=$([ -t 0 ] && echo "-it" || echo "-i")
 # Solo «run» abre el puerto 8080 (para recibir órdenes por HTTP); los demás comandos no lo necesitan.
 PUERTO=()
 [ "${1:-}" = "run" ] && PUERTO=(-p "${CAMEL_PUERTO:-8080}:8080")
+# Si la carpeta tiene dependencias.txt, Camel descarga esas piezas extra (por ejemplo, el driver de una base).
+# Una por renglón, en la forma grupo:artefacto:versión; los renglones con # son comentarios.
+EXTRA=()
+if [ "${1:-}" = "run" ] && [ -f dependencias.txt ]; then
+  DEPS=$(grep -vE '^\s*(#|$)' dependencias.txt | paste -sd, -)
+  [ -n "$DEPS" ] && EXTRA=(--dep="$DEPS")
+fi
 exec docker run --rm $TTY \
   --network "${CAMEL_RED:-practica-retail_default}" \
   -v "$PWD":/work -w /work \
   -v practica-retail-m2:/home/ubuntu/.m2 \
   ${PUERTO[@]+"${PUERTO[@]}"} \
-  "$IMAGEN" "$@"
+  "$IMAGEN" "$@" ${EXTRA[@]+"${EXTRA[@]}"}
