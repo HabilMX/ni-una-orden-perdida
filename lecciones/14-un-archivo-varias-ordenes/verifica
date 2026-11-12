@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Comprueba la lección 14: un lote de la bodega con cinco embarques se parte en cinco, y cada uno llega a los tres
+# destinos (un 856 por orden). Luego, un lote con un embarque malo: los otros cuatro pasan igual, el malo queda
+# anotado en la bitácora del sondeo y el lote se aparta a .error/ para que alguien lo vea.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+
+# Destinos limpios y órdenes creadas (sin el router: la orden ya existe antes de que la bodega la embarque)
+limpiar_y_crear() {
+  INFRA restart api-pedidos >/dev/null 2>&1; INFRA up -d --wait api-pedidos >/dev/null 2>&1 || return 1
+  SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || return 1
+  SOCIO "rm -f /home/socio/entrada/*" || return 1
+  for o in "$@"; do
+    c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-$o.json")
+    [ "$c" = "200" ] || return 1
+  done
+}
+esperar() {   # espera a que el lote salga del buzón (a .camel/ o a .error/) y da unos segundos para el último canal
+  for i in $(seq 1 45); do [ -e "buzon/$1" ] || break; sleep 2; done; sleep 4
+}
+embarcadas() { n=0; for o in "$@"; do [ "$(CAMPO "$o" estatus)" = "EMBARCADO" ] && [ "$(SQL "SELECT estatus FROM pedido_cabecera WHERE pedido='$o'")" = "EMBARCADO" ] && n=$((n+1)); done; echo $n; }
+
+INFRA up -d --wait api-pedidos >/dev/null 2>&1 || { no "La API no levantó: ¿corriste la 00?"; exit 1; }
+SQL "SELECT COUNT(*) FROM embarque" >/dev/null || { no "Al ERP le falta la tabla embarque. Recrea el ambiente: docker compose -f infra/compose.yaml up -d --wait --build --force-recreate -V"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts"' EXIT
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+LISTOS() { SERV logs 2>/dev/null | grep -cE 'Started (orden-router|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|embarque-router|sondeo-bodega) '; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 9 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 9 ] && si "Arrancaron el router, los tres canales y el sondeo de la bodega" \
+  || { no "No arrancaron todos los servicios. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# 1) Un lote bueno: cinco embarques en un archivo
+limpiar_y_crear 4001 4002 4003 4004 4005 || { no "No pude preparar los destinos ni crear las órdenes 4001 a 4005"; apagar; exit 1; }
+cp "$DATOS/embarques/lote-bodega-0001.json" buzon/
+esperar lote-bodega-0001.json
+N=$(embarcadas 4001 4002 4003 4004 4005)
+[ "$N" = "5" ] && si "Lote 0001: las 5 órdenes quedaron EMBARCADO en la API y en el ERP" || no "Lote 0001: solo $N de 5 órdenes quedaron EMBARCADO en la API y en el ERP"
+mkdir -p "$DONDE/salida"; rm -f "$DONDE/salida"/856-*.edi
+BIEN=0
+for o in 4001 4002 4003 4004 4005; do
+  SOCIO "cat /home/socio/entrada/856-$o.edi" > "$DONDE/salida/856-$o.edi"
+  [ -s "$DONDE/salida/856-$o.edi" ] && grep -q "^PRF\*$o~" "$DONDE/salida/856-$o.edi" \
+    && "$RAIZ/herramientas/leer-x12" "$DONDE/salida/856-$o.edi" >/dev/null 2>&1 && BIEN=$((BIEN+1))
+done
+ARCH=$(SOCIO "ls /home/socio/entrada" | grep -c '^856-')
+[ "$BIEN" = "5" ] && [ "$ARCH" = "5" ] && si "Socio: 5 archivos 856, uno por orden, y los 5 pasan el lector X12" \
+  || no "Socio: esperaba 5 archivos 856 bien armados, uno por orden; hay $ARCH y pasan el lector $BIEN"
+[ -f buzon/.camel/lote-bodega-0001.json ] && si "Buzón: el lote 0001 se apartó a .camel/" || no "Buzón: el lote 0001 no está en .camel/ (hay: $(ls -A buzon buzon/.* 2>/dev/null | tr '\n' ' '))"
+
+# 2) Un lote con un embarque malo: el tercero es de la orden 9999, que no existe
+limpiar_y_crear 4001 4002 4004 4005 || { no "No pude preparar los destinos para el lote 0002"; apagar; exit 1; }
+cp "$DATOS/embarques/lote-bodega-0002.json" buzon/
+esperar lote-bodega-0002.json
+N=$(embarcadas 4001 4002 4004 4005)
+[ "$N" = "4" ] && si "Lote 0002: los otros 4 embarques pasaron (4001, 4002, 4004 y 4005 EMBARCADO en la API y el ERP)" \
+  || no "Lote 0002: solo $N de los 4 embarques buenos quedaron EMBARCADO: el malo detuvo a los demás"
+# La bitácora se guarda primero: con «| grep -q» directo, grep cierra la tubería antes de tiempo y pipefail lo
+# cuenta como falla aunque la línea sí esté
+BITACORA=$(SERV logs sondeo-bodega 2>/dev/null)
+echo "$BITACORA" | grep -q "no aceptó el embarque de la orden 9999" \
+  && si "Sondeo: anotó en su bitácora que el embarque de la 9999 no pasó" || no "Sondeo: no anotó cuál embarque del lote no pasó"
+[ -f buzon/.error/lote-bodega-0002.json ] && si "Buzón: el lote 0002 se apartó a .error/ para que alguien vea el embarque malo" \
+  || no "Buzón: el lote 0002 no está en .error/ (hay: $(ls -A buzon buzon/.* 2>/dev/null | tr '\n' ' '))"
+apagar
+exit $ok

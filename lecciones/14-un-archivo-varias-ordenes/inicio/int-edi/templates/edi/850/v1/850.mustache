@@ -1,0 +1,13 @@
+ISA*00*          *00*          *ZZ*{{{body.isa.emisor}}}*ZZ*{{{body.isa.receptor}}}*{{{body.isa.fecha}}}*{{{body.isa.hora}}}*U*00401*{{{body.isa.control}}}*0*P*>~
+GS*PO*{{{body.gs.emisor}}}*{{{body.gs.receptor}}}*{{{body.gs.fecha}}}*{{{body.gs.hora}}}*{{{body.gs.control}}}*X*004010~
+ST*850*{{{body.st.control}}}~
+BEG*00*SA*{{{body.beg.orden}}}**{{{body.beg.fecha}}}~
+N1*ST*{{{body.tienda.nombre}}}*92*{{{body.tienda.clave}}}~
+{{#body.lineas}}
+PO1*{{{n}}}*{{{cantidad}}}*EA*{{{precio}}}**VN*{{{sku}}}~
+PID*F****{{{descripcion}}}~
+{{/body.lineas}}
+CTT*{{{body.ctt}}}~
+SE*{{{body.se.segmentos}}}*{{{body.st.control}}}~
+GE*1*{{{body.gs.control}}}~
+IEA*1*{{{body.isa.control}}}~

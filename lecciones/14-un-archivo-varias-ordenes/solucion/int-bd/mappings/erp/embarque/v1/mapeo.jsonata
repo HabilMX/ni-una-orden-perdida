@@ -1,0 +1,8 @@
+/* El embarque de la bodega, convertido en los datos que pide el procedimiento registrar_embarque del ERP.
+   La fecha va sin zona horaria porque la columna del ERP es DATETIME (hora local de la bodega). */
+{
+  "pedido": orden,
+  "guia": guia,
+  "paqueteria": paqueteria,
+  "fecha": $replace($substring(embarcada, 0, 19), "T", " ")
+}

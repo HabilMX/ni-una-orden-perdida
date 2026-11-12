@@ -1,0 +1,17 @@
+/* Versión 2 del pedido para la API: además de lo de la v1, cada partida lleva su importe
+   y el pedido lleva su total. La API comprueba que el total cuadre al centavo.
+   $round(…, 2): las computadoras guardan 0.1 de forma aproximada; sin redondear,
+   3 × 0.1 da 0.30000000000000004 y la API lo rechaza. */
+{
+  "pedido": orden,
+  "tienda": tienda,
+  "fecha": creada,
+  "partidas": [renglones.{
+    "posicion": renglon,
+    "sku": sku,
+    "cantidad": cantidad,
+    "precio": precio,
+    "importe": $round(cantidad * precio, 2)
+  }],
+  "total": $round($sum(renglones.(cantidad * precio)), 2)
+}
