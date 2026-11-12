@@ -214,3 +214,22 @@ Lo que decidimos en esta lección, con lo que descartamos y qué nos haría camb
 
 **Siguiente:** en la lección 13 empieza la entrega 2: llega el embarque. La bodega deja un archivo, y ahora que
 sabes correr copias, la pregunta es otra: si varias copias leen la misma carpeta, ¿quién toma el archivo?
+
+---
+
+> **Qué hace Hábil**
+>
+> Al cerrar esta entrega, una orden creada llega a la API, al ERP y al socio, cada uno con su formato. En una empresa,
+> ese mismo tramo cruza sistemas que se hablan poco, y lo que se pierde está entre ellos: «un pedido que la tienda
+> cobró y que el almacén no vio».
+>
+> En Hábil construimos a la medida la integración entre su tienda, su ERP, sus socios y sus canales. Para ese
+> problema está **[Hábil MDW](https://www.habil.mx/es/habil-mdw/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_es)**. Hábil MDW es la capa que se pone entre los
+> sistemas que ya tiene. Ahí pasa cada pedido, cada cobro, cada póliza y cada aviso, con la respuesta de quien lo
+> recibió y el motivo si algo falló. Cada sistema entra con su forma, y la plataforma lo traduce a un modelo común: un
+> pedido es un pedido, venga de donde venga.
+>
+> Conectamos los sistemas de un primer flujo completo —por ejemplo, del pedido al cobro y a la factura—, definimos con
+> usted los pasos y las reglas, y lo dejamos funcionando con el rastro a la vista de su equipo.
+>
+> **[Pida su primera conversación, sin costo.](https://wa.me/525667541323?text=Hola%2C%20vengo%20de%20GitHub%20%28Ni%20una%20orden%20perdida%20%C2%B7%20entrega%201%29.%20Me%20interesa%20una%20primera%20conversaci%C3%B3n.%0AIndustria%3A%0APuesto%3A%0ASistemas%20principales%3A)**
