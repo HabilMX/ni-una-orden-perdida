@@ -1,0 +1,58 @@
+# int-rest, segundo momento: el embarque. Recibe del router el aviso de que la orden salió de la bodega y se lo
+# cuenta a la API como un EVENTO del pedido: POST /pedidos/{pedido}/eventos con {"tipo":"embarcado", …}.
+# Es la misma forma de la ruta de /integrar: sobre → mapeo con versión → llave de idempotencia → API.
+# La llave es el ce-id del sobre (orden-<id>-embarcada): un reenvío del mismo embarque no se duplica.
+- route:
+    id: int-rest-embarque
+    from:
+      uri: platform-http:/embarque
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: llave
+            expression:
+              simple:
+                expression: "${header.ce-id}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - log:
+            message: "Recibí del router el embarque de la orden ${variable.orden} correlacion=${variable.correlacion} (sobre ${header.ce-id})"
+        - to:
+            uri: jsonata:mappings/api/embarque/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Idempotency-Key
+            expression:
+              simple:
+                expression: "${variable.llave}"
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # toD: la dirección lleva el número de pedido, así que se arma con cada mensaje
+        - toD:
+            uri: "http://api-pedidos:8080/pedidos/${variable.orden}/eventos"
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode} al embarque de la orden ${variable.orden} correlacion=${variable.correlacion}"

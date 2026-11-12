@@ -1,0 +1,43 @@
+# El sondeo de la bodega: revisa cada tanto la carpeta donde la bodega deja sus archivos de embarque, toma cada
+# archivo terminado y se lo pasa al router por HTTP (POST /embarques). Es un Polling Consumer: nadie le avisa que
+# llegó algo; él va y pregunta.
+#
+#   bodega → buzon/embarque-<orden>.json → [sondeo] → POST /embarques → router → los tres canales
+#
+# Corre en UNA sola copia (ver ../../compose.yaml): si dos copias revisaran la misma carpeta, las dos podrían
+# tomar el mismo archivo y el embarque se mandaría dos veces.
+#
+# Hoy el sondeo lee TODO lo que hay en buzon/ y no aparta nada (noop: true deja cada archivo donde estaba).
+# Tu trabajo está en los parámetros del from: con ellos, el componente file hace todo lo demás.
+- route:
+    id: sondeo-bodega
+    from:
+      uri: file:buzon
+      parameters:
+        noop: true
+        # TODO 1: que solo tome los archivos de embarque terminados, los que se llaman embarque-<algo>.json.
+        #         La bodega escribe primero un .tmp y lo renombra al final: el .tmp NO debe tomarse.
+        #         Busca la opción include del componente file (es una expresión regular sobre el nombre).
+        # TODO 2: que, antes de tomar un archivo, espere a que deje de crecer (opción readLock, valor changed).
+        # TODO 3: quita noop. Lo que el router recibió se aparta a .camel/<nombre> (opción move) y lo que falló,
+        #         a .error/<nombre> (opción moveFailed). Usa ${file:name} para el nombre.
+        # TODO 4: que revise la carpeta cada 2 segundos (opción delay, en milisegundos).
+      steps:
+        - convertBodyTo:
+            type: String
+        - log:
+            message: "Tomé ${file:name} del buzón de la bodega; se lo paso al router"
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # Si el router no contesta 2xx, esto lanza un error, y el archivo se va a .error/ (moveFailed)
+        - to:
+            uri: http://orden-router:8080/embarques
+            parameters:
+              httpMethod: POST
+        - log:
+            message: "El router recibió el embarque (contestó ${header.CamelHttpResponseCode}): ${body}"

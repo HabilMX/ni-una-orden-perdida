@@ -1,0 +1,48 @@
+# int-edi: el servicio que sabe hablar con el socio comercial. Es la ruta de la 07, ahora detrás del router:
+#   recibe la orden por /integrar → mapeo → plantilla 850 → SFTP del socio, con los cuatro cuidados de la 07.
+#
+# El hilo (ce-correlationid) se anota en el log, pero NO viaja dentro del 850: es nuestro, no del socio.
+# Con el socio, lo que une su respuesta con nuestra orden es el número de control del sobre X12 (lección 21).
+- route:
+    id: int-edi
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - to:
+            uri: jsonata:mappings/edi/850/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - to:
+            uri: mustache:templates/edi/850/v1/850.mustache
+        - removeHeaders:
+            pattern: "*"
+        - to:
+            uri: sftp://socio@socio-sftp:22/entrada
+            parameters:
+              password: "{{env:SFTP_CLAVE:practica}}"
+              knownHostsFile: known_hosts
+              strictHostKeyChecking: "yes"
+              fileName: "850-${variable.orden}.edi"
+              tempFileName: "${file:onlyname.noext}.tmp"
+              fileExist: Fail
+        - log:
+            message: "Dejé el 850 de la orden ${variable.orden} en el SFTP del socio correlacion=${variable.correlacion}"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"socio","archivo":"850-${variable.orden}.edi","resultado":"DEPOSITADO"}'

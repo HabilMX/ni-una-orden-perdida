@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Comprueba la lección 13: la bodega deja un archivo de embarque, el sondeo lo toma UNA vez y el embarque llega a
+# los tres destinos (API y ERP en EMBARCADO con su guía; el 856 en el SFTP del socio). Además mide los cuidados del
+# sondeo en la carpeta misma: lo tomado se aparta a .camel/, lo que falla a .error/, y un .tmp no se toca.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+
+# Los destinos empiezan limpios, y el buzón también
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos >/dev/null 2>&1 || { no "La API no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" \
+  || { no "No pude hablar con el ERP, o le faltan las tablas embarque y entrega. Recrea el ambiente: docker compose -f infra/compose.yaml up -d --wait --build --force-recreate -V"; exit 1; }
+SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio: ¿corriste la 00?"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts"' EXIT
+rm -rf buzon; mkdir -p buzon
+API=$(INFRA ps -q api-pedidos); DESDE=$(docker inspect -f '{{.State.StartedAt}}' "$API")
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+LISTOS() { SERV logs 2>/dev/null | grep -cE 'Started (orden-router|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|embarque-router|sondeo-bodega) '; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 9 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 9 ] && si "Arrancaron el router, los tres canales y el sondeo de la bodega" \
+  || { no "No arrancaron todos los servicios. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# Primero la tienda crea las órdenes 4001 y 4002 (una franquicia: el socio sí recibe sus documentos)
+for o in 4001 4002; do
+  c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-$o.json")
+  [ "$c" = "200" ] || no "La tienda no pudo crear la orden $o (el router contestó $c)"
+done
+[ "$(CAMPO 4001 estatus)" = "CREADO" ] && [ "$(SQL "SELECT estatus FROM pedido_cabecera WHERE pedido='4001'")" = "REGISTRADO" ] \
+  && si "Antes del embarque: la 4001 está CREADO en la API y REGISTRADO en el ERP" || { no "La orden 4001 no quedó creada en la API y el ERP"; apagar; exit 1; }
+
+# La bodega deja tres cosas: un embarque terminado, uno que aún escribe (.tmp) y uno que llegó roto
+cp "$DATOS/embarques/embarque-4002.json" buzon/embarque-4002.json.tmp
+cp "$DATOS/embarques/embarque-roto.json" buzon/embarque-roto.json
+cp "$DATOS/embarques/embarque-4001.json" buzon/embarque-4001.json
+for i in $(seq 1 30); do [ "$(CAMPO 4001 estatus)" = "EMBARCADO" ] && break; sleep 2; done
+sleep 6   # unas vueltas más del sondeo: si fuera a tomar algo de más, aquí lo haría
+
+[ "$(CAMPO 4001 estatus)" = "EMBARCADO" ] && [ "$(CAMPO 4001 guia)" = "PAQX770004001" ] \
+  && si "API: la 4001 está EMBARCADO con la guía PAQX770004001" || no "API: la 4001 está «$(CAMPO 4001 estatus)» con guía «$(CAMPO 4001 guia)»"
+N=$(docker logs --since "$DESDE" "$API" 2>&1 | grep -cE " evento llave=orden-4001-embarcada ")
+[ "$N" = "1" ] && si "API: recibió el embarque de la 4001 una sola vez" || no "API: recibió el embarque de la 4001 $N veces (debía ser 1)"
+FILA=$(SQL "SELECT c.estatus, e.guia, e.paqueteria FROM pedido_cabecera c JOIN embarque e USING (pedido) WHERE pedido='4001'")
+[ "$FILA" = "$(printf 'EMBARCADO\tPAQX770004001\tPAQX')" ] && si "ERP: la 4001 está EMBARCADO y su fila de embarque tiene la guía" \
+  || no "ERP: esperaba «EMBARCADO PAQX770004001 PAQX» y tiene «${FILA:-nada}»"
+
+mkdir -p "$DONDE/salida"; rm -f "$DONDE/salida/856-4001.edi"
+SOCIO "cat /home/socio/entrada/856-4001.edi" > "$DONDE/salida/856-4001.edi"
+if [ -s "$DONDE/salida/856-4001.edi" ]; then
+  "$RAIZ/herramientas/leer-x12" "$DONDE/salida/856-4001.edi" >/dev/null 2>&1 \
+    && si "Socio: el 856 de la 4001 está en su SFTP y el lector X12 no le encontró fallas" \
+    || no "Socio: el 856 de la 4001 no pasa el lector: corre herramientas/leer-x12 $DONDE/salida/856-4001.edi"
+  grep -q "REF\*CN\*PAQX770004001~" "$DONDE/salida/856-4001.edi" && grep -q "^PRF\*4001~" "$DONDE/salida/856-4001.edi" \
+    && si "Socio: el 856 lleva la guía (REF*CN) y la orden (PRF)" || no "Socio: el 856 no lleva la guía o la orden"
+else
+  no "Socio: no está el 856 de la 4001 (hay: $(SOCIO 'ls /home/socio/entrada' | tr '\n' ' '))"
+fi
+
+# Los cuidados del sondeo, medidos en la carpeta
+[ -f buzon/.camel/embarque-4001.json ] && [ ! -e buzon/embarque-4001.json ] \
+  && si "Buzón: el embarque de la 4001 se apartó a .camel/" || no "Buzón: el embarque de la 4001 no está en .camel/ (hay: $(ls -A buzon buzon/.camel 2>/dev/null | tr '\n' ' '))"
+[ -f buzon/.error/embarque-roto.json ] \
+  && si "Buzón: el embarque roto se apartó a .error/ (no se perdió ni se reintenta sin fin)" || no "Buzón: el embarque roto no está en .error/"
+[ -f buzon/embarque-4002.json.tmp ] && [ "$(CAMPO 4002 estatus)" = "CREADO" ] \
+  && si "Buzón: el .tmp que la bodega aún escribía no se tocó (la 4002 sigue CREADO)" \
+  || no "Buzón: el sondeo tomó el .tmp que la bodega aún escribía (la 4002 está «$(CAMPO 4002 estatus)»)"
+apagar
+exit $ok

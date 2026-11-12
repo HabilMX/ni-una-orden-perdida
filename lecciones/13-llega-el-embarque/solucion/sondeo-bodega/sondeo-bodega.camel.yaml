@@ -1,0 +1,42 @@
+# El sondeo de la bodega: revisa cada tanto la carpeta donde la bodega deja sus archivos de embarque, toma cada
+# archivo terminado y se lo pasa al router por HTTP (POST /embarques). Es un Polling Consumer: nadie le avisa que
+# llegó algo; él va y pregunta.
+#
+#   bodega → buzon/embarque-<orden>.json → [sondeo] → POST /embarques → router → los tres canales
+#
+# Corre en UNA sola copia (ver ../../compose.yaml): si dos copias revisaran la misma carpeta, las dos podrían
+# tomar el mismo archivo y el embarque se mandaría dos veces.
+- route:
+    id: sondeo-bodega
+    from:
+      uri: file:buzon
+      parameters:
+        # Solo los archivos de embarque terminados. La bodega escribe primero un .tmp y lo renombra al final:
+        # el .tmp no coincide con este patrón, así que nunca se toma un archivo a medias.
+        include: "embarque-.*\\.json"
+        # Y por si alguien escribe directo con el nombre final: antes de tomarlo, espera a que deje de crecer
+        readLock: changed
+        # Lo que el router recibió se aparta a .camel/; lo que falló, a .error/. Nada se borra ni se pierde.
+        move: ".camel/${file:name}"
+        moveFailed: ".error/${file:name}"
+        # Revisa la carpeta cada 2 segundos (2000 ms)
+        delay: 2000
+      steps:
+        - convertBodyTo:
+            type: String
+        - log:
+            message: "Tomé ${file:name} del buzón de la bodega; se lo paso al router"
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # Si el router no contesta 2xx, esto lanza un error, y el archivo se va a .error/ (moveFailed)
+        - to:
+            uri: http://orden-router:8080/embarques
+            parameters:
+              httpMethod: POST
+        - log:
+            message: "El router recibió el embarque (contestó ${header.CamelHttpResponseCode}): ${body}"
