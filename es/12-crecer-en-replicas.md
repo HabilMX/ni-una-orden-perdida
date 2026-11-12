@@ -29,8 +29,9 @@ cp -R inicio mio
 ```
 
 Hoy **no tocas ninguna ruta**. Todo el trabajo va en un solo archivo, `mio/replicas.yaml`. Compose lo junta con el
-`compose.yaml` de la lección, que no se toca: lo que dice el segundo archivo se agrega a lo del primero o lo
-reemplaza.
+`compose.yaml` de la lección, que no se toca: Compose los fusiona campo por campo: un
+`command` del segundo archivo sustituye al del primero, y en `environment` cada variable se agrega o
+reemplaza a la del mismo nombre.
 
 ```bash
 DONDE=mio docker compose -f compose.yaml -f mio/replicas.yaml up -d
@@ -139,12 +140,13 @@ pausa entre cada una, para que el router tenga ocasión de abrir conexiones nuev
 ✅ API: tiene las 30 órdenes (crecer int-bd no tocó a los demás)
    Reparto: practica-retail-l12-int-bd-1=12 practica-retail-l12-int-bd-2=12 practica-retail-l12-int-bd-3=6
 ✅ Entre todas las copias registraron 30 órdenes: ni una de más, ni una de menos
-✅ Cada copia de int-bd registró al menos una orden: el trabajo se repartió
+✅ 3 de 3 copias de int-bd registraron órdenes: el trabajo se repartió
 ```
 
 **Tu reparto va a ser distinto**, y cambia en cada corrida: al probarla vimos 12/12/6 y 6/11/13. Quien elige la copia
-es la red, y la red no reparte exacto. Por eso el verifica no pide 10/10/10: pide que **ninguna copia se quede sin
-trabajo** y que **ninguna orden se pierda ni se repita**. Cada copia cuenta lo suyo en su propio log, así que el
+es la red, y la red no reparte exacto. Por eso el verifica no pide 10/10/10: pide que **al menos dos copias reciban
+trabajo** y que **ninguna orden se pierda ni se repita**. Puede tocarte que una copia se quede sin órdenes en una
+corrida: si las otras dos se repartieron las 30, está bien. Cada copia cuenta lo suyo en su propio log, así que el
 reparto lo dicen las copias, no el router.
 
 **¿No te corre?** `./verifica solucion` prueba la nuestra, y `diff mio/replicas.yaml solucion/replicas.yaml` te dice
