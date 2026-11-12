@@ -1,0 +1,239 @@
+# El router: recibe la orden de la tienda y se la pasa a sus canales a la vez (Multicast).
+#
+#                                        ┌→ int-rest → API de pedidos                 (todas)
+#   tienda → POST /ordenes → [router] ───┼→ int-bd   → ERP                            (todas)
+#                                        └→ int-edi  → SFTP del socio (850)           (solo las de franquicia)
+#
+# No todo va a todos: el canal del socio decide POR EL CONTENIDO de la orden (Content-Based Router).
+# Las tiendas T-501 y T-502 son franquicias: las opera un socio comercial, y solo a él le toca el 850.
+#
+# Cada canal recibe su PROPIA copia de la orden, con el mismo sobre y el mismo hilo.
+# Que un canal falle no detiene a los otros dos.
+#
+# El HILO: cada orden lleva un id de correlación que la acompaña en todo el viaje.
+# Si la tienda manda X-Correlation-Id, se usa ese; si no, el router inventa uno nuevo.
+# Viaja en el sobre como ce-correlationid, y la tienda lo recibe de vuelta en la respuesta,
+# para que pueda buscar su orden en cualquier punto del recorrido.
+# Junta en una lista lo que contestó cada canal (lo trae Camel; no hay que programarlo)
+- beans:
+    - name: juntarRespuestas
+      type: org.apache.camel.processor.aggregate.GroupedBodyAggregationStrategy
+
+- route:
+    id: orden-router
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: tienda
+            expression:
+              jsonpath:
+                expression: "$.tienda"
+        # El id de correlación se guarda ANTES de limpiar encabezados: si no, se borra con ellos
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${header.X-Correlation-Id} != null"
+                steps:
+                  - setVariable:
+                      name: correlacion
+                      expression:
+                        simple:
+                          expression: "${header.X-Correlation-Id}"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: correlacion
+                    expression:
+                      simple:
+                        expression: "${uuid(random)}"
+        - removeHeaders:
+            pattern: "*"
+        # El sobre CloudEvents (modo binario: los datos van en el cuerpo y el sobre en encabezados)
+        - setHeader:
+            name: ce-specversion
+            expression:
+              constant:
+                expression: "1.0"
+        - setHeader:
+            name: ce-type
+            expression:
+              constant:
+                expression: "mx.tienda.orden.creada"
+        - setHeader:
+            name: ce-source
+            expression:
+              simple:
+                expression: "/tiendas/${variable.tienda}"
+        - setHeader:
+            name: ce-subject
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: ce-id
+            expression:
+              simple:
+                expression: "orden-${variable.orden}-creada"
+        # Una extensión del sobre: el hilo de esta orden
+        - setHeader:
+            name: ce-correlationid
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - log:
+            message: "Orden ${variable.orden} correlacion=${variable.correlacion}: se la paso a los tres canales"
+        - multicast:
+            parallelProcessing: true      # los tres a la vez; sin esto, uno tras otro
+            aggregationStrategy: "#juntarRespuestas"
+            steps:
+              - to:
+                  uri: direct:canal-api
+              - to:
+                  uri: direct:canal-erp
+              - to:
+                  uri: direct:canal-socio
+        # A la tienda le contestamos lo que dijo CADA canal (en la 15 esto se guardará en la base de estado).
+        # El cuerpo ahora es la lista de las tres respuestas; join las une con comas.
+        - setBody:
+            expression:
+              simple:
+                expression: '{"orden":"${variable.orden}","canales":[${join(",")}]}'
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              constant:
+                expression: 200
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # La tienda recibe de vuelta el id con el que puede seguir su orden
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+
+# Canal «api»: llama a int-rest y SIEMPRE deja una línea con lo que pasó, aunque el servicio no conteste.
+# Así el router nunca devuelve algo que no sea un resultado (y nunca la orden con los datos del cliente).
+- route:
+    id: canal-api
+    from:
+      uri: direct:canal-api
+      steps:
+        - doTry:
+            steps:
+              - to:
+                  uri: http://int-rest:8080/integrar
+                  parameters:
+                    httpMethod: POST
+                    throwExceptionOnFailure: false
+              - log:
+                  message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-rest contestó ${header.CamelHttpResponseCode}"
+              - setBody:
+                  expression:
+                    simple:
+                      expression: '{"canal":"api","codigo":${header.CamelHttpResponseCode}}'
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - log:
+                      loggingLevel: WARN
+                      message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-rest no contestó (${exception.class.simpleName})"
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: '{"canal":"api","error":"${exception.class.simpleName}"}'
+
+# Canal «erp»: llama a int-bd y SIEMPRE deja una línea con lo que pasó, aunque el servicio no conteste.
+# Así el router nunca devuelve algo que no sea un resultado (y nunca la orden con los datos del cliente).
+- route:
+    id: canal-erp
+    from:
+      uri: direct:canal-erp
+      steps:
+        - doTry:
+            steps:
+              - to:
+                  uri: http://int-bd:8080/integrar
+                  parameters:
+                    httpMethod: POST
+                    throwExceptionOnFailure: false
+              - log:
+                  message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-bd contestó ${header.CamelHttpResponseCode}"
+              - setBody:
+                  expression:
+                    simple:
+                      expression: '{"canal":"erp","codigo":${header.CamelHttpResponseCode}}'
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - log:
+                      loggingLevel: WARN
+                      message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-bd no contestó (${exception.class.simpleName})"
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: '{"canal":"erp","error":"${exception.class.simpleName}"}'
+
+# Canal «socio»: SOLO para las órdenes de una franquicia. Las demás no se le mandan al socio,
+# y el canal lo dice («no aplica») en vez de quedarse callado: la tienda ve que se decidió, no que se olvidó.
+- route:
+    id: canal-socio
+    from:
+      uri: direct:canal-socio
+      steps:
+        # TODO: hoy TODAS las órdenes van al socio. Agrega la condición: solo las de franquicia
+        #       (tiendas T-501 y T-502) siguen a direct:al-socio. Las demás no se le mandan, y el canal
+        #       contesta {"canal":"socio","resultado":"no aplica"} para que se vea que se decidió.
+        - to:
+            uri: direct:al-socio
+
+- route:
+    id: al-socio
+    from:
+      uri: direct:al-socio
+      steps:
+        - doTry:
+            steps:
+              - to:
+                  uri: http://int-edi:8080/integrar
+                  parameters:
+                    httpMethod: POST
+                    throwExceptionOnFailure: false
+              - log:
+                  message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-edi contestó ${header.CamelHttpResponseCode}"
+              - setBody:
+                  expression:
+                    simple:
+                      expression: '{"canal":"socio","codigo":${header.CamelHttpResponseCode}}'
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - log:
+                      loggingLevel: WARN
+                      message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-edi no contestó (${exception.class.simpleName})"
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: '{"canal":"socio","error":"${exception.class.simpleName}"}'

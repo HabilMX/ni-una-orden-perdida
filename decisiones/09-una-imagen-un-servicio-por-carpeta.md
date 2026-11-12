@@ -1,6 +1,6 @@
 # Una sola imagen; cada servicio es una carpeta
 
-> **Dónde muerde:** lección 07.
+> **Dónde muerde:** lección 08.
 
 ## Qué decidimos
 

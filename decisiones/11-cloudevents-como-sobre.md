@@ -1,6 +1,6 @@
 # CloudEvents en modo binario como sobre
 
-> **Dónde muerde:** lección 07, 08.
+> **Dónde muerde:** lección 08, 09.
 
 ## Qué decidimos
 
@@ -11,7 +11,7 @@ de negocio y del momento (`orden-1003-creada`).
 ## Por qué
 
 - **Es una especificación abierta**, no un formato inventado por nosotros.
-- **El cuerpo no cambia:** las rutas de las lecciones 02 a 06 siguen trabajando con la orden de siempre.
+- **El cuerpo no cambia:** las rutas de las lecciones 02 a 07 siguen trabajando con la orden de siempre.
 - **El id es determinístico:** el mismo evento reenviado conserva su id, y la especificación dice que con el mismo
   `source` e `id` se puede tratar como duplicado.
 

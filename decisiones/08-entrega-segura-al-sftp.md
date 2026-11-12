@@ -1,6 +1,6 @@
 # Cuatro cuidados al dejar un archivo al socio
 
-> **Dónde muerde:** lección 06.
+> **Dónde muerde:** lección 07.
 
 ## Qué decidimos
 

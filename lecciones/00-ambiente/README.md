@@ -77,7 +77,7 @@ Deberías ver cuatro servicios, todos en `healthy` (sano):
 | `api-pedidos` | El sistema de pedidos de la empresa, al que se le habla por internet | `localhost:8081` | Una API REST hecha en Quarkus. Guarda en memoria: al reiniciarla, empieza vacía |
 | `erp` | El **ERP**: el sistema central donde la empresa registra lo que vende | `localhost:13306` | Una base MariaDB con dos tablas (cabecera y detalle) y un **procedimiento almacenado** (`registrar_pedido`): un programa guardado dentro de la base |
 | `socio-sftp` | El buzón del **socio comercial**, donde se le dejan archivos | `localhost:2222` | Un servidor **SFTP**, para copiar archivos de forma segura, con las carpetas `entrada/` y `salida/` |
-| `estado` | La libreta donde tu integración anota cómo va cada orden | `localhost:15432` | Una base PostgreSQL con tres tablas. No la tocas hasta la lección 13 |
+| `estado` | La libreta donde tu integración anota cómo va cada orden | `localhost:15432` | Una base PostgreSQL con tres tablas. No la tocas hasta la lección 15 |
 
 ¿Acertaste cuál tardaba más?
 

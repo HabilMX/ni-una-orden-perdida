@@ -1,0 +1,38 @@
+# Los servicios de la lección 09. Los dos son la MISMA imagen de Camel; lo único distinto es la carpeta
+# que cada uno monta (sus rutas y sus mapeos).
+#
+#   DONDE=mio docker compose -f lecciones/09-el-hilo-entre-servicios/compose.yaml up -d      (tu versión)
+#   DONDE=solucion docker compose -f lecciones/09-el-hilo-entre-servicios/compose.yaml up -d (la nuestra)
+#
+# Se unen a la red del ambiente (lección 00) para alcanzar a api-pedidos por su nombre.
+name: practica-retail-l09
+
+x-camel: &camel
+  image: apache/camel-jbang:4.22.1
+  command: ["run", "."]          # corre todos los *.camel.yaml de su carpeta
+  working_dir: /work
+  networks: [practica]
+
+services:
+  orden-router:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/orden-router:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+    ports: ["8080:8080"]        # la tienda le habla al router; es el único que se ve desde tu máquina
+
+  int-rest:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/int-rest:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+    # sin ports: solo lo alcanza el router, por dentro de la red
+
+networks:
+  practica:
+    name: practica-retail_default
+    external: true
+
+volumes:
+  practica-retail-m2:
+    external: true

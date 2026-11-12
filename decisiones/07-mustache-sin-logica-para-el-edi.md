@@ -1,6 +1,6 @@
 # El EDI se arma con una plantilla sin lógica
 
-> **Dónde muerde:** lección 05.
+> **Dónde muerde:** lección 06.
 
 ## Qué decidimos
 

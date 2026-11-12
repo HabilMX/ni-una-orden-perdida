@@ -117,7 +117,7 @@ a como estaba.
 contenido.
 
 **Lo importante del 200:** si la red falla y la tienda reenvía la orden, la API no crea dos pedidos, porque la llave
-le dice que es la misma. Por eso el id de la orden viaja desde la primera estación. En la lección 16 vas a construir
+le dice que es la misma. Por eso el id de la orden viaja desde la primera estación. En la lección 18 vas a construir
 esa misma protección en tu propia integración.
 
 ## 6. Comprueba

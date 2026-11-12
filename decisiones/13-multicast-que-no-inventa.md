@@ -1,6 +1,6 @@
 # La orden sale a todos los canales, y el router cuenta lo que pasó
 
-> **Dónde muerde:** lección 09.
+> **Dónde muerde:** lección 10.
 
 ## Qué decidimos
 
@@ -10,7 +10,7 @@ que **siempre** deja una línea con lo que dijo su servicio —`{"canal":"erp","
 
 ## Por qué
 
-- **Que un canal falle no detiene a los otros:** en la 09 apagas int-bd y la API y el socio reciben la orden igual.
+- **Que un canal falle no detiene a los otros:** en la 10 apagas int-bd y la API y el socio reciben la orden igual.
 - **El router no inventa resultados.** Contestar «salió a los tres» sin saberlo es mentir; la lista dice lo que de
   verdad pasó.
 - **Una respuesta nunca debe llevar la orden con datos del cliente** por accidente: sin la ruta de canal, un canal caído
@@ -27,7 +27,7 @@ que **siempre** deja una línea con lo que dijo su servicio —`{"canal":"erp","
 ## Qué nos haría reabrirla
 
 - Que la tienda necesite una respuesta inmediata aunque los canales tarden: entonces el router contesta «recibido» al
-  guardar la orden y los canales siguen por su cuenta (desde la lección 13, con la base de estado).
+  guardar la orden y los canales siguen por su cuenta (desde la lección 15, con la base de estado).
 
 ## Fuentes
 

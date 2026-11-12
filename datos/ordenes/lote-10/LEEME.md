@@ -1,4 +1,4 @@
-# Lote de 10 órdenes (lección 10)
+# Lote de 10 órdenes (lección 11)
 
 Diez órdenes de distintas tiendas. Las tiendas **T-501** y **T-502** son **franquicias**: las opera un socio
 comercial, y a él sus órdenes le llegan como un 850 por SFTP. Las demás son tiendas propias.

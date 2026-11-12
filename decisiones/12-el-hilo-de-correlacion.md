@@ -1,6 +1,6 @@
 # El hilo de correlación viaja con la orden, pero no sale de casa
 
-> **Dónde muerde:** lección 08, 09.
+> **Dónde muerde:** lección 09, 10.
 
 ## Qué decidimos
 
@@ -15,7 +15,7 @@ lo recibe de vuelta. **Al socio no se le manda dentro del 850.**
 - **El hilo se pierde en el primer servicio que no lo reenvía**, y casi siempre es por leerlo después de un
   `removeHeaders`. Por eso cada servicio lo guarda primero.
 - **El id es nuestro.** Al socio se le manda lo que pacta su guía X12; con él, lo que une su respuesta con nuestra
-  orden es el número de control del sobre X12, que su acuse 997 cita (lección 17c).
+  orden es el número de control del sobre X12, que su acuse 997 cita (lección 21).
 - Los encabezados del sobre (`ce-*`) no salen hacia la tienda: son del viaje interno.
 
 ## Qué descartamos

@@ -1,6 +1,6 @@
 # Quién recibe qué se decide por el contenido, en un solo lugar
 
-> **Dónde muerde:** lección 10.
+> **Dónde muerde:** lección 11.
 
 ## Qué decidimos
 
@@ -12,7 +12,7 @@ Si la orden no le toca, el canal contesta `{"canal":"socio","resultado":"no apli
 
 - **Decidir por el contenido** es el patrón cuando el destino depende de algo de la orden.
 - **Una regla en un solo lugar** se cambia sin buscarla por todas partes; el siguiente paso es sacarla a configuración
-  (ejercicio 10.3).
+  (ejercicio 11.3).
 - **«No aplica» no es silencio:** quien lee la respuesta sabe que se decidió no mandarla, no que se olvidó.
 
 ## Qué descartamos

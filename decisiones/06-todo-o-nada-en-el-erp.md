@@ -1,6 +1,6 @@
 # En el ERP, todo o nada
 
-> **Dónde muerde:** lección 04b.
+> **Dónde muerde:** lección 05.
 
 ## Qué decidimos
 

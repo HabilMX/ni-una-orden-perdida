@@ -6,7 +6,7 @@
 name: practica-retail
 
 services:
-  # Base de estado del router (lección 13 en adelante). Solo el router escribe aquí.
+  # Base de estado del router (lección 15 en adelante). Solo el router escribe aquí.
   estado:
     image: postgres:17-alpine
     environment:
@@ -47,7 +47,7 @@ services:
       interval: 3s
       retries: 40
 
-  # El SFTP del socio comercial: aquí se depositan los EDI X12 (lección 06 en adelante).
+  # El SFTP del socio comercial: aquí se depositan los EDI X12 (lección 07 en adelante).
   socio-sftp:
     image: atmoz/sftp:alpine
     command: "socio:${SFTP_CLAVE:-practica}:1001::entrada,salida"

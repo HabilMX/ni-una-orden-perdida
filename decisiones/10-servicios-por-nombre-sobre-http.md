@@ -1,6 +1,6 @@
 # Los servicios se hablan por nombre, sobre HTTP
 
-> **Dónde muerde:** lección 07.
+> **Dónde muerde:** lección 08.
 
 ## Qué decidimos
 
@@ -11,7 +11,7 @@ ni por `localhost`. En el camino principal de la práctica, los servicios se hab
 
 - **Las IP cambian** cada vez que un contenedor se recrea; el nombre no.
 - **`localhost` dentro de un contenedor es ese mismo contenedor.** El router que llama a `localhost` se llama a sí
-  mismo (en la 07 lo ves: contesta 404).
+  mismo (en la 08 lo ves: contesta 404).
 - HTTP se ve y se prueba con `curl`; los mensajes por un broker (Kafka) llegan en la parte avanzada.
 
 ## Qué descartamos

@@ -13,7 +13,7 @@ CREATE TABLE operacion (
   momento      text NOT NULL,
   canal        text NOT NULL,              -- rest | bd | edi
   estado       text NOT NULL,              -- pendiente | aceptada | rechazada | no_se_sabe | conciliacion_pendiente
-  numero_control text,                     -- lo asigna el router (lección 13)
+  numero_control text,                     -- lo asigna el router (lección 15)
   UNIQUE (orden, momento, canal)
 );
 

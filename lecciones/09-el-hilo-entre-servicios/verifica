@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Comprueba la lección 09: el id de correlación viaja con la orden en todo el recorrido
+# (tienda → router → int-rest → API) y la tienda lo recibe de vuelta.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+
+# La API demo empieza limpia (guarda en memoria): así el primer envío debe dar 201.
+docker compose -f "$RAIZ/infra/compose.yaml" restart api-pedidos >/dev/null 2>&1
+docker compose -f "$RAIZ/infra/compose.yaml" up -d --wait api-pedidos >/dev/null 2>&1 || { no "La API no levantó: ¿corriste la 00?"; exit 1; }
+API=$(docker compose -f "$RAIZ/infra/compose.yaml" ps -q api-pedidos)
+DESDE=$(docker inspect -f '{{.State.StartedAt}}' "$API")
+LOG_API() { docker logs --since "$DESDE" "$API" 2>&1; }
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+for i in $(seq 1 60); do
+  [ "$(SERV logs 2>/dev/null | grep -cE 'Started (orden-router|int-rest) ')" -ge 2 ] && break; sleep 2
+done
+[ "$(SERV logs 2>/dev/null | grep -cE 'Started (orden-router|int-rest) ')" -ge 2 ] && si "Arrancaron el router e int-rest" \
+  || { no "No arrancaron los dos servicios. Esto dijeron:"; SERV logs 2>/dev/null | tail -20; apagar; exit 1; }
+
+# 1) La tienda manda su propio id: tiene que aparecer igual en cada punto del recorrido
+HILO="tienda-$(date +%s)"
+R=$(curl -s -D - -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' \
+      -H "X-Correlation-Id: $HILO" -d @"$RAIZ/datos/ordenes/orden-1003.json")
+echo "$R" | head -1 | grep -q " 201" && si "La tienda mandó la 1003 y la respuesta final fue 201" || no "La tienda esperaba 201: $(echo "$R" | head -1)"
+SERV logs orden-router 2>/dev/null | grep -q "correlacion=$HILO" && si "El router anotó el hilo $HILO" || no "El router no anotó el hilo $HILO"
+SERV logs int-rest 2>/dev/null | grep -q "orden 1003 correlacion=$HILO" && si "int-rest recibió el hilo en el sobre" \
+  || no "int-rest no anotó el hilo: o el router no lo puso en el sobre (ce-correlationid), o int-rest lo leyó después de borrar los encabezados"
+LOG_API | grep -q "201 llave=1003 pedido=1003 correlacion=$HILO" && si "La API registró la 1003 con el mismo hilo: se puede seguir de punta a punta" \
+  || no "La API no recibió el hilo de la 1003 (anotó: $(LOG_API | grep 'llave=1003' | sed 's/.*correlacion=/correlacion=/' | head -1))"
+echo "$R" | tr -d '\r' | grep -qi "^X-Correlation-Id: $HILO$" && si "La tienda recibió de vuelta su mismo id" || no "La tienda no recibió de vuelta X-Correlation-Id: $HILO"
+echo "$R" | tr -d '\r' | grep -qi "^ce-" && no "La respuesta a la tienda trae encabezados del sobre (ce-*): son del viaje interno y no deben salir" \
+  || si "Los encabezados del sobre (ce-*) no salieron hacia la tienda"
+
+# 2) La tienda NO manda id: el router inventa uno, y ese mismo llega a la API
+R=$(curl -s -D - -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1001.json")
+NUEVO=$(echo "$R" | tr -d '\r' | grep -i "^X-Correlation-Id:" | awk '{print $2}')
+if [ -n "$NUEVO" ] && LOG_API | grep -q "201 llave=1001 pedido=1001 correlacion=$NUEVO"; then
+  si "Sin id de la tienda, el router inventó $NUEVO y llegó igual a la API"
+else
+  no "Sin id de la tienda, el hilo no llegó a la API (la tienda recibió «${NUEVO:-nada}»)"
+fi
+apagar
+exit $ok

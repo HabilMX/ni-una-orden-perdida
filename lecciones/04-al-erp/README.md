@@ -216,4 +216,4 @@ confirma el destino, no tu ruta.
 5. ¿Qué revisa `registrar_pedido` antes de marcar un pedido `REGISTRADO`?
 
 **Siguiente:** ¿qué pasa si un renglón de en medio está mal y el ERP lo rechaza? La cabecera ya quedó escrita y el
-detalle a medias. En la lección 04b vas a hacer que el ERP guarde **todo o nada**.
+detalle a medias. En la lección 05 vas a hacer que el ERP guarde **todo o nada**.
