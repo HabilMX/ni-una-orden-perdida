@@ -17,7 +17,7 @@ y el banco pone a alguien que los mande a una ventanilla libre. Hoy vas a ver qu
 bien su trabajo.
 
 Una **réplica** es una copia idéntica del mismo servicio: la misma imagen, la misma carpeta, las mismas rutas.
-int-bd se puede copiar sin cuidado porque **no guarda nada en memoria**: todo lo que importa queda en el ERP.
+int-bd se puede copiar sin que una orden se registre dos veces porque **no guarda nada en memoria**: todo lo que importa queda en el ERP.
 
 ---
 
@@ -129,8 +129,8 @@ guardada. Ahora agrega la b y corre otra vez.
 ./verifica
 ```
 
-`verifica` reinicia la API, vacía el ERP, levanta los servicios con tu `replicas.yaml` y manda las 30 órdenes, una
-cada segundo y medio, como llegarían de una tienda. Está terminada cuando ves las seis marcas verdes:
+`verifica` reinicia la API, vacía el ERP, levanta los servicios con tu `replicas.yaml` y manda las 30 órdenes con una
+pausa entre cada una, para que el router tenga ocasión de abrir conexiones nuevas. Está terminada cuando ves las seis marcas verdes:
 
 ```
 ✅ int-bd corre en 3 copias

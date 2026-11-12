@@ -152,7 +152,7 @@ una vas a volver aquí para ver dónde estás.
 
 *Por qué Camel:* partimos de premisas, no de gustos. Buscamos algo ligero, que escale por servicio, que se defina por
 configuración y que tenga licencia abierta. Al final de la práctica vas a medir tú mismo qué gana y qué cede. El
-detalle está en la ficha [Apache Camel como motor de integración](../decisiones/01-apache-camel-como-motor.md).
+detalle está en [Por qué Camel](../conceptos/por-que-camel.md).
 
 ---
 
