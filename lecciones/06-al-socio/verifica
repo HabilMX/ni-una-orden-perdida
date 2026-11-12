@@ -9,8 +9,11 @@ DONDE="${1:-mio}"
 [ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
 ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
 SOCIO() { docker compose -f "$RAIZ/infra/compose.yaml" exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+# Cada corrida tiene que DEMOSTRAR que arrancó: si no, un «no depositó» se vería verde sin haber intentado nada.
 correr() { rm -rf entrada; mkdir -p entrada; cp "$1" entrada/orden.json
-  "$RAIZ/herramientas/camel" run orden-al-socio.camel.yaml --max-messages=1 --max-seconds=60 >/dev/null 2>&1; }
+  LOG=$(mktemp)
+  "$RAIZ/herramientas/camel" run orden-al-socio.camel.yaml --max-messages=1 --max-seconds=60 >"$LOG" 2>&1
+  grep -q "Started orden-al-socio" "$LOG" || { no "La ruta no arrancó. Esto dijo Camel:"; tail -15 "$LOG"; mv known_hosts.bueno known_hosts 2>/dev/null; exit 1; }; }
 
 SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio: ¿corriste la 00?"; exit 1; }
 cd "$DONDE"
@@ -34,6 +37,7 @@ cp known_hosts known_hosts.bueno
 echo "socio-sftp ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHVuYWxsYXZlZGVvdHJvc2Vydmlkb3JxdWVub2Vz" > known_hosts
 correr "$RAIZ/datos/ordenes/orden-1001.json"
 mv known_hosts.bueno known_hosts
+grep -q "HostKey has been changed" "$LOG" && si "La ruta intentó conectar y el servidor no presentó la llave anotada" || no "No vi el rechazo por llave («HostKey has been changed») en el log"
 [ -z "$(SOCIO 'ls /home/socio/entrada')" ] && si "Con otra llave en known_hosts, la ruta se negó a conectar" || no "Con otra llave en known_hosts la ruta SÍ depositó: no está revisando la llave del servidor"
 rm -rf entrada
 exit $ok

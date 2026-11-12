@@ -10,9 +10,12 @@ IMAGEN="apache/camel-jbang:4.22.1"
 # --network: para que la ruta alcance a los destinos del ambiente por su nombre (api-pedidos, erp…).
 # El volumen de .m2 guarda lo que Camel descarga, para no bajarlo en cada corrida.
 TTY=$([ -t 0 ] && echo "-it" || echo "-i")
-# Solo «run» abre el puerto 8080 (para recibir órdenes por HTTP); los demás comandos no lo necesitan.
+# El puerto 8080 se abre solo si la ruta recibe por HTTP (platform-http). Las demás no lo necesitan, y así
+# no chocan con otra ruta que ya lo esté usando.
 PUERTO=()
-[ "${1:-}" = "run" ] && PUERTO=(-p "${CAMEL_PUERTO:-8080}:8080")
+if [ "${1:-}" = "run" ] && grep -qs "platform-http" ./*.camel.yaml; then
+  PUERTO=(-p "${CAMEL_PUERTO:-8080}:8080")
+fi
 # Si la carpeta tiene dependencias.txt, Camel descarga esas piezas extra (por ejemplo, el driver de una base).
 # Una por renglón, en la forma grupo:artefacto:versión; los renglones con # son comentarios.
 EXTRA=()

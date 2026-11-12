@@ -12,7 +12,10 @@ ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
 
 cd "$DONDE"; rm -rf entrada salida; mkdir -p entrada
 cp "$RAIZ/datos/ordenes/orden-1001.json" "$RAIZ/datos/ordenes/orden-1005-caracteres.json" entrada/
-"$RAIZ/herramientas/camel" run orden-a-edi.camel.yaml --max-messages=2 --max-seconds=90 >/dev/null 2>&1
+LOG=$(mktemp)
+"$RAIZ/herramientas/camel" run orden-a-edi.camel.yaml --max-messages=2 --max-seconds=90 >"$LOG" 2>&1
+# Sin esto, una ruta que ni arrancó se vería igual que una plantilla rota
+grep -q "Started orden-a-edi" "$LOG" || { no "La ruta no arrancó. Esto dijo Camel:"; tail -15 "$LOG"; exit 1; }
 
 for o in 1001 1005; do
   f="salida/850-$o.edi"
