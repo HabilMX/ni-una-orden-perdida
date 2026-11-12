@@ -40,7 +40,7 @@ POST /ordenes  →  sacar el id de la orden  →  traducir  →  POST a la API  
 | Paso en el YAML | Qué hace |
 |---|---|
 | `from: platform-http:/ordenes` | **La estación de entrada.** Abre la dirección `/ordenes` en el puerto 8080 de tu máquina, y solo acepta `POST` |
-| `setHeader: Idempotency-Key` con `jsonpath: "$.orden"` | Saca el número de la orden (`"orden": "1001"`) y lo pone en un encabezado llamado `Idempotency-Key`. Es la **llave** con la que la API reconoce una orden que ya recibió |
+| `setHeader` con `name: Idempotency-Key` y la expresión `jsonpath` `"$.orden"` | Saca el número de la orden (`"orden": "1001"`) y lo pone en un encabezado llamado `Idempotency-Key`. Es la **llave** con la que la API reconoce una orden que ya recibió |
 | `to: jsonata:…/mapeo.jsonata` | **Traduce** la orden del formato de la tienda al formato de la API. El traductor ya viene hecho; en la 03 lo escribes tú |
 | `removeHeaders: CamelHttp*` | Borra las etiquetas de la llamada que entró, para que no se mezclen con la que va a salir |
 | `to: http://api-pedidos:8080/pedidos` | **La estación de salida.** Llama a la API por su nombre de servicio (`api-pedidos`), no por un número de IP |

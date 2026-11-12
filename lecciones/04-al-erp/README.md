@@ -130,7 +130,9 @@ con ese elemento como cuerpo.
 
 ```yaml
 - split:
-    simple: "${variable.detalle}"
+    expression:
+      simple:
+        expression: "${variable.detalle}"
     steps:
       - to:
           uri: sql:INSERT INTO pedido_detalle (…) VALUES (…)

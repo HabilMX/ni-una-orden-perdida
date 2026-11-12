@@ -180,7 +180,7 @@ cd ..
 
 ⚠️ `verifica` **vacía el buzón del socio** antes de probar.
 
-Está terminada cuando ves las seis marcas verdes:
+Está terminada cuando ves las siete marcas verdes:
 
 ```
 ✅ Llegó 850-1001.edi al SFTP del socio
@@ -188,11 +188,13 @@ Está terminada cuando ves las seis marcas verdes:
 ✅ Lo que recibió el socio es el 850 correcto
 ✅ Un segundo envío de la 1001 no pisó el archivo que ya estaba
 ✅ La ruta escribe con nombre temporal
+✅ La ruta intentó conectar y el servidor no presentó la llave anotada
 ✅ Con otra llave en known_hosts, la ruta se negó a conectar
 ```
 
 La quinta es distinta a las demás: el `.tmp` vive unos milisegundos y no hay forma de verlo desde afuera, así que
-`verifica` lo revisa en tu ruta. Las otras cinco las confirma el buzón del socio.
+`verifica` lo revisa en tu ruta. La sexta busca en el log el `HostKey has been changed` del paso 7: demuestra que la
+ruta sí intentó conectarse y que la rechazó la llave, no otra falla. Las demás las confirma el buzón del socio.
 
 **¿No te corre?** `./verifica solucion` prueba la nuestra, y
 `diff mio/orden-al-socio.camel.yaml solucion/orden-al-socio.camel.yaml` te dice en qué son distintas.
@@ -203,7 +205,6 @@ La quinta es distinta a las demás: el `.tmp` vive unos milisegundos y no hay fo
 | `no usa nombre temporal` | Falta `tempFileName` |
 | `HostKey has been changed` en todas las corridas | Recreaste el ambiente: vuelve a correr `confiar-en-socio` (paso 2) |
 | `No pude hablar con el SFTP del socio` | Enciende el ambiente: `docker compose -f infra/compose.yaml up -d --wait` |
-| `port is already allocated` al arrancar | Quedó una ruta corriendo en otra terminal: detenla con `Ctrl+C` |
 
 ---
 
