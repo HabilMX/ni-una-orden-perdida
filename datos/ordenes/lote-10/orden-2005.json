@@ -1,0 +1,25 @@
+{
+  "orden": "2005",
+  "tienda": "T-502",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente@example.com"
+  },
+  "creada": "2026-11-12T11:04:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0001",
+      "descripcion": "Taza blanca",
+      "cantidad": 2,
+      "precio": 89.5
+    },
+    {
+      "renglon": 2,
+      "sku": "SKU-0042",
+      "descripcion": "Mantel azul",
+      "cantidad": 1,
+      "precio": 249.0
+    }
+  ]
+}

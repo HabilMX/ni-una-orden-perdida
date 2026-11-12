@@ -1,0 +1,25 @@
+{
+  "orden": "2007",
+  "tienda": "T-501",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente@example.com"
+  },
+  "creada": "2026-11-12T11:06:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0107",
+      "descripcion": "Juego de vasos",
+      "cantidad": 1,
+      "precio": 159.9
+    },
+    {
+      "renglon": 2,
+      "sku": "SKU-0230",
+      "descripcion": "Charola de bambú",
+      "cantidad": 1,
+      "precio": 119.0
+    }
+  ]
+}

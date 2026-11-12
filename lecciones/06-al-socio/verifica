@@ -18,6 +18,8 @@ correr() { rm -rf entrada; mkdir -p entrada; cp "$1" entrada/orden.json
 SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio: ¿corriste la 00?"; exit 1; }
 cd "$DONDE"
 "$RAIZ/herramientas/confiar-en-socio" >/dev/null || { no "No pude anotar la llave del socio"; exit 1; }
+# La llave que anotamos es de TU ambiente: al salir se borra de solucion/ e inicio/ (en mio/ se queda: es tuya)
+[ "$DONDE" = "mio" ] || trap 'rm -f known_hosts known_hosts.bueno' EXIT
 
 # 1) Llega con su nombre final y sin restos
 correr "$RAIZ/datos/ordenes/orden-1001.json"

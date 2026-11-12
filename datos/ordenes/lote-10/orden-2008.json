@@ -1,0 +1,25 @@
+{
+  "orden": "2008",
+  "tienda": "T-022",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente@example.com"
+  },
+  "creada": "2026-11-12T11:07:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0230",
+      "descripcion": "Charola de bambú",
+      "cantidad": 2,
+      "precio": 119.0
+    },
+    {
+      "renglon": 2,
+      "sku": "SKU-0001",
+      "descripcion": "Taza blanca",
+      "cantidad": 1,
+      "precio": 89.5
+    }
+  ]
+}
