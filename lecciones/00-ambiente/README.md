@@ -75,9 +75,9 @@ Deberías ver cuatro servicios, todos en `healthy` (sano):
 | Servicio | Qué es en la historia | En tu máquina | Qué es, técnicamente |
 |---|---|---|---|
 | `api-pedidos` | El sistema de pedidos de la empresa, al que se le habla por internet | `localhost:8081` | Una API REST hecha en Quarkus. Guarda en memoria: al reiniciarla, empieza vacía |
-| `erp` | El **ERP**: el sistema central donde la empresa registra lo que vende | `localhost:3306` | Una base MariaDB con dos tablas (cabecera y detalle) y un **procedimiento almacenado** (`registrar_pedido`): un programa guardado dentro de la base |
+| `erp` | El **ERP**: el sistema central donde la empresa registra lo que vende | `localhost:13306` | Una base MariaDB con dos tablas (cabecera y detalle) y un **procedimiento almacenado** (`registrar_pedido`): un programa guardado dentro de la base |
 | `socio-sftp` | El buzón del **socio comercial**, donde se le dejan archivos | `localhost:2222` | Un servidor **SFTP**, para copiar archivos de forma segura, con las carpetas `entrada/` y `salida/` |
-| `estado` | La libreta donde tu integración anota cómo va cada orden | `localhost:5432` | Una base PostgreSQL con tres tablas. No la tocas hasta la lección 13 |
+| `estado` | La libreta donde tu integración anota cómo va cada orden | `localhost:15432` | Una base PostgreSQL con tres tablas. No la tocas hasta la lección 13 |
 
 ¿Acertaste cuál tardaba más?
 
@@ -88,19 +88,22 @@ cd lecciones/00-ambiente
 ./verifica
 ```
 
-Está terminada cuando ves las siete marcas verdes:
+Está terminada cuando ves las nueve marcas verdes:
 
 ```
 ✅ estado está arriba
 ✅ erp está arriba
 ✅ socio-sftp está arriba
+✅ api-pedidos está arriba
 ✅ La base de estado tiene sus tres tablas
 ✅ El ERP tiene su procedimiento registrar_pedido
 ✅ El ERP rechaza lo que no cuadra
 ✅ El SFTP del socio tiene entrada/ y salida/
+✅ La API de pedidos contesta y exige su llave (400 sin ella)
 ```
 
-Fíjate en la sexta. `verifica` le pide al ERP que registre un pedido que no existe, y **espera que el ERP se niegue**.
+Fíjate en la séptima. `verifica` le pide al ERP que registre un pedido que no existe, y **espera que el ERP se niegue**. La novena hace lo mismo con la API: le manda un pedido sin
+su llave y espera que lo rechace.
 Los sistemas de esta práctica no dicen que sí a todo, como los de verdad: validan, rechazan y a veces contestan tarde.
 Si un destino aceptara cualquier cosa, tu integración parecería funcionar aunque estuviera mal.
 
@@ -118,7 +121,7 @@ lo vas a encender así.
 
 | Lo que ves | Qué pasa | Qué haces |
 |---|---|---|
-| `port is already allocated` | Ya tienes algo usando ese puerto, por ejemplo un PostgreSQL o un MySQL instalado en tu máquina | Detén ese programa, o pregunta en el canal cómo cambiar el puerto |
+| `port is already allocated` | Ya tienes algo usando ese puerto. Por eso la práctica usa 15432 y 13306 en lugar de los de siempre (5432 y 3306), pero otro programa puede estar en 8081 o 2222 | Detén ese programa, o pregunta en el canal cómo cambiar el puerto |
 | `Cannot connect to the Docker daemon` | Docker no está corriendo | Abre Docker Desktop, o en Mac `colima start` |
 | Un servicio se queda en `starting` | Le falta memoria o sigue construyendo | Espera un minuto más; si no cambia, `docker compose -f infra/compose.yaml logs <servicio>` |
 | `Source file does not exist` | Clonaste el repo fuera de tu home (Mac con colima) | Clónalo dentro de `~` |
@@ -136,7 +139,8 @@ entorno o por un gestor de secretos, y no se guardan en el repositorio.
 1. ¿Qué hace cada una de las cuatro piezas en la historia de la tienda?
 2. ¿Qué significan `up`, `-d` y `--wait`?
 3. ¿Por qué es bueno que el ERP rechace un pedido que no existe?
-4. Si al levantar el ambiente Docker dice que el puerto 5432 está ocupado, ¿qué puede estar pasando en tu máquina?
+4. ¿Por qué la base de estado usa el puerto 15432 en tu máquina y no el 5432 de siempre? ¿Qué pasaría si usara el 5432
+   y tú ya tuvieras un PostgreSQL instalado?
 
 **Siguiente:** en la lección 01 corres tu primera ruta de Camel. Todavía no usa estos sistemas: mueve un archivo de
 una carpeta a otra.
