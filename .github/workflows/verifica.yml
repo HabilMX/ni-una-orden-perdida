@@ -1,0 +1,75 @@
+# Corre el `verifica` de cada lección con la solución de referencia, en cada cambio.
+# Así cualquiera que visite el repo ve, en el README, que la práctica funciona hoy.
+#
+# Qué hace, en orden:
+#   1. Levanta el ambiente de la 00 (infra/compose.yaml) y corre su verifica.
+#   2. Recorre las lecciones en orden y corre `./verifica solucion` en cada una.
+#   3. Control positivo: la primera lección con `inicio/` debe salir en ROJO. Si saliera verde,
+#      el verifica no está midiendo nada y la corrida falla.
+#   4. Cuenta los ✅ y ❌ de la salida. El total se lee de ahí, no del código de salida.
+#
+# No usa ningún secreto: el token de la corrida es de solo lectura.
+name: verifica
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verifica-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lecciones:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ambiente de la práctica (lección 00)
+        run: |
+          docker volume create practica-retail-m2
+          docker compose -f infra/compose.yaml up -d --wait
+          lecciones/00-ambiente/verifica 2>&1 | tee -a salida.txt
+
+      - name: Lecciones con la solución de referencia
+        run: |
+          fallo=0
+          for d in lecciones/[0-9][0-9]-*/; do
+            n=$(basename "$d")
+            [ "$n" = "00-ambiente" ] && continue
+            [ -x "$d/verifica" ] && [ -d "$d/solucion" ] || { echo "⏭  $n: sin verifica o sin solucion, se salta"; continue; }
+            echo "::group::$n"
+            ( cd "$d" && ./verifica solucion ) 2>&1 | tee -a salida.txt
+            rc=${PIPESTATUS[0]}
+            echo "::endgroup::"
+            [ "$rc" -eq 0 ] || { echo "::error::$n salió con $rc"; fallo=1; }
+          done
+          exit $fallo
+
+      - name: Control positivo (inicio debe salir en rojo)
+        run: |
+          d=$(ls -d lecciones/[0-9][0-9]-*/ | while read l; do [ -d "$l/inicio" ] && [ -x "$l/verifica" ] && { echo "$l"; break; }; done)
+          [ -n "$d" ] || { echo "::error::No hay ninguna lección con inicio/ para el control positivo"; exit 1; }
+          if ( cd "$d" && ./verifica inicio ) > control.txt 2>&1; then
+            cat control.txt; echo "::error::$d salió VERDE con inicio/: el verifica no está midiendo"; exit 1
+          fi
+          echo "✔ $d salió en rojo con inicio/, como debe"
+
+      - name: Conteo
+        if: always()
+        run: |
+          v=$(grep -c '✅' salida.txt || true); r=$(grep -c '❌' salida.txt || true)
+          echo "### verifica: ${v} ✅ · ${r} ❌" >> "$GITHUB_STEP_SUMMARY"
+          echo "verdes=$v rojos=$r"
+          [ "$v" -gt 0 ] || { echo "::error::Cero checks contados: la corrida no midió nada"; exit 1; }
+          [ "$r" -eq 0 ]
+
+      - name: Bitácoras si algo falló
+        if: failure()
+        run: docker compose -f infra/compose.yaml logs --tail 80
