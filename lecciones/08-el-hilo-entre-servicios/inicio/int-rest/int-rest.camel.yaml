@@ -1,0 +1,45 @@
+# int-rest: el servicio que sabe hablar con la API de pedidos.
+# Recibe la orden del router, la traduce al formato de la API y la entrega.
+# El hilo: lee ce-correlationid del sobre y se lo pasa a la API como X-Correlation-Id.
+- route:
+    id: int-rest
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # Del sobre se guarda lo que hace falta ANTES de limpiar encabezados
+        - setVariable:
+            name: llave
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        # TODO: guarda en la variable correlacion el ce-correlationid que trae el sobre.
+        #       Tiene que ser AQUÍ: más abajo, removeHeaders borra todos los encabezados.
+        - log:
+            message: "Recibí del router la orden ${variable.llave} correlacion=${variable.correlacion} (sobre ${header.ce-id}, tipo ${header.ce-type})"
+        - to:
+            uri: jsonata:mappings/api/pedido/v2/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Idempotency-Key
+            expression:
+              simple:
+                expression: "${variable.llave}"
+        # TODO: pásale el hilo a la API en el encabezado X-Correlation-Id.
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - to:
+            uri: http://api-pedidos:8080/pedidos
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode} para la orden ${variable.llave} correlacion=${variable.correlacion}"

@@ -29,6 +29,9 @@ import org.jboss.logging.Logger;
  *   <li><b>409</b> si llega la misma llave con contenido DISTINTO: es un conflicto y no se adivina cuál vale.</li>
  * </ul>
  *
+ * <p>Si la llamada trae {@code X-Correlation-Id}, la API lo anota en su bitácora junto a cada respuesta
+ * ({@code correlacion=...}; un guion si no vino). Así se puede seguir una orden hasta aquí solo con ese id.
+ *
  * <p>La lógica vive aquí, en el recurso, porque es un emulador de una sola pieza: no hay dominio que separar.
  * Los pedidos se guardan en memoria; al reiniciar el contenedor se pierden, y eso es intencional para un
  * destino de práctica (cada corrida del curso empieza limpia).
@@ -47,13 +50,17 @@ public class PedidosResource {
     private final Map<String, Recibido> porPedido = new ConcurrentHashMap<>();
 
     @POST
-    public Response crear(@HeaderParam("Idempotency-Key") String llave, Map<String, Object> cuerpo) {
+    public Response crear(@HeaderParam("Idempotency-Key") String llave,
+                          @HeaderParam("X-Correlation-Id") String correlacionRecibida,
+                          Map<String, Object> cuerpo) {
+        String correlacion = correlacionRecibida == null || correlacionRecibida.isBlank() ? "-" : correlacionRecibida;
         if (llave == null || llave.isBlank()) {
+            LOG.infof("400 llave=- correlacion=%s motivo=falta Idempotency-Key", correlacion);
             return error(400, "Falta el encabezado Idempotency-Key");
         }
         String problema = validar(cuerpo);
         if (problema != null) {
-            LOG.infof("422 llave=%s motivo=%s", llave, problema);
+            LOG.infof("422 llave=%s correlacion=%s motivo=%s", llave, correlacion, problema);
             return error(422, problema);
         }
         String pedido = String.valueOf(cuerpo.get("pedido"));
@@ -61,14 +68,14 @@ public class PedidosResource {
         Recibido previo = porLlave.putIfAbsent(llave, nuevo);
         if (previo == null) {
             porPedido.put(pedido, nuevo);
-            LOG.infof("201 llave=%s pedido=%s", llave, pedido);
+            LOG.infof("201 llave=%s pedido=%s correlacion=%s", llave, pedido, correlacion);
             return Response.status(201).entity(acuse(nuevo, "creado")).build();
         }
         if (Objects.equals(previo.cuerpo(), cuerpo)) {
-            LOG.infof("200 llave=%s pedido=%s (reenvío, no se duplica)", llave, pedido);
+            LOG.infof("200 llave=%s pedido=%s correlacion=%s (reenvío, no se duplica)", llave, pedido, correlacion);
             return Response.ok(acuse(previo, "ya_existia")).build();
         }
-        LOG.infof("409 llave=%s pedido=%s (misma llave, contenido distinto)", llave, pedido);
+        LOG.infof("409 llave=%s pedido=%s correlacion=%s (misma llave, contenido distinto)", llave, pedido, correlacion);
         return error(409, "La llave " + llave + " ya se usó con otro contenido");
     }
 

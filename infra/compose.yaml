@@ -40,7 +40,7 @@ services:
   # La API demo de pedidos: el destino REST (lección 02 en adelante). Exige Idempotency-Key.
   api-pedidos:
     build: ./api-demo
-    image: practica-retail/api-demo:1.0.0
+    image: practica-retail/api-demo:1.1.0
     ports: ["8081:8080"]
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && printf \"GET /q/health/ready HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]

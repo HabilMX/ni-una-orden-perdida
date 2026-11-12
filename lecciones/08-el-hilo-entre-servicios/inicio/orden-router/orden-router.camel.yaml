@@ -1,0 +1,94 @@
+# El router: recibe la orden de la tienda y decide a qué servicio de integración se la pasa.
+#
+#   tienda → POST /ordenes → [orden-router] → POST http://int-rest:8080/integrar → [int-rest] → API
+#
+# El HILO: cada orden lleva un id de correlación que la acompaña en todo el viaje.
+# Si la tienda manda X-Correlation-Id, se usa ese; si no, el router inventa uno nuevo.
+# Viaja en el sobre como ce-correlationid, y la tienda lo recibe de vuelta en la respuesta,
+# para que pueda buscar su orden en cualquier punto del recorrido.
+- route:
+    id: orden-router
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: tienda
+            expression:
+              jsonpath:
+                expression: "$.tienda"
+        # El id de correlación se guarda ANTES de limpiar encabezados: si no, se borra con ellos
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${header.X-Correlation-Id} != null"
+                steps:
+                  - setVariable:
+                      name: correlacion
+                      expression:
+                        simple:
+                          expression: "${header.X-Correlation-Id}"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: correlacion
+                    expression:
+                      simple:
+                        expression: "${uuid(random)}"
+        - removeHeaders:
+            pattern: "*"
+        # El sobre CloudEvents (modo binario: los datos van en el cuerpo y el sobre en encabezados)
+        - setHeader:
+            name: ce-specversion
+            expression:
+              constant:
+                expression: "1.0"
+        - setHeader:
+            name: ce-type
+            expression:
+              constant:
+                expression: "mx.tienda.orden.creada"
+        - setHeader:
+            name: ce-source
+            expression:
+              simple:
+                expression: "/tiendas/${variable.tienda}"
+        - setHeader:
+            name: ce-subject
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: ce-id
+            expression:
+              simple:
+                expression: "orden-${variable.orden}-creada"
+        # TODO: una extensión del sobre, el hilo de esta orden. Pon el encabezado ce-correlationid
+        #       con el valor de la variable correlacion (ya la guardamos arriba).
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - log:
+            message: "Orden ${variable.orden} correlacion=${variable.correlacion}: se la paso a int-rest"
+        - to:
+            uri: http://int-rest:8080/integrar
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - log:
+            message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-rest contestó ${header.CamelHttpResponseCode}"
+        # La tienda recibe de vuelta el id con el que puede seguir su orden
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
