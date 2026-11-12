@@ -42,19 +42,49 @@
   $pos := function($id) { $filter($map($partes, function($p, $i) { $p[0] = $id ? $i : -1 }), function($v) { $v >= 0 })[0] };
   $iST := $pos("ST"); $iSE := $pos("SE");
   $primero := $segs[0];
+  /* Qué grupo funcional (GS01) corresponde a cada documento */
+  $grupos := {"850": "PO", "856": "SH", "214": "QM", "997": "FA"};
+  $tipo := $st[1];
+  /* Revisiones propias de cada tipo de documento (las generales van abajo, para todos).
+     Ojo con JSONata: si $filter encuentra UN solo segmento, lo devuelve suelto y no dentro de una lista.
+     Por eso aquí se pregunta «¿hay alguno que cumpla?» o «¿hay alguno que falle?», que vale con uno o con varios. */
+  $hay := function($cumple) { $count($filter($partes, $cumple)) > 0 };
+  $cuenta := function($id) { $count($filter($segs, function($s) { $substringBefore($s & "*", "*") = $id })) };
+  $hls := $filter($partes, function($p) { $p[0] = "HL" });
+  $propias := $tipo = "856" ? [
+      { "que": "856: trae un BSN con su número de embarque, fecha y hora",
+        "ok": $cuenta("BSN") = 1 and $hay(function($p) { $p[0] = "BSN" and $p[2] != "" and $p[3] != "" and $p[4] != "" }) },
+      { "que": "856: el primer HL es el embarque (S) y no tiene padre",
+        "ok": $cuenta("HL") >= 2 and $hls[0][3] = "S" and $hls[0][2] = "" },
+      { "que": "856: los HL van numerados 1, 2, 3… en orden",
+        "ok": $cuenta("HL") >= 2 and $join($map($hls, function($h) { $h[1] }), ",") =
+              $join($map([1..$cuenta("HL")], function($i) { $string($i) }), ",") },
+      { "que": "856: cada HL cuelga de uno que ya apareció antes",
+        "ok": $cuenta("HL") >= 2 and $not($hay(function($p) { $p[0] = "HL" and $p[2] != "" and $number($p[2]) >= $number($p[1]) })) },
+      { "que": "856: trae la paquetería (TD5) y la guía (REF*CN)",
+        "ok": $cuenta("TD5") > 0 and $hay(function($p) { $p[0] = "REF" and $p[1] = "CN" and $p[2] != "" }) }
+    ] : $tipo = "214" ? [
+      { "que": "214: trae un B10 con la guía (B10-01) y el código de la paquetería (B10-03)",
+        "ok": $cuenta("B10") = 1 and $hay(function($p) { $p[0] = "B10" and $p[1] != "" and $p[3] != "" }) },
+      { "que": "214: trae al menos un estatus (LX y AT7)", "ok": $cuenta("LX") > 0 and $cuenta("AT7") > 0 },
+      { "que": "214: cada AT7 dice el estatus (AT7-01) y su fecha en 8 dígitos (AT7-05)",
+        "ok": $cuenta("AT7") > 0 and $not($hay(function($p) { $p[0] = "AT7" and ($p[1] = "" or $not($exists($p[5])) or $not($contains($p[5], /^[0-9]{8}$/))) })) }
+    ] : [];
   {
     "tipo": $st[1] & " — " & ($lookup($tipos, $st[1]) ? $lookup($tipos, $st[1]) : "tipo desconocido"),
     "segmentos": $map($partes, function($p) {
       $p[0] & "  " & ($lookup($nombres, $p[0]) ? $lookup($nombres, $p[0]) : "(segmento que este lector no conoce)") &
       "\n      " & $join($map([1..$count($p)-1], function($i) { $formatNumber($i, "00") & "=" & $p[$i] }), "  ")
     }),
-    "revision": [
+    "revision": $append([
+      { "que": "El grupo (GS01) es el que corresponde a un " & $tipo,
+        "ok": $lookup($grupos, $tipo) ? $gs[1] = $lookup($grupos, $tipo) : true },
       { "que": "El ISA mide 106 caracteres con su ~ (es de ancho fijo)", "ok": $length($primero) = 105 },
       { "que": "El número de control del ISA coincide con el del IEA", "ok": $isa[13] = $iea[2] },
       { "que": "El número de control del GS coincide con el del GE", "ok": $gs[6] = $ge[2] },
       { "que": "El número de control del ST coincide con el del SE", "ok": $st[2] = $se[2] },
       { "que": "El SE cuenta bien los segmentos del documento (de ST a SE)", "ok": $number($se[1]) = $iSE - $iST + 1 },
       { "que": "Ningún segmento está vacío ni trae un separador de más al final", "ok": $count($filter($partes, function($p) { $p[$count($p)-1] = "" })) = 0 }
-    ]
+    ], $propias)
   }
 )

@@ -1,0 +1,25 @@
+{
+  "orden": "4004",
+  "tienda": "T-502",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente4004@example.com"
+  },
+  "creada": "2026-11-12T10:40:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0210",
+      "descripcion": "Jarra de vidrio",
+      "cantidad": 1,
+      "precio": 129.0
+    },
+    {
+      "renglon": 2,
+      "sku": "SKU-0211",
+      "descripcion": "Tapete de baño",
+      "cantidad": 2,
+      "precio": 99.0
+    }
+  ]
+}

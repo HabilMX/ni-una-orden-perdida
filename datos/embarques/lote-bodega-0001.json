@@ -1,0 +1,102 @@
+{
+  "lote": "0001",
+  "bodega": "B-NORTE",
+  "generado": "2026-11-13T11:00:00-06:00",
+  "embarques": [
+    {
+      "embarque": "EMB-4001",
+      "orden": "4001",
+      "tienda": "T-501",
+      "bodega": "B-NORTE",
+      "paqueteria": "PAQX",
+      "guia": "PAQX770004001",
+      "embarcada": "2026-11-13T09:30:00-06:00",
+      "renglones": [
+        {
+          "renglon": 1,
+          "sku": "SKU-0001",
+          "cantidad": 2
+        },
+        {
+          "renglon": 2,
+          "sku": "SKU-0042",
+          "cantidad": 1
+        }
+      ]
+    },
+    {
+      "embarque": "EMB-4002",
+      "orden": "4002",
+      "tienda": "T-502",
+      "bodega": "B-NORTE",
+      "paqueteria": "PAQX",
+      "guia": "PAQX770004002",
+      "embarcada": "2026-11-13T09:45:00-06:00",
+      "renglones": [
+        {
+          "renglon": 1,
+          "sku": "SKU-0107",
+          "cantidad": 1
+        }
+      ]
+    },
+    {
+      "embarque": "EMB-4003",
+      "orden": "4003",
+      "tienda": "T-501",
+      "bodega": "B-NORTE",
+      "paqueteria": "PAQX",
+      "guia": "PAQX770004003",
+      "embarcada": "2026-11-13T10:00:00-06:00",
+      "renglones": [
+        {
+          "renglon": 1,
+          "sku": "SKU-0100",
+          "cantidad": 10
+        },
+        {
+          "renglon": 2,
+          "sku": "SKU-0102",
+          "cantidad": 3
+        }
+      ]
+    },
+    {
+      "embarque": "EMB-4004",
+      "orden": "4004",
+      "tienda": "T-502",
+      "bodega": "B-NORTE",
+      "paqueteria": "PAQX",
+      "guia": "PAQX770004004",
+      "embarcada": "2026-11-13T10:15:00-06:00",
+      "renglones": [
+        {
+          "renglon": 1,
+          "sku": "SKU-0210",
+          "cantidad": 1
+        },
+        {
+          "renglon": 2,
+          "sku": "SKU-0211",
+          "cantidad": 2
+        }
+      ]
+    },
+    {
+      "embarque": "EMB-4005",
+      "orden": "4005",
+      "tienda": "T-501",
+      "bodega": "B-NORTE",
+      "paqueteria": "PAQX",
+      "guia": "PAQX770004005",
+      "embarcada": "2026-11-13T10:30:00-06:00",
+      "renglones": [
+        {
+          "renglon": 1,
+          "sku": "SKU-0305",
+          "cantidad": 4
+        }
+      ]
+    }
+  ]
+}
