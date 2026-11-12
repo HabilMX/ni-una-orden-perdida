@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Prueba un mapeo contra sus casos dorados.
+#   ../../herramientas/probar-mapeo mio/mappings/api/pedido/v1
+# La carpeta debe tener mapeo.jsonata y cases/<nombre>/{entrada.json,esperado.json}.
+set -uo pipefail
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+DIR="$(cd "${1:?Dime la carpeta del mapeo}" && pwd)"
+[ -f "$DIR/mapeo.jsonata" ] || { echo "❌ No hay mapeo.jsonata en $DIR"; exit 1; }
+N=$(find "$DIR/cases" -name entrada.json 2>/dev/null | wc -l | tr -d ' ')
+# Se niega a dar verde sin casos: un cero de casos no es un éxito.
+[ "$N" -gt 0 ] || { echo "❌ No hay casos en $DIR/cases: sin casos no hay nada que probar"; exit 1; }
+case "$DIR" in "$RAIZ"/*) REL="${DIR#"$RAIZ"/}";; *) echo "❌ La carpeta debe estar dentro del repo"; exit 1;; esac
+LOG=$(mktemp)
+docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 apache/camel-jbang:4.22.1 \
+  run herramientas/probar-mapeo.camel.yaml --prop=casos="$REL/cases" --prop=mapeo="$REL/mapeo.jsonata" \
+  --max-messages="$N" --max-seconds=120 >"$LOG" 2>&1
+OK=$(grep -c "CASO-OK" "$LOG"); FALLA=$(grep -c "CASO-FALLA" "$LOG")
+grep -E "CASO-OK|CASO-FALLA|esperaba:|obtuve:" "$LOG" | sed -E 's/.*CASO-OK (.*)/✅ \1/; s/.*CASO-FALLA (.*)/❌ \1/; s#/work/##' | sed -E "s#$REL/cases/##"
+echo "Casos: $N · pasan $OK · fallan $FALLA"
+if [ $((OK+FALLA)) -ne "$N" ]; then echo "❌ No se probaron todos los casos (revisa $LOG)"; exit 1; fi
+[ "$FALLA" -eq 0 ]

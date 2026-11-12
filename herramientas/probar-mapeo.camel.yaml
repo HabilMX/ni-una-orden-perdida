@@ -1,0 +1,47 @@
+# Herramienta: corre un mapeo JSONata contra sus casos dorados y dice cuáles pasan.
+# Cada caso es una carpeta con entrada.json (lo que llega) y esperado.json (lo que debe salir).
+# No la edites: la usa el script probar-mapeo.
+- route:
+    id: probar-mapeo
+    from:
+      uri: "file:{{casos}}"
+      parameters:
+        recursive: true
+        noop: true
+        include: "entrada\\.json"
+      steps:
+        - setVariable:
+            name: caso
+            simple: "${header.CamelFileParent}"
+        # Lo que entra al mapeo es el texto JSON del caso
+        - to:
+            uri: "jsonata:file:{{mapeo}}"
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - setVariable:
+            name: obtenido
+            simple: "${bodyAs(String)}"
+        # Traer el esperado del mismo caso y convertir ambos a datos para compararlos sin importar espacios ni orden de llaves
+        - pollEnrich:
+            simple: "file:${variable.caso}?fileName=esperado.json&noop=true&idempotent=false"
+            timeout: 3000
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: esperado
+            simple: "${body}"
+        - setBody:
+            simple: "${variable.obtenido}"
+        - unmarshal:
+            json: {}
+        - choice:
+            when:
+              - simple: "${body} == ${variable.esperado}"
+                steps:
+                  - log:
+                      message: "CASO-OK ${variable.caso}"
+            otherwise:
+              steps:
+                - log:
+                    message: "CASO-FALLA ${variable.caso}\n   esperaba: ${variable.esperado}\n   obtuve:   ${variable.obtenido}"

@@ -7,7 +7,7 @@ ok=0
 si() { echo "✅ $1"; }
 no() { echo "❌ $1"; ok=1; }
 
-for s in estado erp socio-sftp; do
+for s in estado erp socio-sftp api-pedidos; do
   [ "$($C ps --format '{{.Service}} {{.Health}}' | awk -v s=$s '$1==s{print $2}')" = "healthy" ] && si "$s está arriba" || no "$s no está arriba: corre  docker compose -f infra/compose.yaml up -d --wait"
 done
 
@@ -22,4 +22,7 @@ r=$($C exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "c
 echo "$r" | grep -q "El pedido no existe" && si "El ERP rechaza lo que no cuadra" || no "El ERP no rechazó un pedido inexistente (o no contestó)"
 
 $C exec -T socio-sftp sh -c 'test -d /home/socio/entrada && test -d /home/socio/salida' && si "El SFTP del socio tiene entrada/ y salida/" || no "El SFTP del socio no tiene sus carpetas"
+# Control positivo de la API: sin llave de idempotencia debe rechazar (400), no aceptar
+c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8081/pedidos -H 'Content-Type: application/json' -d '{}')
+[ "$c" = "400" ] && si "La API de pedidos contesta y exige su llave (400 sin ella)" || no "La API de pedidos no contestó como debe (llegó ${c:-nada})"
 exit $ok

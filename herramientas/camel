@@ -10,9 +10,12 @@ IMAGEN="apache/camel-jbang:4.22.1"
 # --network: para que la ruta alcance a los destinos del ambiente por su nombre (api-pedidos, erp…).
 # El volumen de .m2 guarda lo que Camel descarga, para no bajarlo en cada corrida.
 TTY=$([ -t 0 ] && echo "-it" || echo "-i")
+# Solo «run» abre el puerto 8080 (para recibir órdenes por HTTP); los demás comandos no lo necesitan.
+PUERTO=()
+[ "${1:-}" = "run" ] && PUERTO=(-p "${CAMEL_PUERTO:-8080}:8080")
 exec docker run --rm $TTY \
   --network "${CAMEL_RED:-practica-retail_default}" \
   -v "$PWD":/work -w /work \
   -v practica-retail-m2:/home/ubuntu/.m2 \
-  -p "${CAMEL_PUERTO:-8080}:8080" \
+  ${PUERTO[@]+"${PUERTO[@]}"} \
   "$IMAGEN" "$@"

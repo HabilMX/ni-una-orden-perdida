@@ -13,7 +13,7 @@ services:
       POSTGRES_DB: estado
       POSTGRES_USER: router
       POSTGRES_PASSWORD: ${ESTADO_CLAVE:-practica}
-    ports: ["5432:5432"]
+    ports: ["15432:5432"]   # en tu máquina, 15432: así no choca con un PostgreSQL que ya tengas
     volumes:
       - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
@@ -29,7 +29,7 @@ services:
       MARIADB_USER: integracion
       MARIADB_PASSWORD: ${ERP_CLAVE:-practica}
       MARIADB_ROOT_PASSWORD: ${ERP_CLAVE_ROOT:-practica-root}
-    ports: ["3306:3306"]
+    ports: ["13306:3306"]   # en tu máquina, 13306: así no choca con un MySQL o MariaDB que ya tengas
     volumes:
       - ./mariadb:/docker-entrypoint-initdb.d:ro
     healthcheck:
