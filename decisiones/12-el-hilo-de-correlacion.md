@@ -19,7 +19,8 @@ lo recibe de vuelta. **Al socio no se le manda dentro del 850.**
 - **El hilo se pierde en el primer servicio que no lo reenvía**, y casi siempre es por leerlo después de un
   `removeHeaders`. Por eso cada servicio lo guarda primero.
 - **El id es nuestro.** Al socio se le manda lo que pacta su guía X12; con él, lo que une su respuesta con nuestra
-  orden es el número de control del sobre X12, que su acuse 997 cita (lección 21).
+  orden son los números de control del 850: su acuse 997 cita el `GS06` en el `AK1` y el `ST02` en el `AK2`
+  (lección 21).
 - Los encabezados del sobre (`ce-*`) no salen hacia la tienda: son del viaje interno.
 
 ## Qué descartamos
@@ -40,3 +41,4 @@ lo recibe de vuelta. **Al socio no se le manda dentro del 850.**
 - Correlation Identifier (EIP): https://www.enterpriseintegrationpatterns.com/patterns/messaging/CorrelationIdentifier.html
 - Correlation Identifier en Camel: https://camel.apache.org/components/next/eips/correlation-identifier.html
 - W3C Trace Context: https://www.w3.org/TR/trace-context/
+- X12, ejemplo de 997 (`AK1` con el control del grupo, `AK2` con el de la transacción): https://x12.org/examples/004010x363/example-04-basic-functional-acknowledgment-partially-accepted-detail

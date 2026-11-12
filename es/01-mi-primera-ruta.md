@@ -87,8 +87,6 @@ ls -a entrada/   # -a muestra también lo escondido (lo que empieza con punto)
 
 Si alguna respuesta no coincidió, anota por qué crees que pasó. Esa nota vale más que haber acertado.
 
-<!-- PENDIENTE (mdw-lab): sección «5. Míralo por dentro con camel trace», cuando el trace de la 01 esté armado. -->
-
 ## 5. Ponle nombre a lo que viste
 
 La ruta tiene tres piezas. Nómbralas con una imagen y luego con su nombre formal:

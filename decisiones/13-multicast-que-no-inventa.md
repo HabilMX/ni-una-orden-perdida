@@ -9,8 +9,9 @@ Si un canal se cae y el router contesta «salió a todos», la tienda cree algo 
 ## Qué decidimos
 
 El router manda la misma orden **a la vez** a sus canales (Multicast en paralelo). Cada canal es una ruta pequeña
-que **siempre** deja una línea con lo que dijo su servicio —`{"canal":"erp","codigo":200}`— o, si no contestó,
-`{"canal":"erp","error":"…"}`. El router le contesta a la tienda la lista de esas líneas.
+hecha para dejar una línea con lo que dijo su servicio —`{"canal":"erp","codigo":200}`— o, si no contestó,
+`{"canal":"erp","error":"…"}`. El router espera a que terminen todos los canales y le contesta a la tienda la
+lista de esas líneas, en el orden en que están escritos en el YAML.
 
 ## Por qué
 

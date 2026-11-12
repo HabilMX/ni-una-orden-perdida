@@ -49,7 +49,7 @@ Ahora `mio/` tiene cuatro carpetas, una por servicio: `orden-router`, `int-rest`
 
 Abre `mio/orden-router/orden-router.camel.yaml`. Arriba ya conoces todo: el hilo de la 09 y el sobre `ce-*`. Abajo
 hay algo nuevo: **tres rutas de canal**, `canal-api`, `canal-erp` y `canal-socio`. Cada una llama a su servicio y
-**siempre** deja una sola línea con lo que pasó:
+está hecha para dejar **una sola línea** con lo que pasó, conteste o no su servicio:
 
 | Si el servicio… | La línea es… |
 |---|---|
@@ -138,8 +138,10 @@ La tienda recibe lo que dijo cada canal:
 {"orden":"1001","canales":[{"canal":"api","codigo":201},{"canal":"erp","codigo":200},{"canal":"socio","codigo":200}]}
 ```
 
-El orden de las tres líneas puede cambiar de una corrida a otra: los canales trabajan a la vez y cada uno termina
-cuando termina. Fíjate también en los logs: los tres renglones de «contestó» del router salen casi al mismo tiempo.
+Los canales trabajan a la vez, pero el router **espera a que terminen los tres** antes de contestar, y la lista sale
+en el orden en que están escritos en el YAML (api, erp, socio), no en el que fueron terminando. Fíjate en los logs:
+los tres renglones de «contestó» del router salen casi al mismo tiempo, y su orden sí puede cambiar de una corrida a
+otra.
 
 Si el canal del socio dice `500`, revisa el log de int-edi. Si ves `reject HostKey`, te faltó anotar la llave.
 
@@ -185,8 +187,9 @@ El hilo de la 09 viaja en el sobre a los tres canales. Pero cada destino lo guar
 
 ¿Por qué no se lo mandamos al socio? Porque al socio solo se le envían los campos que pacta con él el formato X12. El
 hilo es nuestro, de nuestra integración; meterlo en un campo que el socio no pidió no se hace. Con el socio, el hilo
-ya existe: es el **número de control** del sobre del 850 (el `ISA13` y el `GS06` de la 06). Cuando el socio conteste
-con su acuse de recibo, el 997, va a citar ese número. Eso lo usas en la lección 21.
+ya existe: son los **números de control** del 850 que viste en la 06. Cuando el socio conteste con su acuse de recibo,
+el 997, su `AK1` cita el `GS06` (el del grupo) y su `AK2` el `ST02` (el de la transacción). El `ISA13`, el del
+sobre completo, lo cita otro acuse, el `TA1`. Eso lo usas en la lección 21.
 
 **No todos los destinos pueden guardar tu id.** Por eso, más adelante, una base de estado va a unir el hilo con el
 número de control.

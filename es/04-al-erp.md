@@ -66,8 +66,8 @@ partes, `cabecera` y `detalle`, que tienen exactamente los nombres de las column
 ```
 
 Fíjate en la fecha. La tienda manda `2026-11-12T10:15:00-06:00` y el mapeo la deja en `2026-11-12 10:15:00`. Le
-quita la zona horaria (`-06:00`) porque la columna del ERP es de tipo `DATETIME`, que guarda la hora local de la
-tienda y no sabe de zonas.
+quita la zona horaria (`-06:00`) porque la columna del ERP es de tipo `DATETIME`, que guarda fecha y hora **sin zona**.
+El acuerdo con el ERP es que esa hora es la de la tienda; el tipo de dato no lo sabe, lo sabe quien lo lee.
 
 **La ruta:** abre `mio/orden-al-erp.camel.yaml`. Arriba de la ruta hay un **bean** llamado `erp`: es la conexión a
 la base, con su dirección, usuario y contraseña. Los pasos `sql:` lo usan con `dataSource: "#erp"`.

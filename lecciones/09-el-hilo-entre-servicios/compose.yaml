@@ -26,7 +26,7 @@ services:
     volumes:
       - ./${DONDE:-mio}/int-rest:/work
       - practica-retail-m2:/home/ubuntu/.m2
-    # sin ports: solo lo alcanza el router, por dentro de la red
+    # sin ports: no se ve desde tu máquina; por dentro de la red, cualquier servicio lo alcanza
 
 networks:
   practica:

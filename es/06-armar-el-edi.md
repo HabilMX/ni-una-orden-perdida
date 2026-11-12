@@ -171,11 +171,13 @@ incómodos:
 
 **Predice:** ¿por qué el segundo nombre cambió? Piensa qué haría el socio al leer `PID*F****Juego 4*6 ~ cristal~`.
 
-El `*` y el `~` son los separadores del documento. Si van dentro de un dato, el socio leería un elemento de más y un
-segmento cortado a la mitad. Por eso el mapeo los cambia por espacios antes de que lleguen a la plantilla, y el caso
+El `*` y el `~` son los separadores del documento, y el `>` también: el `ISA` los declara (el `>` es su último
+elemento). Si van dentro de un dato, el socio leería un elemento de más y un segmento cortado a la mitad. Por eso el
+mapeo los cambia por espacios antes de que lleguen a la plantilla, y el caso
 dorado `caracteres-especiales` comprueba que lo haga.
 
-Ahora el `&`. Cambia **solo** `{{{descripcion}}}` por `{{descripcion}}`, con llaves dobles, y vuelve a correr la
+Ahora el `&`. **No es separador**: X12 lo acepta dentro de un dato, y el socio lo leería bien. Su riesgo es otro, y
+viene de la plantilla. Cambia **solo** `{{{descripcion}}}` por `{{descripcion}}`, con llaves dobles, y vuelve a correr la
 ruta. Mira el `PID` de la orden 1005:
 
 ```
@@ -244,4 +246,4 @@ Lo que decidimos en esta lección, con lo que descartamos y qué nos haría camb
 5. ¿Por qué no puede ir un `*` dentro del nombre de un producto, y qué pasa con un `&` si usas llaves dobles?
 
 **Siguiente:** en la lección 07 el 850 deja de quedarse en `salida/`: viaja al buzón SFTP del socio, con cuidado de
-que nunca vea un archivo a medias.
+que no tome un archivo a medias.

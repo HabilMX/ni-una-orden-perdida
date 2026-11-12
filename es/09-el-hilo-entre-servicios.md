@@ -26,6 +26,7 @@ En la 08 viste los encabezados `ce-*` sin usarlos. Hoy los lees:
 
 | Encabezado | Qué dice | Para la orden 1003 |
 |---|---|---|
+| `ce-specversion` | Qué **versión** de CloudEvents usa el sobre | `1.0` |
 | `ce-id` | Qué **evento** es este, uno solo | `orden-1003-creada` |
 | `ce-type` | De qué **tipo** es el evento | `mx.tienda.orden.creada` |
 | `ce-source` | **Dónde** pasó | `/tiendas/T-022` |

@@ -4,13 +4,13 @@
 
 ## El problema
 
-Si la red se corta después de que la API guardó el pedido, reenviarlo sin cuidado crea un pedido duplicado.
+Si la red se corta después de que la API guardó el pedido, reenviarlo sin una llave crea un pedido duplicado.
 
 ## Qué decidimos
 
 Una operación es *idempotente* si hacerla dos veces deja lo mismo que hacerla una: si la tienda reenvía el pedido, la
 API no crea un segundo. Para lograrlo, cada pedido que mandamos a la API lleva el encabezado `Idempotency-Key` con el
-número de la orden. La API demo no es permisiva, y contesta lo que pide el borrador del IETF para este encabezado:
+número de la orden. La API demo no es permisiva. Este es su contrato:
 
 | Llega | Contesta |
 |---|---|
@@ -19,6 +19,11 @@ número de la orden. La API demo no es permisiva, y contesta lo que pide el borr
 | La misma llave con el mismo contenido | **200**, sin duplicar: es un reenvío |
 | La misma llave con **otro** contenido | **422**, con el tipo `llave-reusada` |
 | Un pedido que no cuadra (sin partidas, un total mal sumado) | **422**, con el tipo `pedido-invalido` |
+
+Del borrador del IETF para este encabezado salen el 400 y el 422 por llave reusada. El 201 y el 200 son decisión de
+la API de la práctica: el borrador no los fija. Y en el borrador la llave es una cadena de los *Structured Fields* de
+HTTP, que va entre comillas (`"1001"`); la práctica la manda sin comillas para que se lea igual que el número de
+orden. Una API que siga el borrador al pie de la letra la pediría con comillas.
 
 Los dos 422 se distinguen por el **cuerpo**, no por el código: todo error sale en el formato estándar de problemas
 de HTTP (`application/problem+json`), y su campo `type` dice cuál es.

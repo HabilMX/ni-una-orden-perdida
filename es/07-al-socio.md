@@ -1,6 +1,6 @@
 # Lección 07 — Al socio
 
-> **Lo que vas a lograr:** dejar el 850 de la 06 en el buzón del socio comercial con tres cuidados: que nunca vea un
+> **Lo que vas a lograr:** dejar el 850 de la 06 en el buzón del socio comercial con tres cuidados: que no tome un
 > archivo a medias, que la misma orden siempre tenga el mismo nombre y que un segundo envío no borre el primero.
 
 **Antes de empezar necesitas:** la lección 06 terminada y el ambiente de la 00 encendido:
@@ -120,7 +120,9 @@ tempFileName: "${file:onlyname.noext}.tmp"
 ```
 
 Mientras se escribe se llama `850-1001.tmp`; cuando termina, se renombra a `850-1001.edi`. Si el socio solo recoge
-archivos `.edi`, nunca ve uno incompleto.
+archivos `.edi`, es muy difícil que tome uno incompleto: el renombre es lo último que pasa. No es una garantía
+total (un socio que recoge cualquier archivo, o una carpeta compartida mal configurada, lo rompen), y por eso en la
+lección 21 la confirmación de que llegó bien la da el 997, no el archivo.
 
 **No pisar.** Por omisión, si el archivo ya existe, Camel lo reemplaza. Tú quieres lo contrario: que falle y alguien
 decida.

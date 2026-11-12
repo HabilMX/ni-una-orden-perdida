@@ -39,7 +39,7 @@ POST /ordenes  →  sacar el id de la orden  →  traducir  →  POST a la API  
 
 | Paso en el YAML | Qué hace |
 |---|---|
-| `from: platform-http:/ordenes` | **La estación de entrada.** Abre la dirección `/ordenes` en el puerto 8080 de tu máquina, y solo acepta `POST` |
+| `from: platform-http:/ordenes` con `httpMethodRestrict: POST` | **La estación de entrada.** Abre la dirección `/ordenes`; el parámetro `httpMethodRestrict` hace que solo acepte `POST`. El puerto 8080 no lo pone la ruta: lo abre `herramientas/camel` |
 | `setHeader` con `name: Idempotency-Key` y la expresión `jsonpath` `"$.orden"` | Saca el número de la orden (`"orden": "1001"`) y lo pone en un encabezado llamado `Idempotency-Key`. Es la **llave** con la que la API reconoce una orden que ya recibió |
 | `to: jsonata:…/mapeo.jsonata` | **Traduce** la orden del formato de la tienda al formato de la API. El traductor ya viene hecho; en la 03 lo escribes tú |
 | `removeHeaders: CamelHttp*` | Borra las etiquetas de la llamada que entró, para que no se mezclen con la que va a salir |
@@ -67,7 +67,7 @@ En una terminal, arranca la ruta:
 ../../../herramientas/camel run orden-a-api.camel.yaml
 ```
 
-La primera vez tarda unos 15 segundos, porque Camel baja lo que necesita para hablar HTTP. Espera la línea
+La primera vez tarda más, porque Camel baja lo que necesita para hablar HTTP. Espera la línea
 `Started orden-a-api`.
 
 En **otra** terminal, desde la misma carpeta `mio/`, haz de tienda y manda la orden:
@@ -108,6 +108,12 @@ curl -i -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @si
 | Sin renglones | **422** | «Entendí lo que mandaste, pero no tiene sentido»: un pedido sin partidas no se puede registrar |
 | Sin la llave `Idempotency-Key` | **400** | «Te falta algo obligatorio» |
 | La misma llave con **otro** contenido | **422** | «Esta llave ya la usaste con algo distinto». Mira el `type` del cuerpo |
+
+Esta tabla es el **contrato de la API de la práctica**. Del borrador del IETF para `Idempotency-Key` toma el 400 sin
+llave y el 422 por llave reusada; el 201 y el 200 los decide esta API, porque el borrador no los fija. Y otra
+diferencia: en el borrador la llave es una cadena con comillas (`"1001"`); aquí va sin comillas, igual que el número
+de la orden. Una API que siga el borrador al pie de la letra la pediría entre comillas: antes de integrar, se lee su
+contrato.
 
 Cuando algo sale mal, la API contesta con un JSON de error de forma estándar (*Problem Details*, el tipo
 `application/problem+json`): trae `type`, `title`, `status` y `detail`. El `type` es el que distingue un 422 de otro.

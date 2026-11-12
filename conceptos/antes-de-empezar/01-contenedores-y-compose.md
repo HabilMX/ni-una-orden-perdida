@@ -34,9 +34,10 @@ una dirección IP.
 
 ## Lo que necesitas saber para la práctica
 
-- `up -d` levanta en segundo plano; `down` apaga y borra los contenedores (los datos de los volúmenes se quedan).
+- `up -d` levanta en segundo plano; `down` apaga y borra los contenedores, y con ellos los datos que guardaron. Un
+  *volumen con nombre* sí sobreviviría a `down`, pero esta práctica no usa ninguno: así cada lección arranca limpia.
 - `logs <servicio>` muestra lo que ese contenedor escribió. Es la primera parada cuando algo no funciona.
-- Desde la lección 08 cada servicio de Camel es un contenedor. Todos usan **la misma imagen**; lo que cambia es la
+- Desde la lección 08 cada servicio de la práctica tiene su propio contenedor. Todos usan **la misma imagen**; lo que cambia es la
   carpeta que cada uno monta (ficha [09](../../decisiones/09-una-imagen-un-servicio-por-carpeta.md)).
 - `localhost` dentro de un contenedor es ese mismo contenedor, no tu máquina.
 

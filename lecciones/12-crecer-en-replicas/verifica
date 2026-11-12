@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Comprueba la lección 12: int-bd corre en tres copias y las 30 órdenes del lote se reparten entre ellas.
-# Cada orden queda una sola vez en el ERP, y cada copia registra al menos una.
+# Cada orden queda una sola vez en el ERP, y el trabajo cae en más de una copia. No se exige que TODAS reciban:
+# quien elige la copia es el DNS, y con 30 órdenes una copia podría quedarse sin ninguna aunque todo esté bien.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -58,19 +59,19 @@ API_N=$(docker logs --since "$DESDE" "$API" 2>&1 | grep -cE "201 llave=30[0-9]{2
   || no "API: esperaba $TOTAL órdenes y tiene $API_N"
 
 # Quién registró qué: lo dice el log de cada copia, no la respuesta del router
-REPARTO=""; SUMA=0; VACIAS=0
+REPARTO=""; SUMA=0; CON=0
 for c in $(SERV ps -q int-bd); do
   n=$(docker logs "$c" 2>&1 | grep -c "El ERP registró el pedido 30")
   REPARTO="$REPARTO$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')=$n "
-  SUMA=$((SUMA + n)); [ "$n" -ge 1 ] || VACIAS=$((VACIAS + 1))
+  SUMA=$((SUMA + n)); [ "$n" -ge 1 ] && CON=$((CON + 1))
 done
 echo "   Reparto: $REPARTO"
 [ "$SUMA" = "$TOTAL" ] && si "Entre todas las copias registraron $SUMA órdenes: ni una de más, ni una de menos" \
   || no "Entre todas las copias registraron $SUMA órdenes y se esperaban $TOTAL"
-if [ "$N_BD" -ge 2 ] && [ "$VACIAS" = "0" ]; then
-  si "Cada copia de int-bd registró al menos una orden: el trabajo se repartió"
+if [ "$N_BD" -ge 2 ] && [ "$CON" -ge 2 ]; then
+  si "$CON de $N_BD copias de int-bd registraron órdenes: el trabajo se repartió"
 elif [ "$N_BD" -ge 2 ]; then
-  no "$VACIAS de $N_BD copias no registraron nada: el router sigue usando la misma conexión. ¿Le diste al router una vida de conexión y un DNS corto?"
+  no "Solo $CON de $N_BD copias registró órdenes: el router sigue usando la misma conexión. ¿Le diste al router una vida de conexión y un DNS corto?"
 else
   no "Con una sola copia no hay nada que repartir"
 fi

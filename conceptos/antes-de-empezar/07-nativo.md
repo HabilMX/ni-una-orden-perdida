@@ -28,7 +28,7 @@ Lo que se gana, según la documentación de Quarkus:
 Lo que cuesta, y se dice igual de claro:
 
 - **Compilar tarda varios minutos y pide una máquina con bastante memoria.** No se hace en cada cambio pequeño.
-- **En carga sostenida rinde menos por copia que la JVM**, porque la JVM optimiza mientras corre y el nativo no.
+- **En carga sostenida suele rendir menos por copia que la JVM**, porque la JVM optimiza mientras corre y el nativo no.
 - **No todo cabe:** lo que un programa descubre al vuelo (reflexión, clases que se cargan por nombre) hay que declararlo
   al compilar. Por eso no todas las extensiones de Camel Quarkus funcionan en nativo; cada una lo dice en su página.
 
@@ -42,11 +42,12 @@ cuando unas pocas copias atienden mucho tráfico por largo tiempo. Cuál convien
 
 ## Compruébalo
 
-Pregunta: tu tienda tiene un pico de ventas de diez minutos cada noche, y fuera de ese pico casi no hay tráfico. ¿Qué
-modo consideras primero, y qué tendrías que medir antes de decidir?
+Pregunta: tu tienda recibe picos de ventas que llegan sin aviso (una mención en redes, una oferta de un competidor), y
+fuera de esos picos casi no hay tráfico. ¿Qué modo consideras primero, y qué tendrías que medir antes de decidir?
 
 Respuesta: el **nativo**, porque tiene que arrancar copias rápido para el pico. Antes de decidir mides cuánto tarda en
-arrancar y cuánto rinde cada copia, en tu servicio y con tu carga: los números de otro no son los tuyos.
+arrancar y cuánto rinde cada copia, en tu servicio y con tu carga: los números de otro no son los tuyos. Si el pico llegara a la misma hora cada noche,
+podrías encender las copias antes, y el arranque pesaría menos.
 
 ## Si quieres ir más lejos
 

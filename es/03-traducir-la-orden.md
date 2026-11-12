@@ -108,7 +108,7 @@ Cuando lo tengas, pruébalo contra los casos dorados, desde la carpeta de la lec
 La herramienta corre tu mapeo con cada `entrada.json` y compara el resultado con su `esperado.json`. Al final dice
 `Casos: 3 · pasan … · fallan …`. Si un caso falla, te muestra lo que obtuvo; ábrelo junto a su `esperado.json` y busca la diferencia.
 
-La primera vez tarda unos 20 segundos, porque Camel baja lo que necesita.
+La primera vez tarda más, porque Camel baja lo que necesita. Espera a que aparezca la línea de los casos.
 
 ## 6. Compara con tu predicción
 

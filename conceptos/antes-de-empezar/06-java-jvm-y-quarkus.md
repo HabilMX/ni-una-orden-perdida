@@ -1,7 +1,7 @@
 # Java, la JVM y Quarkus
 
 **Para qué te sirve aquí:** Camel está hecho en Java, y tus rutas corren dentro de una JVM aunque tú solo escribas
-YAML. Cuando una integración pasa a un proyecto real, corre sobre Quarkus.
+YAML. Cuando una integración pasa a un proyecto real, puede correr sobre Quarkus, como en la lección 32.
 
 ## Lo que ves en tu terminal
 

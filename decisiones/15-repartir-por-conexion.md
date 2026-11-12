@@ -16,8 +16,9 @@ servicios. Y la lección enseña **por qué eso no basta**: quien llama abre una
 (`sun.net.inetaddr.ttl`). Al vencer la conexión, la siguiente pregunta otra vez por la dirección y puede caer en otra
 copia. Las dos cosas van en el compose, como opciones de arranque; no hay archivo de propiedades.
 
-El `verifica` no exige un reparto parejo, porque quien elige la copia es la red y no es exacto. Pide que **cada copia
-registre al menos una orden** y que entre todas sumen **las 30, una sola vez**.
+El `verifica` no exige un reparto parejo, porque quien elige la copia es la red y no es exacto. Pide que **más de una
+copia registre órdenes** y que entre todas sumen **las 30, una sola vez**. No pide que todas reciban: una copia
+podría quedarse sin ninguna por azar del DNS, aunque la integración esté bien.
 
 ## Por qué
 
@@ -28,8 +29,9 @@ registre al menos una orden** y que entre todas sumen **las 30, una sola vez**.
 - **En Kubernetes la idea sigue siendo cierta.** Un Service elige un destino para cada **conexión** nueva; una conexión
   que nunca se cierra nunca se reparte.
 - **La caché de direcciones de Java** se gobierna con `networkaddress.cache.ttl`, una propiedad de seguridad de la
-  JVM. Desde la línea de comando se le da con su equivalente `sun.net.inetaddr.ttl`, que es la que usa la práctica:
-  así cabe en el compose sin archivos de configuración.
+  JVM, documentada. La práctica usa `sun.net.inetaddr.ttl`, una propiedad **privada** del JDK que hace lo mismo desde
+  la línea de comando: así cabe en el compose sin archivos de configuración. Por ser privada, una versión futura de
+  Java podría quitarla, y el `verifica` de la 12 lo delataría. En un proyecto real se prefiere la documentada.
 - **El 1 segundo es para verlo en la práctica**, no una cifra recomendada. Cuánto debe vivir una conexión depende de
   cuánto tráfico hay y de qué tan rápido cambian las copias.
 

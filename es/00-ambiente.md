@@ -16,7 +16,7 @@ que la información viaje entre ellos sin perderse. En esta lección los enciend
 | Una terminal | Escribir los comandos | En Mac, la app *Terminal*; en Windows, *Ubuntu* dentro de WSL; en Linux, la que traiga |
 | **git** | Bajar el repositorio de la práctica | `git --version` responde con un número |
 | **Docker** con Compose | Correr cada sistema en su propio contenedor, sin instalarlo en tu máquina | `docker compose version` responde con un número |
-| Unos 4 GB de RAM libres | Los cuatro sistemas juntos usan unos 300 MB; Camel, lo demás | — |
+| Memoria libre para Docker | Los cuatro sistemas y Camel corren a la vez | `docker compose up --wait` termina sin que tu máquina se trabe |
 
 No instalas Java, ni Maven, ni Camel, ni ninguna base de datos. **Todo corre dentro de Docker.**
 
@@ -32,11 +32,9 @@ de tu home.
 
 ```bash
 cd ~                                  # ve a tu carpeta personal
-git clone <liga del repo>             # baja una copia del repositorio a tu máquina
+git clone https://github.com/HabilMX/ni-una-orden-perdida.git   # baja una copia a tu máquina
 cd ni-una-orden-perdida               # entra a la carpeta que se creó
 ```
-
-<!-- PENDIENTE: la liga pública del repo, cuando master lo publique. -->
 
 ## 2. Predice
 
@@ -61,8 +59,9 @@ docker compose -f infra/compose.yaml up -d --wait
 - `-d` los deja corriendo en segundo plano, así recuperas tu terminal.
 - `--wait` espera hasta que todos digan que están sanos.
 
-**La primera vez tarda unos 3 minutos**, sobre todo por la API de pedidos: Docker la construye desde su código antes
-de arrancarla. Las siguientes veces son segundos.
+**La primera vez tarda varios minutos**, sobre todo por la API de pedidos: Docker la construye desde su código antes
+de arrancarla. Sabrás que terminó cuando `--wait` te regrese la terminal y `docker compose ps` diga `healthy` en
+cada sistema. Las siguientes veces es mucho más rápido.
 
 ## 4. Compara con tu predicción
 

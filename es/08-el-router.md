@@ -60,7 +60,7 @@ services:
     <<: *camel
     volumes:
       - ./${DONDE:-mio}/int-rest:/work
-    # sin ports: solo lo alcanza el router, por dentro de la red
+    # sin ports: no se ve desde tu máquina; por dentro de la red, cualquier servicio lo alcanza
 ```
 
 Dos cosas que vale la pena ver:
@@ -68,8 +68,8 @@ Dos cosas que vale la pena ver:
 - **Los dos servicios son la misma imagen de Camel.** Lo único distinto es la carpeta que cada uno monta. `&camel`
   define la parte común una vez y `<<: *camel` la reutiliza. Para crear un servicio nuevo no hay que programar otro
   programa: basta otra carpeta con sus rutas.
-- **Solo el router tiene `ports`.** Es el único que se ve desde tu máquina. A int-rest solo lo alcanza el router, por
-  dentro de la red de Docker.
+- **Solo el router tiene `ports`.** Es el único que se ve desde tu máquina. int-rest no se ve desde afuera, pero
+  dentro de la red de Docker cualquier servicio puede llamarlo; en esta práctica, el único que lo llama es el router.
 
 `DONDE` es una variable que dice qué carpetas montar: `mio` (la tuya, por omisión) o `solucion` (la nuestra).
 
@@ -83,6 +83,7 @@ llamada le pone unos encabezados que empiezan con `ce-`:
 
 | Encabezado | Valor para la orden 1003 |
 |---|---|
+| `ce-specversion` | `1.0` |
 | `ce-type` | `mx.tienda.orden.creada` |
 | `ce-source` | `/tiendas/T-022` |
 | `ce-subject` | `1003` |
