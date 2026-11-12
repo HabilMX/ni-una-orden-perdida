@@ -148,7 +148,7 @@ variables no se borran con los encabezados. Regresa tu paso a su lugar.
 ```
 
 `verifica` reinicia la API, levanta los dos servicios y manda dos órdenes: la 1003 con un hilo propio y la 1001 sin
-ninguno. Está terminada cuando ves las siete marcas verdes:
+ninguno. Está terminada cuando ves las ocho marcas verdes:
 
 ```
 ✅ Arrancaron el router e int-rest
@@ -157,10 +157,14 @@ ninguno. Está terminada cuando ves las siete marcas verdes:
 ✅ int-rest recibió el hilo en el sobre
 ✅ La API registró la 1003 con el mismo hilo: se puede seguir de punta a punta
 ✅ La tienda recibió de vuelta su mismo id
+✅ Los encabezados del sobre (ce-*) no salieron hacia la tienda
 ✅ Sin id de la tienda, el router inventó … y llegó igual a la API
 ```
 
 Donde ves `…` aparece el id de esa corrida: `verifica` usa uno nuevo cada vez.
+
+La séptima revisa algo que no escribiste tú: el sobre `ce-*` es para los servicios de adentro, y el router lo
+borra antes de contestarle a la tienda. A la tienda solo le regresa `X-Correlation-Id`.
 
 **¿No te corre?** `./verifica solucion` prueba la nuestra, y estos dos comandos te dicen en qué son distintas:
 
