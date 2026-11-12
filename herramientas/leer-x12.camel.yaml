@@ -1,0 +1,33 @@
+# Herramienta: lee un archivo X12 y lo explica en español. No la edites: la usa el script leer-x12.
+- route:
+    id: leer-x12
+    from:
+      uri: "file:{{carpeta}}"
+      parameters:
+        fileName: "{{archivo}}"
+        noop: true
+      steps:
+        # El texto X12 se vuelve una cadena JSON para que JSONata lo pueda recibir
+        - convertBodyTo:
+            type: String
+        - marshal:
+            json: {}
+        - to:
+            uri: "jsonata:file:herramientas/leer-x12.jsonata"
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - log:
+            message: "X12-TIPO ${body[tipo]}"
+        - split:
+            simple: "${body[segmentos]}"
+            steps:
+              - log:
+                  message: "X12-SEG ${body}"
+        - split:
+            simple: "${body[revision]}"
+            steps:
+              - log:
+                  message: "X12-REV ${body[ok]} ${body[que]}"

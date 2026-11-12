@@ -1,0 +1,60 @@
+/* Lector de X12 en español: parte el texto en segmentos y elementos, dice qué es cada uno
+   y revisa lo que un socio revisaría al recibirlo. Lo usa herramientas/leer-x12.
+   Separadores de esta práctica: * entre elementos, ~ al final de cada segmento, > dentro de un elemento. */
+(
+  $nombres := {
+    "ISA": "Sobre de intercambio (quién manda, a quién, número de control)",
+    "IEA": "Cierre del sobre de intercambio",
+    "GS":  "Grupo funcional (qué tipo de documentos trae)",
+    "GE":  "Cierre del grupo",
+    "ST":  "Inicio del documento",
+    "SE":  "Fin del documento (cuenta sus segmentos)",
+    "BEG": "Inicio de la orden de compra (número y fecha)",
+    "BSN": "Inicio del aviso de embarque",
+    "B10": "Datos del envío del transportista",
+    "N1":  "Nombre de una parte (a quién se envía)",
+    "PO1": "Renglón de la orden (cantidad, unidad, precio, producto)",
+    "PID": "Descripción del producto",
+    "CTT": "Totales (cuántos renglones)",
+    "HL":  "Nivel jerárquico (embarque, orden, artículo)",
+    "TD5": "Transportista",
+    "REF": "Referencia (guía, número de rastreo)",
+    "DTM": "Fecha y hora",
+    "SN1": "Artículo embarcado",
+    "LIN": "Producto",
+    "AT7": "Estatus del envío",
+    "AK1": "Acuse: qué grupo se revisó",
+    "AK2": "Acuse: qué documento se revisó",
+    "AK5": "Acuse: resultado del documento",
+    "AK9": "Acuse: resultado del grupo"
+  };
+  $tipos := {"850": "Orden de compra", "856": "Aviso de embarque", "214": "Estatus del transportista", "997": "Acuse funcional"};
+  /* Ojo: $trim de JSONata también junta los espacios repetidos y rompería el relleno del ISA.
+     Por eso solo se quitan los saltos de línea y espacios de las ORILLAS de cada segmento. */
+  $orillas := function($s) { $replace($s, /^\s+|\s+$/, "") };
+  $segs := $filter($map($split($, "~"), $orillas), function($s) { $s != "" });
+  $partes := $map($segs, function($s) { $split($s, "*") });
+  $de := function($id) { $filter($partes, function($p) { $p[0] = $id }) };
+  $isa := $de("ISA")[0]; $iea := $de("IEA")[0];
+  $gs := $de("GS")[0];   $ge := $de("GE")[0];
+  $st := $de("ST")[0];   $se := $de("SE")[0];
+  /* En qué posición está un segmento (se usa para contar de ST a SE) */
+  $pos := function($id) { $filter($map($partes, function($p, $i) { $p[0] = $id ? $i : -1 }), function($v) { $v >= 0 })[0] };
+  $iST := $pos("ST"); $iSE := $pos("SE");
+  $primero := $segs[0];
+  {
+    "tipo": $st[1] & " — " & ($lookup($tipos, $st[1]) ? $lookup($tipos, $st[1]) : "tipo desconocido"),
+    "segmentos": $map($partes, function($p) {
+      $p[0] & "  " & ($lookup($nombres, $p[0]) ? $lookup($nombres, $p[0]) : "(segmento que este lector no conoce)") &
+      "\n      " & $join($map([1..$count($p)-1], function($i) { $formatNumber($i, "00") & "=" & $p[$i] }), "  ")
+    }),
+    "revision": [
+      { "que": "El ISA mide 106 caracteres con su ~ (es de ancho fijo)", "ok": $length($primero) = 105 },
+      { "que": "El número de control del ISA coincide con el del IEA", "ok": $isa[13] = $iea[2] },
+      { "que": "El número de control del GS coincide con el del GE", "ok": $gs[6] = $ge[2] },
+      { "que": "El número de control del ST coincide con el del SE", "ok": $st[2] = $se[2] },
+      { "que": "El SE cuenta bien los segmentos del documento (de ST a SE)", "ok": $number($se[1]) = $iSE - $iST + 1 },
+      { "que": "Ningún segmento está vacío ni trae un separador de más al final", "ok": $count($filter($partes, function($p) { $p[$count($p)-1] = "" })) = 0 }
+    ]
+  }
+)

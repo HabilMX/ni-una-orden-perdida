@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Lee un archivo X12 y lo explica en español: qué es cada segmento y si está bien armado.
+#   ../../herramientas/leer-x12 datos/edi/850-ejemplo.edi
+# Sale con error si alguna revisión falla.
+set -uo pipefail
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+ARCH="$(cd "$(dirname "${1:?Dime el archivo X12}")" && pwd)/$(basename "$1")"
+[ -f "$ARCH" ] || { echo "❌ No existe $1"; exit 1; }
+case "$ARCH" in "$RAIZ"/*) REL="${ARCH#"$RAIZ"/}";; *) echo "❌ El archivo debe estar dentro del repo"; exit 1;; esac
+LOG=$(mktemp)
+docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 apache/camel-jbang:4.22.1 \
+  run herramientas/leer-x12.camel.yaml --prop=carpeta="$(dirname "$REL")" --prop=archivo="$(basename "$REL")" \
+  --max-messages=1 --max-seconds=60 >"$LOG" 2>&1
+grep -q "X12-TIPO" "$LOG" || { echo "❌ No pude leer el archivo como X12 (revisa $LOG)"; exit 1; }
+echo "📄 $(grep -m1 'X12-TIPO' "$LOG" | sed 's/.*X12-TIPO //')"
+echo
+awk '/X12-SEG /{sub(/.*X12-SEG /,"  "); print; getline; print}' "$LOG"
+echo
+FALLAS=0
+while read -r linea; do
+  ok=$(echo "$linea" | awk '{print $1}'); que=$(echo "$linea" | cut -d' ' -f2-)
+  if [ "$ok" = "true" ]; then echo "✅ $que"; else echo "❌ $que"; FALLAS=$((FALLAS+1)); fi
+done < <(grep 'X12-REV' "$LOG" | sed 's/.*X12-REV //')
+[ "$FALLAS" -eq 0 ]
