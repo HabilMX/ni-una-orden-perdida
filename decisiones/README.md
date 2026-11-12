@@ -1,0 +1,24 @@
+# Decisiones de diseño
+
+Cada decisión de la práctica tiene su ficha, y cada ficha se lee sola, sin haber hecho la lección. Todas tienen la
+misma forma: **qué decidimos, por qué, qué descartamos, qué nos haría reabrirla y sus fuentes**.
+
+Una decisión no es una verdad: es la mejor respuesta que encontramos con lo que sabemos hoy. Por eso cada ficha dice
+qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
+
+| # | Decisión | Lección |
+|---|---|---|
+| 01 | [Apache Camel como motor de integración](01-apache-camel-como-motor.md) | 01 |
+| 02 | [Rutas en YAML, en su forma canónica](02-rutas-en-yaml-canonico.md) | 01 en adelante |
+| 03 | [JSONata para traducir entre formatos](03-jsonata-para-traducir.md) | 03 |
+| 04 | [Sin casos dorados no hay mapeo](04-casos-dorados.md) | 03 en adelante |
+| 05 | [La API recibe una llave de idempotencia](05-idempotency-key-hacia-la-api.md) | 02 |
+| 06 | [En el ERP, todo o nada](06-todo-o-nada-en-el-erp.md) | 04b |
+| 07 | [El EDI se arma con una plantilla sin lógica](07-mustache-sin-logica-para-el-edi.md) | 05 |
+| 08 | [Cuatro cuidados al dejar un archivo al socio](08-entrega-segura-al-sftp.md) | 06 |
+| 09 | [Una sola imagen; cada servicio es una carpeta](09-una-imagen-un-servicio-por-carpeta.md) | 07 |
+| 10 | [Los servicios se hablan por nombre, sobre HTTP](10-servicios-por-nombre-sobre-http.md) | 07 |
+| 11 | [CloudEvents en modo binario como sobre](11-cloudevents-como-sobre.md) | 07, 08 |
+| 12 | [El hilo de correlación viaja con la orden, pero no sale de casa](12-el-hilo-de-correlacion.md) | 08, 09 |
+| 13 | [La orden sale a todos los canales, y el router cuenta lo que pasó](13-multicast-que-no-inventa.md) | 09 |
+| 14 | [Quién recibe qué se decide por el contenido, en un solo lugar](14-quien-recibe-se-decide-en-un-lugar.md) | 10 |
