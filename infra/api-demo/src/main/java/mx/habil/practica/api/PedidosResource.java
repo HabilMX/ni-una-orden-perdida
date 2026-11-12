@@ -22,12 +22,22 @@ import org.jboss.logging.Logger;
  * <p>No es permisiva a propósito, para que el alumno vea lo que un destino real contesta:
  * <ul>
  *   <li><b>400</b> si falta el encabezado {@code Idempotency-Key}.</li>
- *   <li><b>422</b> si el pedido no trae número, tienda o al menos un renglón válido, o si trae un total que no
- *       cuadra al centavo con sus partidas (o con más de dos decimales).</li>
  *   <li><b>201</b> la primera vez que llega un pedido con una llave.</li>
  *   <li><b>200</b> si vuelve a llegar la MISMA llave con el MISMO contenido: es un reenvío y no se duplica.</li>
- *   <li><b>409</b> si llega la misma llave con contenido DISTINTO: es un conflicto y no se adivina cuál vale.</li>
+ *   <li><b>422</b> si llega la misma llave con contenido DISTINTO: quien envía reusó la llave, y no se adivina
+ *       cuál de los dos contenidos vale. Es lo que pide el borrador del IETF del encabezado Idempotency-Key.</li>
+ *   <li><b>422</b> también si el pedido no trae número, tienda o al menos un renglón válido, o si trae un total que
+ *       no cuadra al centavo con sus partidas (o con más de dos decimales).</li>
  * </ul>
+ *
+ * <p>Los dos 422 se distinguen por el cuerpo, no por el código: todo error sale como
+ * {@code application/problem+json} (RFC 9457) y su campo {@code type} dice cuál es ({@link #LLAVE_REUSADA},
+ * {@link #PEDIDO_INVALIDO}, {@link #FALTA_LLAVE}, {@link #NO_EXISTE}). La llave se revisa ANTES de validar el
+ * contenido: una llave reusada se reporta como tal aunque el contenido nuevo tampoco sea válido. Un pedido inválido
+ * no guarda su llave, así que puede reenviarse corregido con la misma.
+ *
+ * <p>El 409 del borrador («la petición original sigue en proceso») no aparece aquí: esta API contesta al momento y
+ * nunca tiene una petición a medias.
  *
  * <p>Si la llamada trae {@code X-Correlation-Id}, la API lo anota en su bitácora junto a cada respuesta
  * ({@code correlacion=...}; un guion si no vino). Así se puede seguir una orden hasta aquí solo con ese id.
@@ -43,6 +53,12 @@ public class PedidosResource {
 
     private static final Logger LOG = Logger.getLogger(PedidosResource.class);
 
+    /** Identificadores de cada tipo de error (campo {@code type} del problem+json). Son URI de tipo «tag». */
+    static final String FALTA_LLAVE = "tag:habil.mx,2026:ni-una-orden-perdida/falta-llave";
+    static final String PEDIDO_INVALIDO = "tag:habil.mx,2026:ni-una-orden-perdida/pedido-invalido";
+    static final String LLAVE_REUSADA = "tag:habil.mx,2026:ni-una-orden-perdida/llave-reusada";
+    static final String NO_EXISTE = "tag:habil.mx,2026:ni-una-orden-perdida/no-existe";
+
     /** Lo recibido por llave de idempotencia: el cuerpo original y el pedido que generó. */
     private record Recibido(Map<String, Object> cuerpo, String pedido, String recibido) { }
 
@@ -56,34 +72,47 @@ public class PedidosResource {
         String correlacion = correlacionRecibida == null || correlacionRecibida.isBlank() ? "-" : correlacionRecibida;
         if (llave == null || llave.isBlank()) {
             LOG.infof("400 llave=- correlacion=%s motivo=falta Idempotency-Key", correlacion);
-            return error(400, "Falta el encabezado Idempotency-Key");
+            return error(400, FALTA_LLAVE, "Falta la llave de idempotencia", "Falta el encabezado Idempotency-Key");
+        }
+        Recibido previo = porLlave.get(llave);
+        if (previo != null) {
+            return yaVista(previo, llave, correlacion, cuerpo);
         }
         String problema = validar(cuerpo);
         if (problema != null) {
             LOG.infof("422 llave=%s correlacion=%s motivo=%s", llave, correlacion, problema);
-            return error(422, problema);
+            return error(422, PEDIDO_INVALIDO, "El pedido no es válido", problema);
         }
         String pedido = String.valueOf(cuerpo.get("pedido"));
         Recibido nuevo = new Recibido(cuerpo, pedido, OffsetDateTime.now().toString());
-        Recibido previo = porLlave.putIfAbsent(llave, nuevo);
-        if (previo == null) {
-            porPedido.put(pedido, nuevo);
-            LOG.infof("201 llave=%s pedido=%s correlacion=%s", llave, pedido, correlacion);
-            return Response.status(201).entity(acuse(nuevo, "creado")).build();
+        previo = porLlave.putIfAbsent(llave, nuevo);
+        if (previo != null) {
+            // Otra llamada con la misma llave ganó por un instante: se contesta como si hubiera llegado antes
+            return yaVista(previo, llave, correlacion, cuerpo);
         }
+        porPedido.put(pedido, nuevo);
+        LOG.infof("201 llave=%s pedido=%s correlacion=%s", llave, pedido, correlacion);
+        return Response.status(201).entity(acuse(nuevo, "creado")).build();
+    }
+
+    /** La llave ya llegó antes: mismo contenido es un reenvío (200); otro contenido es una llave reusada (422). */
+    private Response yaVista(Recibido previo, String llave, String correlacion, Map<String, Object> cuerpo) {
         if (Objects.equals(previo.cuerpo(), cuerpo)) {
-            LOG.infof("200 llave=%s pedido=%s correlacion=%s (reenvío, no se duplica)", llave, pedido, correlacion);
+            LOG.infof("200 llave=%s pedido=%s correlacion=%s (reenvío, no se duplica)", llave, previo.pedido(), correlacion);
             return Response.ok(acuse(previo, "ya_existia")).build();
         }
-        LOG.infof("409 llave=%s pedido=%s correlacion=%s (misma llave, contenido distinto)", llave, pedido, correlacion);
-        return error(409, "La llave " + llave + " ya se usó con otro contenido");
+        LOG.infof("422 llave=%s pedido=%s correlacion=%s motivo=llave reusada con otro contenido",
+                llave, previo.pedido(), correlacion);
+        return error(422, LLAVE_REUSADA, "La llave ya se usó con otro contenido",
+                "La llave " + llave + " ya se usó con otro contenido; no se adivina cuál de los dos vale");
     }
 
     @GET
     @Path("/{pedido}")
     public Response consultar(@PathParam("pedido") String pedido) {
         Recibido r = porPedido.get(pedido);
-        return r == null ? error(404, "No existe el pedido " + pedido) : Response.ok(r.cuerpo()).build();
+        return r == null ? error(404, NO_EXISTE, "No existe el pedido", "No existe el pedido " + pedido)
+                : Response.ok(r.cuerpo()).build();
     }
 
     /** Devuelve el motivo del rechazo, o {@code null} si el pedido es válido. */
@@ -131,7 +160,11 @@ public class PedidosResource {
         return Map.of("pedido", r.pedido(), "resultado", resultado, "recibido", r.recibido());
     }
 
-    private static Response error(int estatus, String mensaje) {
-        return Response.status(estatus).entity(Map.of("error", mensaje)).build();
+    /** Un error con la forma de RFC 9457: qué tipo es, un título corto, el código y el detalle de este caso. */
+    private static Response error(int estatus, String tipo, String titulo, String detalle) {
+        return Response.status(estatus)
+                .type("application/problem+json")
+                .entity(Map.of("type", tipo, "title", titulo, "status", estatus, "detail", detalle))
+                .build();
     }
 }

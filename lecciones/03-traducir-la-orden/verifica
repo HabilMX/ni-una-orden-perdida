@@ -27,7 +27,7 @@ PID=$!
 for i in $(seq 1 60); do grep -q "Started orden-a-api" "$LOG" && break; sleep 2; done
 grep -q "Started orden-a-api" "$LOG" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
 c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1003.json")
-[ "$c" = "201" ] && si "La API aceptó la orden 1003 (201)" || no "La API no aceptó la orden 1003: llegó $c (si es 422, el total no cuadra al centavo)"
+[ "$c" = "201" ] && si "La API aceptó la orden 1003 (201)" || no "La API no aceptó la orden 1003: llegó $c (si es 422, el motivo está en la bitácora de la API: docker compose -f infra/compose.yaml logs api-pedidos)"
 t=$(curl -s localhost:8081/pedidos/1003 | python3 -c "import sys,json; print(json.load(sys.stdin).get('total'))" 2>/dev/null)
 [ "$t" = "25.19" ] && si "El pedido quedó con total 25.19" || no "El pedido quedó con total ${t:-ninguno}, no 25.19"
 docker stop $(docker ps -q --filter ancestor=apache/camel-jbang:4.22.1) >/dev/null 2>&1; wait $PID 2>/dev/null
