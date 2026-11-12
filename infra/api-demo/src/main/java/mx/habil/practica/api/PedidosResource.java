@@ -22,7 +22,8 @@ import org.jboss.logging.Logger;
  * <p>No es permisiva a propósito, para que el alumno vea lo que un destino real contesta:
  * <ul>
  *   <li><b>400</b> si falta el encabezado {@code Idempotency-Key}.</li>
- *   <li><b>422</b> si el pedido no trae número, tienda o al menos un renglón válido.</li>
+ *   <li><b>422</b> si el pedido no trae número, tienda o al menos un renglón válido, o si trae un total que no
+ *       cuadra al centavo con sus partidas (o con más de dos decimales).</li>
  *   <li><b>201</b> la primera vez que llega un pedido con una llave.</li>
  *   <li><b>200</b> si vuelve a llegar la MISMA llave con el MISMO contenido: es un reenvío y no se duplica.</li>
  *   <li><b>409</b> si llega la misma llave con contenido DISTINTO: es un conflicto y no se adivina cuál vale.</li>
@@ -95,6 +96,25 @@ public class PedidosResource {
         for (Object o : partidas) {
             if (!(o instanceof Map<?, ?> m) || !(m.get("cantidad") instanceof Number c) || c.intValue() <= 0) {
                 return "Hay una partida sin cantidad positiva";
+            }
+        }
+        // Si el pedido trae total (desde la versión 2 del mapeo), tiene que cuadrar al centavo con sus partidas.
+        if (cuerpo.containsKey("total")) {
+            if (!(cuerpo.get("total") instanceof Number total)) {
+                return "El total no es un número";
+            }
+            java.math.BigDecimal suma = java.math.BigDecimal.ZERO;
+            for (Object o : partidas) {
+                Map<?, ?> m = (Map<?, ?>) o;
+                if (!(m.get("precio") instanceof Number precio)) {
+                    return "Hay una partida sin precio";
+                }
+                suma = suma.add(new java.math.BigDecimal(precio.toString())
+                        .multiply(new java.math.BigDecimal(((Number) m.get("cantidad")).toString())));
+            }
+            java.math.BigDecimal declarado = new java.math.BigDecimal(total.toString());
+            if (declarado.scale() > 2 || declarado.compareTo(suma) != 0) {
+                return "El total " + declarado.toPlainString() + " no cuadra con las partidas, que suman " + suma.toPlainString();
             }
         }
         return null;
