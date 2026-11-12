@@ -1,0 +1,30 @@
+# La orden se convierte en un X12 850 para el socio comercial.
+#   archivo de la orden → el mapeo calcula los datos del 850 → la plantilla los acomoda → archivo .edi
+# (En la 06 este archivo viaja al SFTP del socio; por ahora se queda en salida/.)
+- route:
+    id: orden-a-edi
+    from:
+      uri: file:entrada
+      parameters:
+        include: ".*\\.json"
+      steps:
+        - setVariable:
+            name: orden
+            jsonpath: "$.orden"
+        # 1) El mapeo CALCULA (rellenos, fechas, precios, cuenta de segmentos, texto limpio)
+        - to:
+            uri: jsonata:mappings/edi/850/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}          # la plantilla recibe solo datos (mapas y listas), nunca objetos
+        # 2) La plantilla ACOMODA
+        - to:
+            uri: mustache:templates/edi/850/v1/850.mustache
+        - to:
+            uri: file:salida
+            parameters:
+              fileName: "850-${variable.orden}.edi"
+        - log:
+            message: "Generé el 850 de la orden ${variable.orden}"

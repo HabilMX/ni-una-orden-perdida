@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Comprueba la lección 05: el mapeo calcula el 850, la plantilla lo acomoda y el resultado es un X12 bien armado.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). No necesita el ambiente: solo Docker.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+
+"$RAIZ/herramientas/probar-mapeo" "$DONDE/mappings/edi/850/v1" >/dev/null && si "El mapeo del 850 pasa sus casos dorados" || no "El mapeo del 850 no pasa sus casos dorados"
+
+cd "$DONDE"; rm -rf entrada salida; mkdir -p entrada
+cp "$RAIZ/datos/ordenes/orden-1001.json" "$RAIZ/datos/ordenes/orden-1005-caracteres.json" entrada/
+"$RAIZ/herramientas/camel" run orden-a-edi.camel.yaml --max-messages=2 --max-seconds=90 >/dev/null 2>&1
+
+for o in 1001 1005; do
+  f="salida/850-$o.edi"
+  [ -f "$f" ] || { no "No se generó $f"; continue; }
+  if grep -q "&amp;" "$f"; then no "El 850 de la $o trae &amp;: usa llaves TRIPLES en la plantilla"; fi
+  "$RAIZ/herramientas/leer-x12" "$PWD/$f" >/dev/null 2>&1 \
+    && si "El 850 de la $o es un X12 bien armado (el lector no encontró fallas)" || no "El 850 de la $o no pasa la revisión del lector: corre herramientas/leer-x12 sobre él"
+done
+cmp -s salida/850-1001.edi "$RAIZ/datos/edi/850-ejemplo.edi" && si "El 850 de la 1001 es idéntico al de ejemplo" || no "El 850 de la 1001 no es idéntico al de ejemplo (compáralos con diff)"
+cmp -s salida/850-1005.edi "$RAIZ/datos/edi/850-1005-esperado.edi" && si "El 850 de la 1005 (con & y *) es el esperado" || no "El 850 de la 1005 no es el esperado (compáralos con diff)"
+exit $ok
