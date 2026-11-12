@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Comprueba la lección 00: el ambiente está arriba y cada pieza contesta lo que debe.
+set -uo pipefail
+cd "$(dirname "$0")/../.."
+C="docker compose -f infra/compose.yaml"
+ok=0
+si() { echo "✅ $1"; }
+no() { echo "❌ $1"; ok=1; }
+
+for s in estado erp socio-sftp; do
+  [ "$($C ps --format '{{.Service}} {{.Health}}' | awk -v s=$s '$1==s{print $2}')" = "healthy" ] && si "$s está arriba" || no "$s no está arriba: corre  docker compose -f infra/compose.yaml up -d --wait"
+done
+
+t=$($C exec -T estado psql -U router -d estado -tAc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('orden','operacion','intento')" 2>/dev/null)
+[ "$t" = "3" ] && si "La base de estado tiene sus tres tablas" || no "La base de estado no tiene sus tres tablas (encontré: ${t:-ninguna})"
+
+p=$($C exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "select count(*) from information_schema.routines where routine_schema='erp' and routine_name='registrar_pedido'" 2>/dev/null)
+[ "$p" = "1" ] && si "El ERP tiene su procedimiento registrar_pedido" || no "El ERP no tiene registrar_pedido"
+
+# Control positivo del ERP: el procedimiento RECHAZA un pedido que no existe (no es permisivo)
+r=$($C exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "call registrar_pedido('NO-EXISTE')" 2>&1)
+echo "$r" | grep -q "El pedido no existe" && si "El ERP rechaza lo que no cuadra" || no "El ERP no rechazó un pedido inexistente (o no contestó)"
+
+$C exec -T socio-sftp sh -c 'test -d /home/socio/entrada && test -d /home/socio/salida' && si "El SFTP del socio tiene entrada/ y salida/" || no "El SFTP del socio no tiene sus carpetas"
+exit $ok

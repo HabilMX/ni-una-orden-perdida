@@ -1,0 +1,48 @@
+# El ambiente de la práctica: los destinos emulados y la base de estado.
+# Se levanta con:   docker compose -f infra/compose.yaml up -d --wait
+#
+# ⚠️ Las contraseñas de aquí son de PRÁCTICA, para una máquina local. No son secretos:
+#    por eso viven en el archivo. En un sistema real llegan por variables o por un gestor de secretos.
+name: practica-retail
+
+services:
+  # Base de estado del router (lección 13 en adelante). Solo el router escribe aquí.
+  estado:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: estado
+      POSTGRES_USER: router
+      POSTGRES_PASSWORD: ${ESTADO_CLAVE:-practica}
+    ports: ["5432:5432"]
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U router -d estado"]
+      interval: 3s
+      retries: 20
+
+  # El ERP emulado: tablas de cabecera y detalle, y el procedimiento que registra el pedido.
+  erp:
+    image: mariadb:11.8
+    environment:
+      MARIADB_DATABASE: erp
+      MARIADB_USER: integracion
+      MARIADB_PASSWORD: ${ERP_CLAVE:-practica}
+      MARIADB_ROOT_PASSWORD: ${ERP_CLAVE_ROOT:-practica-root}
+    ports: ["3306:3306"]
+    volumes:
+      - ./mariadb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      retries: 30
+
+  # El SFTP del socio comercial: aquí se depositan los EDI X12 (lección 06 en adelante).
+  socio-sftp:
+    image: atmoz/sftp:alpine
+    command: "socio:${SFTP_CLAVE:-practica}:1001::entrada,salida"
+    ports: ["2222:22"]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 22"]
+      interval: 3s
+      retries: 20
