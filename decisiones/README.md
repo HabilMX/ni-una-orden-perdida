@@ -23,3 +23,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 12 | [El hilo de correlación viaja con la orden, pero no sale de casa](12-el-hilo-de-correlacion.md) | 09, 10 |
 | 13 | [La orden sale a todos los canales, y el router cuenta lo que pasó](13-multicast-que-no-inventa.md) | 10 |
 | 14 | [Quién recibe qué se decide por el contenido, en un solo lugar](14-quien-recibe-se-decide-en-un-lugar.md) | 11 |
+| 15 | [Tres copias no reparten solas: el reparto es por conexión](15-repartir-por-conexion.md) | 12 |
