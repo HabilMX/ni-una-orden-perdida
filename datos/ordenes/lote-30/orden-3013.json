@@ -1,0 +1,18 @@
+{
+  "orden": "3013",
+  "tienda": "T-014",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente@example.com"
+  },
+  "creada": "2026-11-12T12:12:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0001",
+      "descripcion": "Taza blanca",
+      "cantidad": 1,
+      "precio": 89.5
+    }
+  ]
+}

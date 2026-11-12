@@ -1,0 +1,18 @@
+{
+  "orden": "3015",
+  "tienda": "T-031",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente@example.com"
+  },
+  "creada": "2026-11-12T12:14:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0107",
+      "descripcion": "Vaso de vidrio",
+      "cantidad": 3,
+      "precio": 35.0
+    }
+  ]
+}

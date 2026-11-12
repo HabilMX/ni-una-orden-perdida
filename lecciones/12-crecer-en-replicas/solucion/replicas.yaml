@@ -1,0 +1,14 @@
+# Lo que cambia en la lección 12. Compose lo junta con ../compose.yaml: lo que aquí se dice, se agrega o reemplaza.
+services:
+  int-bd:
+    deploy:
+      replicas: 3               # tres copias del MISMO servicio; el router las sigue llamando «int-bd»
+
+  orden-router:
+    # Cada conexión del router a un canal vive a lo más 1 segundo (1000 ms). Al vencer, la siguiente llamada
+    # abre una conexión nueva. Por omisión vive para siempre, y entonces todas las órdenes van a la misma copia.
+    command: ["run", ".", "--prop=camel.component.http.connectionTimeToLive=1000"]
+    environment:
+      # La JVM recuerda la dirección de «int-bd» solo 1 segundo, así que cada conexión nueva le vuelve a
+      # preguntar al DNS de Docker, que contesta las tres direcciones en distinto orden cada vez.
+      JDK_JAVA_OPTIONS: "-Dsun.net.inetaddr.ttl=1"

@@ -1,0 +1,52 @@
+# Los servicios de la lección 12: el router y los tres canales, igual que en la 11. Este archivo NO se toca:
+# lo que cambia en esta lección (cuántas copias de int-bd y cómo las alcanza el router) vive en replicas.yaml,
+# dentro de tu carpeta. Compose junta los dos archivos: el segundo agrega o cambia lo que dice el primero.
+#
+#   DONDE=mio docker compose -f compose.yaml -f mio/replicas.yaml up -d                (tu versión)
+#   DONDE=solucion docker compose -f compose.yaml -f solucion/replicas.yaml up -d      (la nuestra)
+#
+# Se unen a la red del ambiente (lección 00) para alcanzar a los destinos por su nombre.
+name: practica-retail-l12
+
+x-camel: &camel
+  image: apache/camel-jbang:4.22.1
+  command: ["run", "."]          # corre todos los *.camel.yaml de su carpeta
+  working_dir: /work
+  networks: [practica]
+
+services:
+  orden-router:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/orden-router:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+    ports: ["8080:8080"]        # la tienda le habla al router; es el único que se ve desde tu máquina
+
+  int-rest:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/int-rest:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+  int-bd:
+    <<: *camel
+    # Las mismas piezas de su dependencias.txt: el controlador de MariaDB y las transacciones
+    command: ["run", ".", "--dep=org.mariadb.jdbc:mariadb-java-client:3.5.11,org.apache.camel:camel-spring:4.22.1,org.springframework:spring-jdbc:7.0.9"]
+    volumes:
+      - ./${DONDE:-mio}/int-bd:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+  int-edi:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/int-edi:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+networks:
+  practica:
+    name: practica-retail_default
+    external: true
+
+volumes:
+  practica-retail-m2:
+    external: true

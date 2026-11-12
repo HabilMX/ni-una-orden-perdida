@@ -1,0 +1,13 @@
+# Lo que cambia en la lección 12. Compose lo junta con ../compose.yaml: lo que aquí se dice, se agrega o reemplaza.
+# Hoy no cambia nada: int-bd corre en una sola copia, como en la 11.
+services:
+  int-bd: {}
+    # TODO 1: pide tres copias de int-bd. Busca en la documentación de Compose «deploy» → «replicas».
+    #         Corre el verifica: ¿cuántas órdenes registró cada copia? Anota tu explicación antes de seguir.
+
+  orden-router: {}
+    # TODO 2: haz que el router reparta. Dos cosas, las dos en este archivo:
+    #   a) que cada conexión a un canal viva a lo más 1 segundo. Es la opción connectionTimeToLive del
+    #      componente http; se le pasa al router en su command:  ["run", ".", "--prop=…=1000"]
+    #   b) que la JVM del router recuerde la dirección de «int-bd» solo 1 segundo. Va en environment, en
+    #      JDK_JAVA_OPTIONS, con la propiedad sun.net.inetaddr.ttl
