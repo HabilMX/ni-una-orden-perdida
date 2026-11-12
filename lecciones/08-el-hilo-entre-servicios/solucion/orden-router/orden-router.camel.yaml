@@ -90,6 +90,9 @@
               throwExceptionOnFailure: false
         - log:
             message: "Orden ${variable.orden} correlacion=${variable.correlacion}: int-rest contestó ${header.CamelHttpResponseCode}"
+        # Los encabezados del viaje interno (el sobre ce-*) no salen hacia la tienda
+        - removeHeaders:
+            pattern: "ce-*"
         # La tienda recibe de vuelta el id con el que puede seguir su orden
         - setHeader:
             name: X-Correlation-Id

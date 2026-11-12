@@ -40,6 +40,8 @@ SERV logs int-rest 2>/dev/null | grep -q "orden 1003 correlacion=$HILO" && si "i
 LOG_API | grep -q "201 llave=1003 pedido=1003 correlacion=$HILO" && si "La API registró la 1003 con el mismo hilo: se puede seguir de punta a punta" \
   || no "La API no recibió el hilo de la 1003 (anotó: $(LOG_API | grep 'llave=1003' | sed 's/.*correlacion=/correlacion=/' | head -1))"
 echo "$R" | tr -d '\r' | grep -qi "^X-Correlation-Id: $HILO$" && si "La tienda recibió de vuelta su mismo id" || no "La tienda no recibió de vuelta X-Correlation-Id: $HILO"
+echo "$R" | tr -d '\r' | grep -qi "^ce-" && no "La respuesta a la tienda trae encabezados del sobre (ce-*): son del viaje interno y no deben salir" \
+  || si "Los encabezados del sobre (ce-*) no salieron hacia la tienda"
 
 # 2) La tienda NO manda id: el router inventa uno, y ese mismo llega a la API
 R=$(curl -s -D - -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1001.json")
