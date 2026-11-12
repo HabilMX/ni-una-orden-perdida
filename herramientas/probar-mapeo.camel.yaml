@@ -35,6 +35,12 @@
         - pollEnrich:
             simple: "file:${variable.caso}?fileName=esperado.json&noop=true&idempotent=false"
             timeout: 3000
+        # El esperado en una sola línea, para mostrarlo completo si el caso falla
+        - to:
+            uri: "jsonata:file:herramientas/compactar.jsonata"
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
         - setVariable:
             name: esperadoTexto
             simple: "${bodyAs(String)}"
