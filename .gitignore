@@ -6,3 +6,7 @@ lecciones/*/*/salida/
 .camel-jbang-run/
 *.log
 known_hosts
+# El buzón de la bodega (lección 13 en adelante): lo llena el verifica o el alumno, y el sondeo lo vacía
+lecciones/*/buzon/
+# Lo que compila Maven (infra/api-demo)
+target/
