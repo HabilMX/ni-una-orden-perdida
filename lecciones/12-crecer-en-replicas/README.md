@@ -130,7 +130,7 @@ guardada. Ahora agrega la b y corre otra vez.
 ```
 
 `verifica` reinicia la API, vacía el ERP, levanta los servicios con tu `replicas.yaml` y manda las 30 órdenes, una
-cada segundo y medio, como llegarían de una tienda. Está terminada cuando ves las siete marcas verdes:
+cada segundo y medio, como llegarían de una tienda. Está terminada cuando ves las seis marcas verdes:
 
 ```
 ✅ int-bd corre en 3 copias
