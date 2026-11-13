@@ -13,6 +13,18 @@ AQUI="$(cd "$(dirname "$0")" && pwd)"
 cd "$AQUI/.."
 CIFRAS="$AQUI/cifras.md"
 C() { docker compose "$@"; }
+# Construir. El Dockerfile de int-rest vive en la carpeta de la 31 y la API en infra/: las dos quedan fuera de esta
+# carpeta. Un buildx reciente no lee fuera de donde estás sin permiso explícito («additional privileges requested»),
+# así que se construye con «docker buildx bake» (lee este mismo compose.yaml) dándole permiso SOLO para esas dos
+# carpetas. Un buildx viejo, que no conoce --allow, tampoco pide ese permiso: ahí basta con «docker compose build».
+construir() {
+  if docker buildx bake --help 2>/dev/null | grep -q -- '--allow'; then
+    docker buildx bake -f compose.yaml --load \
+      --allow fs.read=../31-de-laboratorio-a-kubernetes --allow fs.read=../../infra/api-demo "$@"
+  else
+    C build "$@"
+  fi
+}
 # La hora en milisegundos. perl viene en macOS, en Linux y en Git Bash; «date +%N» no existe en macOS.
 ms() { perl -MTime::HiRes=time -e 'printf "%.0f\n", time*1000'; }
 puerto() { [ "$1" = "jvm" ] && echo 8091 || echo 8092; }
@@ -56,11 +68,11 @@ memoria_con_carga() {
 }
 
 echo "1. Construyendo las dos imágenes desde cero (la nativa tarda varios minutos)…"
-C build api-pedidos >/dev/null 2>&1 || { echo "No pude construir la API"; exit 1; }
+construir api-pedidos >/dev/null 2>&1 || { echo "No pude construir la API"; exit 1; }
 declare -a FILAS
 for modo in jvm nativo; do
   t0=$(ms)
-  if C build --no-cache "int-rest-$modo" >"$AQUI/build-$modo.log" 2>&1; then
+  if construir --no-cache "int-rest-$modo" >"$AQUI/build-$modo.log" 2>&1; then
     construir=$(awk -v d=$(( $(ms) - t0 )) 'BEGIN{printf "%.1f", d/1000}')
   else
     echo "   No se pudo construir int-rest-$modo. Lo último que dijo:"; tail -10 "$AQUI/build-$modo.log"; construir="—"
