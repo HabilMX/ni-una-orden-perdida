@@ -1,0 +1,9 @@
+{"isa":{"emisor":"TIENDANORTE    ","receptor":"SOCIO01        ","fecha":"261113","hora":"0945","control":"000004002"},
+ "gs":{"emisor":"TIENDANORTE","receptor":"SOCIO01","fecha":"20261113","hora":"0945","control":"4002"},
+ "st":{"control":"0001"},
+ "bsn":{"embarque":"EMB-4002","fecha":"20261113","hora":"0945"},
+ "envio":{"paqueteria":"PAQX","guia":"PAQX770004002","fecha":"20261113","hora":"0945"},
+ "orden":"4002",
+ "lineas":[{"hl":3,"n":1,"sku":"SKU-0107","cantidad":1}],
+ "ctt":1,
+ "se":{"segmentos":13}}

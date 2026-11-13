@@ -1,0 +1,6 @@
+# Piezas extra que Camel descarga para esta lección.
+# El controlador (driver) de MariaDB: sin él, Camel no sabe hablar con la base del ERP.
+org.mariadb.jdbc:mariadb-java-client:3.5.11
+# Las transacciones: la regla «todo o nada» y quien la aplica sobre la conexión.
+org.apache.camel:camel-spring:4.22.1
+org.springframework:spring-jdbc:7.0.9

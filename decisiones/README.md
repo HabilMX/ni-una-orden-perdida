@@ -36,3 +36,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 25 | [El 997 se correlaciona por el grupo y el documento, y solo él confirma](25-el-997-se-correlaciona-por-grupo-y-documento.md) | 21 en adelante |
 | 26 | [Un cortacircuito por canal, en el router](26-un-cortacircuito-por-canal.md) | 22 en adelante |
 | 27 | [El reproceso a mano es un intento más, con nombre y motivo](27-el-rerun-es-un-intento-manual.md) | 23 en adelante |
+| 28 | [Un tope por copia hacia el ERP, contando lo que va en curso](28-un-tope-por-copia.md) | 24 en adelante |

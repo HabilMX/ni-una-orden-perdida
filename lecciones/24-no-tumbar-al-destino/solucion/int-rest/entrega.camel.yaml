@@ -1,0 +1,61 @@
+# int-rest, tercer momento: la entrega. La paquetería avisó que entregó; se lo cuenta a la API como el evento
+# «entregado» del pedido, con la guía. La API se niega (422) si el pedido no se ha embarcado o si la guía no es
+# la del embarque. Misma forma que la ruta del embarque; la llave es el ce-id (orden-<id>-entregada).
+- route:
+    id: int-rest-entrega
+    from:
+      uri: platform-http:/entrega
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: llave
+            expression:
+              simple:
+                expression: "${header.ce-id}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - log:
+            message: "Recibí del router la entrega de la orden ${variable.orden} correlacion=${variable.correlacion} (sobre ${header.ce-id})"
+        - to:
+            uri: jsonata:mappings/api/entrega/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Idempotency-Key
+            expression:
+              simple:
+                expression: "${variable.llave}"
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - toD:
+            uri: "http://api-pedidos:8080/pedidos/${variable.orden}/eventos"
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: api/entrega/v1
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode} a la entrega de la orden ${variable.orden} correlacion=${variable.correlacion}"

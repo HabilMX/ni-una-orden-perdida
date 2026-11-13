@@ -1,0 +1,35 @@
+/* Lee un 997 (acuse funcional X12 004010) y dice qué acusa y cómo. Calcula; no escribe nada.
+
+   Llega:  el texto del 997, como cadena JSON ("ISA*00*...~GS*FA*...~ST*997*0001~AK1*PO*100000001~...").
+   Sale:   {"socio": {"control": ISA13 del 997},
+            "grupo": {"tipo": AK1-01, "control": AK1-02},          ← el GS01 y el GS06 del grupo que acusa
+            "documento": {"tipo": AK2-01, "control": AK2-02},      ← el ST01 y el ST02 del documento que acusa
+            "acuse": AK5-01,                                       ← A aceptado, R rechazado (y E, aceptado con errores)
+            "errores": [{"segmento", "posicion", "elemento", "valor"}]}   ← de AK3 y AK4, si los hay
+
+   El 997 cita lo que acusa por los números del GRUPO y del DOCUMENTO, no por el ISA: el ISA13 del 997 es del socio.
+   Este socio acusa un documento por 997 y señala a lo más un error (un AK3 con su AK4).
+   Si el texto no es un 997, el mapeo se niega. */
+(
+  $segs := $split($replace($, /[\r\n]/, ""), "~")[$ != ""].(
+    $e := $split($, "*");
+    {"id": $e[0], "e": $e}
+  );
+  $seg := function($id) { $segs[id = $id][0] };
+  $st := $seg("ST");
+  $st.e[1] = "997" ? (
+    $ak1 := $seg("AK1"); $ak2 := $seg("AK2"); $ak5 := $seg("AK5"); $ak4 := $seg("AK4");
+    {
+      "socio": {"control": $seg("ISA").e[13]},
+      "grupo": {"tipo": $ak1.e[1], "control": $ak1.e[2]},
+      "documento": {"tipo": $ak2.e[1], "control": $ak2.e[2]},
+      "acuse": $ak5.e[1],
+      "errores": [$segs[id = "AK3"].{
+        "segmento": e[1],
+        "posicion": e[2],
+        "elemento": $ak4.e[1],
+        "valor": $ak4.e[4]
+      }]
+    }
+  ) : $error("No es un 997: el ST dice " & $st.e[1])
+)
