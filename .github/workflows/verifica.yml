@@ -28,7 +28,10 @@ concurrency:
 jobs:
   lecciones:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # En una Mac M5, con las imágenes y las dependencias ya bajadas, la suite tardó 21 min (1 264 s). Aquí empieza en
+    # frío (bajar imágenes y dependencias de Maven) y en 4 núcleos x86 más lentos: se estima entre 2 y 3 veces más.
+    # 90 min deja margen sin dejar colgada una corrida trabada toda la tarde.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
