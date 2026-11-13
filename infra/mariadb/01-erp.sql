@@ -43,14 +43,15 @@ CREATE TABLE embarque (
   guia         VARCHAR(30) NOT NULL,
   paqueteria   VARCHAR(10) NOT NULL,
   fecha        DATETIME NOT NULL,
-  FOREIGN KEY (pedido) REFERENCES pedido_cabecera(pedido)
+  -- ON DELETE CASCADE: al borrar un pedido (como hacen los verifica de la 04 a la 12) se va con su embarque
+  FOREIGN KEY (pedido) REFERENCES pedido_cabecera(pedido) ON DELETE CASCADE
 );
 
 CREATE TABLE entrega (
   pedido       VARCHAR(20) PRIMARY KEY,
   guia         VARCHAR(30) NOT NULL,
   fecha        DATETIME NOT NULL,
-  FOREIGN KEY (pedido) REFERENCES pedido_cabecera(pedido)
+  FOREIGN KEY (pedido) REFERENCES pedido_cabecera(pedido) ON DELETE CASCADE
 );
 
 -- Registra que el pedido salió de la bodega: solo un pedido REGISTRADO, y lo deja EMBARCADO.
