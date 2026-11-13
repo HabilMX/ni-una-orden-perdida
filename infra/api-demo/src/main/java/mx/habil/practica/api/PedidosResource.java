@@ -44,6 +44,9 @@ import org.jboss.logging.Logger;
  * paquetería la avanzan con {@code POST /pedidos/{pedido}/eventos} (ver {@link #registrarEvento}), y el {@code GET}
  * devuelve el pedido con su {@code estatus} y su {@code guia}. Los eventos también exigen {@code Idempotency-Key}.
  *
+ * <p>Desde la 1.4.0, {@code POST /admin/modo} hace que crear un pedido sea lento o se rechace por negocio (ver
+ * {@link Modo}): así las lecciones 19 y 20 tienen un destino que tarda y uno que dice que no.
+ *
  * <p>Si la llamada trae {@code X-Correlation-Id}, la API lo anota en su bitácora junto a cada respuesta
  * ({@code correlacion=...}; un guion si no vino). Así se puede seguir una orden hasta aquí solo con ese id.
  *
@@ -66,6 +69,7 @@ public class PedidosResource {
     static final String EVENTO_INVALIDO = "tag:habil.mx,2026:ni-una-orden-perdida/evento-invalido";
     static final String FUERA_DE_ORDEN = "tag:habil.mx,2026:ni-una-orden-perdida/fuera-de-orden";
     static final String GUIA_DISTINTA = "tag:habil.mx,2026:ni-una-orden-perdida/guia-distinta";
+    static final String RECHAZADO_POR_NEGOCIO = "tag:habil.mx,2026:ni-una-orden-perdida/rechazado-por-negocio";
 
     /** Los estatus por los que pasa un pedido, en este orden. */
     static final String CREADO = "CREADO";
@@ -86,6 +90,10 @@ public class PedidosResource {
     private final Map<String, Avance> avancePorPedido = new ConcurrentHashMap<>();
     private final Map<String, Evento> eventosPorLlave = new ConcurrentHashMap<>();
 
+    /** El modo de la API (normal, lento o rechaza): lo cambia {@code POST /admin/modo}. Solo afecta a crear. */
+    @jakarta.inject.Inject
+    Modo modo;
+
     @POST
     public Response crear(@HeaderParam("Idempotency-Key") String llave,
                           @HeaderParam("X-Correlation-Id") String correlacionRecibida,
@@ -94,6 +102,14 @@ public class PedidosResource {
         if (llave == null || llave.isBlank()) {
             LOG.infof("400 llave=- correlacion=%s motivo=falta Idempotency-Key", correlacion);
             return error(400, FALTA_LLAVE, "Falta la llave de idempotencia", "Falta el encabezado Idempotency-Key");
+        }
+        if (Modo.RECHAZA.equals(modo.actual())) {
+            LOG.infof("422 llave=%s correlacion=%s motivo=rechazado por negocio (modo rechaza)", llave, correlacion);
+            return error(422, RECHAZADO_POR_NEGOCIO, "El pedido se rechazó por una regla de negocio",
+                    "La API está en modo rechaza: este pedido no se registra, y repetirlo da la misma respuesta");
+        }
+        if (Modo.LENTO.equals(modo.actual())) {
+            esperar(modo.esperaMs());
         }
         Recibido previo = porLlave.get(llave);
         if (previo != null) {
@@ -115,6 +131,15 @@ public class PedidosResource {
         avancePorPedido.put(pedido, new Avance(CREADO, null, null));
         LOG.infof("201 llave=%s pedido=%s correlacion=%s", llave, pedido, correlacion);
         return Response.status(201).entity(acuse(nuevo, "creado")).build();
+    }
+
+    /** El modo lento: espera ANTES de registrar, así que quien corte la llamada no sabe que sí quedó. */
+    private static void esperar(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** La llave ya llegó antes: mismo contenido es un reenvío (200); otro contenido es una llave reusada (422). */
