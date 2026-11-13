@@ -1,0 +1,55 @@
+# int-edi, tercer momento: la entrega. Le reenvía al socio el estatus de la paquetería con un X12 214
+# (estatus del transportista): «entregado, sin novedad». Lo deja en su SFTP como 214-<orden>.edi, con los mismos
+# cuatro cuidados del 850 y el 856. El número de control lo asigna el router y llega en el sobre.
+- route:
+    id: int-edi-entrega
+    from:
+      uri: platform-http:/entrega
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"control":"${header.ce-numerocontrol}","datos":${body}}'
+        - to:
+            uri: jsonata:mappings/edi/214/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - to:
+            uri: mustache:templates/edi/214/v1/214.mustache
+        - removeHeaders:
+            pattern: "*"
+        - to:
+            uri: sftp://socio@socio-sftp:22/entrada
+            parameters:
+              password: "{{env:SFTP_CLAVE:practica}}"
+              knownHostsFile: known_hosts
+              strictHostKeyChecking: "yes"
+              fileName: "214-${variable.orden}.edi"
+              tempFileName: "${file:onlyname.noext}.tmp"
+              fileExist: Fail
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: edi/214/v1
+        - log:
+            message: "Dejé el 214 de la orden ${variable.orden} en el SFTP del socio correlacion=${variable.correlacion}"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"socio","archivo":"214-${variable.orden}.edi","resultado":"DEPOSITADO"}'

@@ -1,0 +1,102 @@
+# ¿Cuándo dos mensajes son el mismo? (lección 18)
+#
+# La paquetería puede avisar dos veces la misma entrega: no recibió nuestro 202 a tiempo, o su sistema reintenta
+# por su cuenta. La bodega puede dejar dos veces el mismo lote. Antes de guardar un momento, el router lo RECONOCE:
+#
+#   llave  = el ce-id del momento (orden-<orden>-<momento>) + el canal  → la UNIQUE de operacion
+#   huella = sha256 de lo que llegó, ya normalizado (jsonb: sin espacios de más ni orden de campos)
+#
+#   - nuevo:     no hay operaciones con esa llave → se guarda y se reparte, como hasta la 17.
+#   - repetido:  la llave existe y la huella es la misma → 202 «ya la tenía», sin guardar ni repartir nada.
+#   - conflicto: la llave existe y la huella es OTRA → 409; se anota en la tabla conflicto, se avisa en el log
+#                (WARN) y no se pisa lo guardado. Alguien cambió el contenido: lo decide una persona.
+#
+# Si dos avisos iguales llegan al mismo tiempo y los dos se ven «nuevos», la UNIQUE de operacion detiene al
+# segundo: su transacción se deshace, contesta error, y cuando lo reintente ya se reconocerá como repetido.
+
+# Lo recibe la puerta de cada momento (embarque-router, webhook-paqueteria) cuando ya sabe sus canales
+- route:
+    id: recibir-momento
+    from:
+      uri: direct:recibir-momento
+      steps:
+        - to:
+            uri: direct:reconocer
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.visto} == 'repetido'"
+                steps:
+                  - log:
+                      message: "Orden ${variable.orden} momento ${variable.momento} correlacion=${variable.correlacion}: es un repetido (misma huella); ya lo tenía, no reparto nada"
+                  - to:
+                      uri: direct:contestar-reconocido
+              - expression:
+                  simple:
+                    expression: "${variable.visto} == 'conflicto'"
+                steps:
+                  - to:
+                      uri: direct:contestar-reconocido
+            otherwise:
+              steps:
+                - to:
+                    uri: direct:guardar-momento
+                - log:
+                    message: "Momento ${variable.momento} de la orden ${variable.orden} correlacion=${variable.correlacion}: guardado con sus canales ${variable.canales}"
+                - to:
+                    uri: direct:contestar-y-repartir
+
+# Un repetido se contesta 202 (sí lo tenemos); un conflicto, 409 (con esa llave tenemos otra cosa)
+- route:
+    id: contestar-reconocido
+    from:
+      uri: direct:contestar-reconocido
+      steps:
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"orden":"${variable.orden}","momento":"${variable.momento}","resultado":"${variable.visto}"}'
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              simple:
+                expression: "${variable.visto == 'repetido' ? '202' : '409'}"
+                resultType: java.lang.Integer
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+
+# Reconocer: TU parte de la lección. Deja en ${variable.visto} «nuevo», «repetido» o «conflicto», y en
+# ${variable.huella} la huella de lo que llegó. No cambia el cuerpo.
+#
+# Tal como viene, todo lo ve «nuevo»: un aviso repetido choca con la UNIQUE de operacion al guardarse, y la
+# paquetería recibe un error por algo que sí teníamos.
+- route:
+    id: reconocer
+    from:
+      uri: direct:reconocer
+      steps:
+        # TODO 1: con una consulta a la base de estado (dataSource "#estado", outputType SelectOne, variableReceive),
+        #         calcula la huella de lo que llegó y lee la del primero que se guardó con esa llave:
+        #           nueva    = encode(sha256(convert_to(CAST(CAST(:#${body} AS jsonb) AS text), 'UTF8')), 'hex')
+        #           guardada = la columna huella de operacion, para esta orden y este momento (NULL si no hay)
+        #         ¿Por qué CAST a jsonb antes de sacar la huella? Prueba mandar el mismo aviso en una sola línea.
+        # TODO 2: deja la huella nueva en la variable huella (guardar-momento la escribe en cada operación).
+        # TODO 3: decide con un choice: sin guardada → nuevo; igual → repetido; distinta → conflicto.
+        # TODO 4: si es conflicto, anótalo en la tabla conflicto (llave orden-<orden>-<momento>, las dos huellas, el
+        #         cuerpo y la correlación) y avísalo con un log WARN que empiece con «CONFLICTO orden-<orden>-<momento>».
+        - setVariable:
+            name: visto
+            expression:
+              constant:
+                expression: nuevo
