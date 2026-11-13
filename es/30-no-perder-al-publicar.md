@@ -212,18 +212,22 @@ ver la integración sin contenedores, el apéndice (lecciones 31 y 32) es de lec
 
 > **Qué hace Hábil**
 >
-> En esta práctica una orden cruzó una API, un ERP y un socio que habla X12, y aprendiste a que no se perdiera en
-> ninguno de los huecos: el destino caído, la respuesta que no llega, el aviso repetido, el evento que no se publicó.
-> En una empresa, esos huecos están entre sistemas que se hablan poco, y lo que se pierde ahí lo nota primero el
-> cliente: «un pedido que la tienda cobró y que el almacén no vio».
+> Al cerrar esta práctica:
+> - un aviso repetido no duplica nada;
+> - si no se sabe si algo llegó, queda pendiente de conciliar en vez de darse por fallado;
+> - lo depositado no se da por confirmado hasta que el socio acusa recibo;
+> - un canal caído no frena a los demás;
+> - cada destino recibe solo las llamadas que aguanta;
+> - cada orden se puede seguir sin mostrar datos personales.
 >
-> En Hábil construimos a la medida la integración entre su tienda, su ERP, sus socios y sus canales. Para ese
-> problema está **[Hábil MDW](https://www.habil.mx/es/habil-mdw/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_es)**. Hábil MDW es la capa que se pone entre los
-> sistemas que ya tiene. Ahí pasa cada pedido, cada cobro, cada póliza y cada aviso, con la respuesta de quien lo
-> recibió y el motivo si algo falló. Cada sistema entra con su forma, y la plataforma lo traduce a un modelo común: un
-> pedido es un pedido, venga de donde venga.
+> En una empresa, esto suele sonar así: «No sabemos si esa operación llegó. Se reintenta a mano, y a veces se
+> duplica». Y hay fallas que no marcan error: el envío salió, pero la respuesta nunca llegó.
 >
-> Conectamos los sistemas de un primer flujo completo —por ejemplo, del pedido al cobro y a la factura—, definimos con
-> usted los pasos y las reglas, y lo dejamos funcionando con el rastro a la vista de su equipo.
+> En Hábil construimos a la medida la integración entre su tienda, su ERP, sus socios y sus canales.
+> **[Hábil MDW](https://www.habil.mx/es/habil-mdw/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_es)**
+> está diseñada para operar 24/7, con rastro de cada operación: qué se mandó a cada sistema, qué contestó, a qué hora
+> y, si falló, por qué. Cada envío queda con su respuesta o con su motivo de falla, y los reintentos están diseñados
+> para no repetir el efecto. Un envío que salió mal lo reintenta su equipo de operación como un envío nuevo, con
+> rastro de quién lo hizo y sin tocar la base de datos a mano.
 >
 > **[Pida su primera conversación, sin costo.](https://wa.me/525667541323?text=Hola%2C%20vengo%20de%20GitHub%20%28Ni%20una%20orden%20perdida%29.%20Me%20interesa%20una%20primera%20conversaci%C3%B3n.%0AIndustria%3A%0APuesto%3A%0ASistemas%20principales%3A)**
