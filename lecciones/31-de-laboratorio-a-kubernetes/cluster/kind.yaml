@@ -1,0 +1,12 @@
+# El clúster de la lección 31: un Kubernetes de juguete que corre DENTRO de Docker (kind = «Kubernetes in Docker»).
+# Un solo nodo, que hace de jefe y de trabajador. La versión de Kubernetes va fija con su huella (sha256), la que
+# publica kind v0.33.0 para esta versión: así todos corren el mismo Kubernetes.
+#
+#   kind create cluster --name ni-una-orden-perdida --config cluster/kind.yaml
+#
+# El nombre del clúster es propio de la práctica: no choca con otros clústeres kind que tengas.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5

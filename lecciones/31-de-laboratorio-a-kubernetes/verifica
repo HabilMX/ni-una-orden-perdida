@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Comprueba la lección 31: int-rest, llevado a Camel Quarkus, corre en Kubernetes y su HPA lo escala solo.
+#   1. Crea un clúster kind PROPIO (ni-una-orden-perdida), con metrics-server, la API de pedidos y un cliente.
+#   2. Construye int-rest con camel export (../Dockerfile) y lo despliega con TUS archivos de $DONDE/k8s/.
+#   3. Una orden pasa por int-rest y la API la registra (control de que el camino funciona).
+#   4. Con carga, las copias de int-rest SUBEN (se cuentan las copias listas del Deployment, no lo que dice la
+#      ruta), el Service reparte entre ellas y la API contesta todas las órdenes de la carga.
+#   5. Sin carga, las copias BAJAN al mínimo.
+#   6. Al salir, bien o mal, BORRA su clúster.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita Docker, kind y kubectl. No usa el ambiente de la 00.
+# Tarda unos 4 minutos (lecciones/31-…/CAPACIDAD.md); la primera vez, más, porque baja imágenes y construye.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+CLUSTER=ni-una-orden-perdida
+IMG_INT=ni-una-orden-perdida/int-rest:jvm
+IMG_API=ni-una-orden-perdida/api-demo:1.4.0
+CARGA_SEG="${CARGA_SEG:-120}"     # cuánto dura la carga, en segundos
+CARGA_QPS="${CARGA_QPS:-150}"     # cuántas órdenes por segundo manda el cliente, en total
+CONEX=8                           # cuántas conexiones a la vez abre el cliente
+[ -d "$DONDE/k8s" ] || { echo "❌ No existe $DONDE/k8s/. Copia inicio/ a mio/ primero: cp -R inicio mio"; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+for b in docker kind kubectl; do
+  command -v "$b" >/dev/null || { no "No encuentro «$b». Instálalo (ver es/31) y vuelve a intentar"; exit 1; }
+done
+
+# Todo lo de esta corrida vive en una carpeta temporal: el kubeconfig del clúster (así no se toca el tuyo, ni
+# el contexto de otros clústeres) y la salida de la carga. Se borra al salir, junto con el clúster.
+TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/leccion31.XXXXXX")"
+export KUBECONFIG="$TRABAJO/kubeconfig"
+K() { command kubectl --context "kind-$CLUSTER" "$@"; }
+limpiar() { kind delete cluster --name "$CLUSTER" >/dev/null 2>&1; rm -rf "$TRABAJO"; }
+trap limpiar EXIT
+trap 'echo; echo "Interrumpido: borro el clúster"; exit 130' INT TERM
+# esperar SEG condición: repite la condición (una FUNCIÓN, que se vuelve a evaluar cada vez) hasta que se cumpla
+esperar() { local seg=$1; shift; for _ in $(seq 1 "$seg"); do "$@" >/dev/null 2>&1 && return 0; sleep 1; done; return 1; }
+LISTAS() { local n; n=$(K get deploy int-rest -o jsonpath='{.status.readyReplicas}' 2>/dev/null); echo "${n:-0}"; }
+
+# 1. El clúster. Si quedó uno de una corrida anterior con este nombre, es de la práctica: se borra y se crea limpio
+echo "   Creando el clúster kind «$CLUSTER» (1 o 2 minutos)…"
+kind get clusters 2>/dev/null | hay -x "$CLUSTER" && kind delete cluster --name "$CLUSTER" >/dev/null 2>&1
+kind create cluster --name "$CLUSTER" --config cluster/kind.yaml --wait 120s >"$TRABAJO/kind.log" 2>&1 \
+  || { no "kind no pudo crear el clúster. Esto dijo:"; tail -5 "$TRABAJO/kind.log"; exit 1; }
+si "Clúster kind «$CLUSTER» creado (Kubernetes $(K get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}'))"
+
+# 2. Las imágenes: int-rest pasa por camel export (Dockerfile), y la API es la misma de la lección 00
+echo "   Construyendo int-rest con camel export y la API (la primera vez, de 3 a 6 minutos)…"
+docker build -q -f Dockerfile --target jvm -t "$IMG_INT" int-rest >"$TRABAJO/build-int.log" 2>&1 \
+  || { no "No se pudo construir int-rest. Lo último que dijo:"; tail -15 "$TRABAJO/build-int.log"; exit 1; }
+docker build -q -t "$IMG_API" "$RAIZ/infra/api-demo" >"$TRABAJO/build-api.log" 2>&1 \
+  || { no "No se pudo construir la API. Lo último que dijo:"; tail -15 "$TRABAJO/build-api.log"; exit 1; }
+kind load docker-image "$IMG_INT" "$IMG_API" --name "$CLUSTER" >"$TRABAJO/load.log" 2>&1 \
+  || { no "No pude subir las imágenes al clúster:"; tail -5 "$TRABAJO/load.log"; exit 1; }
+si "int-rest salió de camel export a una imagen de Camel Quarkus, y está en el clúster junto con la API"
+
+# 3. metrics-server, la API, el cliente y la orden de prueba (nada de esto se toca en la lección)
+K apply -k cluster/metrics-server >"$TRABAJO/ms.log" 2>&1 || { no "No pude instalar metrics-server:"; tail -5 "$TRABAJO/ms.log"; exit 1; }
+K create configmap orden --from-file=orden.json="$RAIZ/datos/ordenes/orden-1001.json" >/dev/null
+K apply -f cluster/api-pedidos.yaml -f cluster/cliente.yaml >/dev/null || { no "No pude crear la API y el cliente"; exit 1; }
+
+# 4. TUS archivos. El Deployment y el Service primero; el HPA, aparte, para decirte cuál falló
+if K apply -f "$DONDE/k8s/int-rest.yaml" >"$TRABAJO/apply-int.log" 2>&1; then
+  si "Kubernetes aceptó $DONDE/k8s/int-rest.yaml (el Deployment y el Service)"
+else
+  no "Kubernetes rechazó $DONDE/k8s/int-rest.yaml:"; sed 's/^/     /' "$TRABAJO/apply-int.log"; exit 1
+fi
+K rollout status deploy/int-rest --timeout=180s >/dev/null 2>&1 && K rollout status deploy/api-pedidos --timeout=180s >/dev/null 2>&1 \
+  && K wait --for=condition=Ready pod/cliente --timeout=180s >/dev/null 2>&1 \
+  || { no "int-rest, la API o el cliente no quedaron listos. Así están:"; K get pods 2>&1 | sed 's/^/     /'; exit 1; }
+
+PEDIR() { K exec cliente -- fortio "$@" -H "Content-Type: application/json" -payload-file /ordenes/orden.json http://int-rest:8080/integrar; }
+PEDIR curl -H "ce-subject: 1001" -H "ce-correlationid: l31-prueba" >"$TRABAJO/una.log" 2>&1
+N1=$(K logs deploy/api-pedidos 2>/dev/null | grep -c "201 llave=1001 ")
+[ "$N1" = "1" ] && si "Control: la orden 1001 pasó por int-rest y la API la registró una vez (la ruta no cambió ni una letra)" \
+  || { no "Control: la orden 1001 no llegó a la API (registros: $N1). Lo que dijo int-rest:"; K logs deploy/int-rest --tail 8 2>&1 | sed 's/^/     /'; exit 1; }
+
+CPU_REQ=$(K get deploy int-rest -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}')
+[ -n "$CPU_REQ" ] && si "Cada copia de int-rest reserva CPU: requests.cpu=$CPU_REQ" \
+  || no "int-rest no reserva CPU (resources.requests.cpu): el HPA no puede calcular el porcentaje (TODO 1)"
+
+if K apply -f "$DONDE/k8s/hpa.yaml" >"$TRABAJO/apply-hpa.log" 2>&1; then
+  si "Kubernetes aceptó $DONDE/k8s/hpa.yaml"
+else
+  no "Kubernetes rechazó $DONDE/k8s/hpa.yaml (TODO 3 y 4):"; sed 's/^/     /' "$TRABAJO/apply-hpa.log"; exit 1
+fi
+MIN=$(K get hpa int-rest -o jsonpath='{.spec.minReplicas}'); MIN=${MIN:-1}
+MAX=$(K get hpa int-rest -o jsonpath='{.spec.maxReplicas}')
+META=$(K get hpa int-rest -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}')
+OBJ=$(K get hpa int-rest -o jsonpath='{.spec.scaleTargetRef.name}')
+[ "$OBJ" = "int-rest" ] && [ "${MAX:-0}" -gt "$MIN" ] && [ -n "$META" ] \
+  && si "El HPA escala a int-rest entre $MIN y $MAX copias, con meta de CPU de $META %" \
+  || { no "El HPA debe escalar a int-rest (escala a «$OBJ») con un máximo mayor que el mínimo (mín $MIN, máx ${MAX:-?}) y una meta de CPU en porcentaje (meta «$META»)"; exit 1; }
+
+# El HPA tarda en tener su primera medición: metrics-server mide cada 15 s, y el HPA pregunta cada 15 s
+CPU_HOY() { K get hpa int-rest -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}'; }
+LEE_CPU() { [ -n "$(CPU_HOY)" ]; }
+EN_MINIMO() { [ "$(LISTAS)" = "$MIN" ]; }
+if esperar 180 LEE_CPU; then
+  si "El HPA ya lee la CPU de int-rest: $(CPU_HOY) % de lo reservado, sin carga"
+else
+  no "El HPA no logra leer la CPU de int-rest. Kubernetes dice: $(K get hpa int-rest -o jsonpath='{.status.conditions[?(@.type=="ScalingActive")].message}')"; exit 1
+fi
+esperar 120 EN_MINIMO
+
+# 5. La carga: varias conexiones a la vez, sin reusarlas (-keepalive=false). Una conexión que no se cierra no se
+#    reparte (ficha 15): sin esto, todas las órdenes seguirían yendo a la primera copia aunque hubiera cuatro.
+echo "   Carga: $CARGA_QPS órdenes por segundo durante $CARGA_SEG s. Cada 10 s, lo que ve el HPA:"
+# Una orden «carga» antes de empezar: así la API ya la conoce y a cada orden de la carga le contesta 200 (reenvío)
+PEDIR curl -H "ce-subject: carga" -H "ce-correlationid: l31-carga" >/dev/null 2>&1
+API_ANTES=$(K logs deploy/api-pedidos 2>/dev/null | grep -c "llave=carga ")
+PEDIR load -qps "$CARGA_QPS" -c "$CONEX" -t "${CARGA_SEG}s" -keepalive=false -H "ce-subject: carga" -H "ce-correlationid: l31-carga" \
+  >"$TRABAJO/carga.log" 2>&1 &
+CARGA=$!
+TOPE=0; T0=$(date +%s)
+while kill -0 "$CARGA" 2>/dev/null; do
+  sleep 10
+  n=$(LISTAS); [ "$n" -gt "$TOPE" ] && TOPE=$n
+  echo "     t=$(( $(date +%s) - T0 ))s  copias listas=$n  CPU=$(CPU_HOY) % (meta $META %)"
+done
+wait "$CARGA"
+# Quién atendió: lo dice la bitácora de cada copia, no el HPA
+CON=0; PODS=$(K get pods -l app=int-rest -o name)
+for p in $PODS; do n=$(K logs "$p" 2>/dev/null | grep -c "Recibí del router la orden carga "); [ "$n" -gt 0 ] && CON=$((CON + 1)); done
+[ "$TOPE" -gt "$MIN" ] && si "Con carga, el HPA subió int-rest de $MIN a $TOPE copias listas (máximo $MAX)" \
+  || no "Con carga, int-rest se quedó en $TOPE copia(s): el HPA no subió. ¿La meta es un porcentaje de requests.cpu?"
+[ "$CON" -ge 2 ] && si "$CON copias de int-rest atendieron órdenes de la carga: el Service repartió" \
+  || no "Solo $CON copia de int-rest atendió la carga"
+
+# ¿Se perdió alguna? Lo que el cliente dice que le contestaron, contra lo que la API registró. fortio manda además
+# una orden de calentamiento por conexión antes de empezar, que no cuenta en su resumen: la API ve $CONEX de más
+ENVIADAS=$(sed -n 's/^All done \([0-9]*\) calls.*/\1/p' "$TRABAJO/carga.log")
+OK200=$(sed -n 's/^Code 200 : \([0-9]*\) .*/\1/p' "$TRABAJO/carga.log"); OK200=${OK200:-0}
+API_N=$(( $(K logs deploy/api-pedidos 2>/dev/null | grep -c "llave=carga ") - API_ANTES - CONEX ))
+[ -n "$ENVIADAS" ] && [ "$ENVIADAS" -gt 0 ] && [ "$OK200" = "$ENVIADAS" ] && [ "$API_N" = "$ENVIADAS" ] \
+  && si "Las $ENVIADAS órdenes de la carga llegaron a la API y cada una tuvo respuesta: ninguna se perdió mientras crecía" \
+  || no "De ${ENVIADAS:-?} órdenes de la carga, $OK200 tuvieron respuesta 200 y la API registró $API_N (sin contar las $CONEX de calentamiento). Esto dijo el cliente: $(grep -E '^Code ' "$TRABAJO/carga.log" | tr '\n' ' ')"
+
+# 6. Sin carga, vuelve al mínimo
+T1=$(date +%s)
+if esperar 240 EN_MINIMO; then
+  si "Sin carga, int-rest volvió a $MIN copia(s) en $(( $(date +%s) - T1 )) s"
+else
+  no "Sin carga, int-rest sigue en $(LISTAS) copias después de 4 minutos (mínimo $MIN): ¿behavior.scaleDown sigue como venía?"
+fi
+exit $ok

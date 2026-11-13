@@ -1,0 +1,60 @@
+# int-rest en Kubernetes: un Deployment (las copias) y un Service (el nombre fijo que reparte entre ellas).
+# Es el mismo int-rest de la lección 12, exportado a Camel Quarkus (ver ../../Dockerfile).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: int-rest
+  labels: { app: int-rest }
+spec:
+  replicas: 1                       # con cuántas arranca; desde que existe el HPA, quien decide es él
+  selector:
+    matchLabels: { app: int-rest }
+  template:
+    metadata:
+      labels: { app: int-rest }
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: int-rest
+          image: ni-una-orden-perdida/int-rest:jvm
+          imagePullPolicy: Never    # la imagen la subió «kind load» al nodo; no hay registro de dónde bajarla
+          ports:
+            - containerPort: 8080
+          # La configuración de Quarkus va en variables de entorno, no en application.properties: el nombre de la
+          # propiedad en mayúsculas y con «_» en vez de «.». quarkus.shutdown.timeout → QUARKUS_SHUTDOWN_TIMEOUT.
+          env:
+            # Cuando el HPA quita una copia, Quarkus deja de aceptar órdenes nuevas y espera hasta 10 s a que
+            # terminen las que ya traía, en vez de cortarlas a la mitad.
+            - name: QUARKUS_SHUTDOWN_TIMEOUT
+              value: 10s
+          resources:
+            # Lo que la copia RESERVA en el nodo. El HPA mide la CPU como porcentaje de esto: con 200m (la quinta
+            # parte de un núcleo), una copia que usa 100m va al 50 %. Sin requests.cpu, el HPA no puede calcular
+            # el porcentaje y se queda en <unknown>.
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            # El techo: más de 1 núcleo no se le da, y si pasa de 512 MiB de memoria, Kubernetes la reinicia.
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          # ¿Ya puede recibir órdenes? Mientras diga que no, el Service no le manda nada.
+          readinessProbe:
+            httpGet: { path: /q/health/ready, port: 8080 }
+            periodSeconds: 3
+          # ¿Sigue viva? Si deja de contestar, Kubernetes la reinicia.
+          livenessProbe:
+            httpGet: { path: /q/health/live, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# El nombre fijo: el cliente llama a http://int-rest:8080/integrar y el Service escoge una copia por conexión.
+apiVersion: v1
+kind: Service
+metadata:
+  name: int-rest
+spec:
+  selector: { app: int-rest }
+  ports:
+    - port: 8080
+      targetPort: 8080

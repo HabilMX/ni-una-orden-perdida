@@ -1,0 +1,26 @@
+# El HorizontalPodAutoscaler (HPA): sube o baja el número de copias de int-rest según la CPU que usan.
+# Cada 15 s mira el promedio de CPU de las copias (lo mide metrics-server) contra la meta, y calcula:
+#   copias que quiere = copias que hay × (CPU promedio ÷ meta), redondeado hacia arriba, entre el mínimo y el máximo
+# Ejemplo: 1 copia al 150 % con meta de 50 % → quiere 3 copias.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: int-rest
+spec:
+  # A quién escala: el Deployment int-rest
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: int-rest
+  # TODO 3: sin carga se queda en 1 copia (minReplicas) y con carga sube a lo más a 4 (maxReplicas).
+  # TODO 4: la meta, en metrics: un recurso (type: Resource) que es la cpu, con target de tipo Utilization y
+  #         averageUtilization: 50 (que cada copia use, en promedio, la mitad de su requests.cpu).
+  # Qué tan rápido baja. Por omisión espera 5 minutos sin carga antes de quitar copias (para no subir y bajar a
+  # cada rato); aquí son 30 s, para que lo veas bajar sin esperar tanto.
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15

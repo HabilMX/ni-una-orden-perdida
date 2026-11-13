@@ -1,0 +1,26 @@
+# El cliente que manda órdenes a int-rest desde DENTRO del clúster, como lo haría el router.
+# Es fortio, un generador de carga de HTTP. Se queda prendido y el verifica le pide cosas con «kubectl exec»:
+#   una orden suelta:   fortio curl … http://int-rest:8080/integrar
+#   carga sostenida:    fortio load -c 8 -t 150s -keepalive=false … http://int-rest:8080/integrar
+# La orden que manda es la 1001 de datos/ordenes/, que el verifica guarda en el ConfigMap «orden».
+# Este archivo NO se toca en la lección.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cliente
+  labels: { app: cliente }
+spec:
+  containers:
+    - name: fortio
+      image: fortio/fortio:1.76.0
+      args: ["server"]              # prendido sin hacer nada, esperando que le pidan algo
+      resources:
+        requests: { cpu: 100m, memory: 32Mi }
+        limits: { cpu: "1", memory: 128Mi }
+      volumeMounts:
+        - name: orden
+          mountPath: /ordenes
+  volumes:
+    - name: orden
+      configMap:
+        name: orden
