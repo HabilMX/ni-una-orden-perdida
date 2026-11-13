@@ -1,9 +1,9 @@
 # Ni una orden perdida — lecciones
 
-Las lecciones se hacen en orden: cada una parte de lo que dejó la anterior. Empieza por la
-[00](00-ambiente.md), que levanta el ambiente.
+Son 31 lecciones, de la 00 a la 30, todas en Docker Compose, más un apéndice opcional de solo lectura. Se hacen en
+orden: cada una parte de lo que dejó la anterior. Empieza por la [00](00-ambiente.md), que levanta el ambiente.
 
-### Entrega 1 — Que llegue
+### Parte 1 — Que llegue
 
 | # | Lección |
 |---|---|
@@ -21,40 +21,47 @@ Las lecciones se hacen en orden: cada una parte de lo que dejó la anterior. Emp
 | 11 | [No todo va a todos](11-no-todo-va-a-todos.md) |
 | 12 | [Crecer en réplicas](12-crecer-en-replicas.md) |
 
-### Entrega 2 — Que avance
+### Parte 2 — Que avance
 
 | # | Lección |
 |---|---|
-| 13 | Llega el embarque *(en construcción)* |
-| 14 | Un archivo, varias órdenes *(en construcción)* |
-| 15 | El estado vive fuera del proceso *(en construcción)* |
-| 16 | Llega la entrega *(en construcción)* |
-| 17 | La entrega llegó antes que la guía *(en construcción)* |
+| 13 | [Llega el embarque](13-llega-el-embarque.md) |
+| 14 | [Un archivo, varias órdenes](14-un-archivo-varias-ordenes.md) |
+| 15 | [El estado vive fuera del proceso](15-el-estado-vive-fuera-del-proceso.md) |
+| 16 | [Llega la entrega](16-llega-la-entrega.md) |
+| 17 | [La entrega llegó antes que la guía](17-la-entrega-llego-antes-que-la-guia.md) |
 
-### Entrega 3 — Que no falle
-
-| # | Lección |
-|---|---|
-| 18 | ¿Cuándo dos mensajes son el mismo? *(en construcción)* |
-| 19 | El destino no contesta *(en construcción)* |
-| 20 | Aceptado, rechazado o no se sabe *(en construcción)* |
-| 21 | Enviado no es confirmado *(en construcción)* |
-| 22 | Tirar un canal *(en construcción)* |
-| 23 | Reprocesar lo que falló *(en construcción)* |
-| 24 | No tumbar al destino *(en construcción)* |
-| 25 | Esperar a los canales *(en construcción)* |
-| 26 | Sobrevivir al reinicio *(en construcción)* |
-| 27 | Seguir una orden *(en construcción)* |
-| 28 | Lo que el rastro no debe mostrar *(en construcción)* |
-
-### Opcional — Que escale
+### Parte 3 — Que no falle
 
 | # | Lección |
 |---|---|
-| 29 | Un tópico, un grupo por integración *(en construcción)* |
-| 30 | No perder al consumir *(en construcción)* |
-| 31 | No perder al publicar *(en construcción)* |
-| 32 | De laboratorio a proyecto *(en construcción)* |
-| 33 | JVM contra nativo, medido *(en construcción)* |
+| 18 | [¿Cuándo dos mensajes son el mismo?](18-cuando-dos-mensajes-son-el-mismo.md) |
+| 19 | [El destino no contesta](19-el-destino-no-contesta.md) |
+| 20 | [Aceptado, rechazado o no se sabe](20-aceptado-rechazado-o-no-se-sabe.md) |
+| 21 | [Enviado no es confirmado](21-enviado-no-es-confirmado.md) |
+| 22 | [Tirar un canal](22-tirar-un-canal.md) |
+| 23 | [Reprocesar lo que falló](23-reprocesar-lo-que-fallo.md) |
+| 24 | [No tumbar al destino](24-no-tumbar-al-destino.md) |
+| 25 | [Esperar a los canales](25-esperar-a-los-canales.md) |
+| 26 | [Seguir una orden](26-seguir-una-orden.md) |
+| 27 | [Lo que el rastro no debe mostrar](27-lo-que-el-rastro-no-debe-mostrar.md) |
+
+### Parte 4 — Que escale
+
+| # | Lección |
+|---|---|
+| 28 | [Un tópico, un grupo por integración](28-un-topico-un-grupo-por-integracion.md) |
+| 29 | [No perder al consumir](29-no-perder-al-consumir.md) |
+| 30 | [No perder al publicar](30-no-perder-al-publicar.md) |
+
+### Apéndice opcional
+
+La práctica termina en la 30. El apéndice lleva una integración a Kubernetes y la compara en JVM y en nativo; pide un
+equipo con más memoria y disco, y lo dice al principio.
+
+| # | Lección |
+|---|---|
+| 31 | [De laboratorio a proyecto, en Kubernetes](31-de-laboratorio-a-kubernetes.md) |
+| 32 | [JVM contra nativo, medido](32-jvm-contra-nativo.md) |
 
 Las decisiones de diseño, con su porqué, están en [`decisiones/`](../decisiones/README.md).

@@ -40,7 +40,7 @@ poca memoria.
   rinde menos por copia que la JVM. Responde rápido **escalando**, no por copia (ficha [nativo](antes-de-empezar/07-nativo.md)).
 - **No todo componente funciona en nativo.** Cada extensión de Camel Quarkus dice si lo soporta.
 - **Camel es una biblioteca, no una plataforma.** No trae una consola para reprocesar lo que falló ni una base de
-  estado: eso lo construyes tú, y la práctica te enseña cómo (entrega 3).
+  estado: eso lo construyes tú, y la práctica te enseña cómo (parte 3).
 - **Hay que aprender su forma de pensar:** mensajes, rutas, componentes y expresiones.
 
 ## Cuándo no usar Camel

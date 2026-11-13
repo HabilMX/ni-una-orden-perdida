@@ -1,4 +1,4 @@
-# Órdenes de la segunda y la tercera entrega (lecciones 13 en adelante)
+# Órdenes de la parte 2 y la parte 3 (lecciones 13 en adelante)
 
 Ocho órdenes, de la 4001 a la 4008, todas de franquicias (T-501 y T-502): a cada una le toca el canal del socio,
 así que se ven sus tres momentos en los tres destinos (creada → 850, embarcada → 856, entregada → 214).

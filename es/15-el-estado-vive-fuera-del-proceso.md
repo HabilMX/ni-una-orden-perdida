@@ -166,7 +166,7 @@ copiar: cada copia recordaría cosas distintas, y al reiniciarse olvidaría. Con
 mismo.
 
 **Separar «recibí» de «entregué» cambia la conversación.** La tienda ya no espera a que contesten los tres destinos.
-A cambio, alguien tiene que mirar lo que quedó pendiente: eso es lo que construye la entrega 3.
+A cambio, alguien tiene que mirar lo que quedó pendiente: eso es lo que construye la parte 3.
 
 ## Ejercicio: la orden en tres tablas
 

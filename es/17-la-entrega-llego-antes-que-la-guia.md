@@ -188,7 +188,7 @@ Con tu versión terminada:
 
 ## Lo que ya funciona
 
-Con esta lección cierras la entrega 2. Además de lo de la entrega 1, una orden ya hace esto:
+Con esta lección cierras la parte 2. Además de lo de la parte 1, una orden ya hace esto:
 
 - se embarca desde un archivo de la bodega, con o sin lote, sin tomarlo a medias ni dos veces;
 - se guarda antes de contestar, con una fila por canal y un registro de cada intento;
@@ -196,7 +196,7 @@ Con esta lección cierras la entrega 2. Además de lo de la entrega 1, una orden
 - y si la entrega llega antes que el embarque, espera estacionada y sale una sola vez, en cuanto puede.
 
 Lo que todavía no hace: reconocer un mensaje que llega repetido con otro contenido, ni reintentar lo que quedó en
-`no_se_sabe`. Eso es la entrega 3.
+`no_se_sabe`. Eso es la parte 3.
 
 ## Por qué se hizo así
 
@@ -214,5 +214,5 @@ Lo que decidimos en esta lección, con lo que descartamos y qué nos haría camb
    que revisa la base cada minuto. ¿Qué ganas con el evento? ¿Qué perderías con el temporizador, y en qué caso sí te
    haría falta uno?
 
-**Siguiente:** en la lección 18 empieza la entrega 3, «que no falle». Primero, una pregunta que parece fácil:
+**Siguiente:** en la lección 18 empieza la parte 3, «que no falle». Primero, una pregunta que parece fácil:
 ¿cuándo dos mensajes son el mismo?

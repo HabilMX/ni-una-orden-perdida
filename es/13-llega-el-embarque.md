@@ -22,7 +22,7 @@ a revisar, se lleva solo los sobres cerrados (no la carta que alguien sigue escr
 ya entregó y deja a un lado lo que llegó roto. Y hay **un solo conserje**: si fueran tres, dos podrían subir la
 misma carta.
 
-Esta es la entrega 2: la orden ya se creó; ahora sale de la bodega (hoy), se parte en varias (14), se guarda su
+Esta es la parte 2: la orden ya se creó; ahora sale de la bodega (hoy), se parte en varias (14), se guarda su
 estado (15) y llega con el cliente (16 y 17).
 
 ---
