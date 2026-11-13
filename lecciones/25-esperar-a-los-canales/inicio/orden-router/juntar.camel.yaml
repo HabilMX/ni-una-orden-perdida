@@ -1,0 +1,98 @@
+# Esperar a los canales (lección 25): el reparto manda cada momento a sus canales (se esparce); aquí se junta.
+#
+#   momento creada de la 4001 ──→ rest  aceptada   ✓ (espera aceptada)
+#                             ──→ bd    aceptada   ✓ (espera aceptada)
+#                             ──→ edi   aceptada   … (espera confirmada: falta el 997)
+#                                  ⇒ todavía no está COMPLETA
+#
+# Lo que cada canal espera, y su plazo, viene en reglas/maquina-de-estados.yaml (sección completa). Lo que se junta
+# NO vive en la memoria del router: está en la base, en operacion, desde la 15. Juntar es preguntarle a la base.
+#
+# Cada 2 s, el reloj (vigilar):
+#   1. da por COMPLETO cada momento cuyos canales llegaron todos a lo que se espera de ellos (tabla completitud);
+#   2. avisa de cada canal que pasó su plazo sin llegar (tabla alerta y un WARN en el log), SIN cerrar el momento.
+# Hace falta un reloj porque lo que no llega no avisa: un 997 que no viene no dispara ningún evento.
+
+- route:
+    id: vigilar
+    from:
+      uri: timer:vigilar
+      parameters:
+        period: 2000
+      steps:
+        # Las reglas se leen del archivo cada vez (como en direct:decidir): un cambio vale para la siguiente vuelta
+        - to:
+            uri: language:constant:resource:file:reglas/maquina-de-estados.yaml
+            parameters:
+              contentCache: false
+        - unmarshal:
+            yaml: {}
+        - setBody:
+            expression:
+              simple:
+                expression: "${body[completa]}"
+        - marshal:
+            json: {}
+        - setVariable:
+            name: reglas
+            expression:
+              simple:
+                expression: "${bodyAs(String)}"
+        - to:
+            uri: direct:juntar
+        - to:
+            uri: direct:vencidos
+
+# 1. COMPLETA. Esta versión da por completo un momento cuando ningún canal sigue pendiente ni estacionado.
+#    TODO 1: no alcanza. Un 850 depositado queda «aceptada», y lo que se espera del socio es su 997 («confirmada»);
+#    y un canal rechazado tampoco terminó bien. Cambia la condición del HAVING para que cada canal haya llegado a uno
+#    de los estados de su llega_a en las reglas: jsonb_each convierte las reglas en filas (canal, regla), y
+#    jsonb_contains(r.regla -> 'llega_a', to_jsonb(p.estado)) pregunta si el estado está en la lista.
+#    Se escribe una vez: ON CONFLICT DO NOTHING, y RETURNING dice cuáles se acaban de completar.
+- route:
+    id: juntar
+    from:
+      uri: direct:juntar
+      steps:
+        - to:
+            uri: >-
+              sql:INSERT INTO completitud (orden, momento)
+              SELECT p.orden, p.momento
+              FROM operacion p JOIN jsonb_each(CAST(:#${variable.reglas} AS jsonb)) AS r(canal, regla) ON r.canal = p.canal
+              WHERE NOT EXISTS (SELECT 1 FROM completitud c WHERE c.orden = p.orden AND c.momento = p.momento)
+              GROUP BY p.orden, p.momento
+              HAVING bool_and(p.estado NOT IN ('pendiente', 'estacionada'))
+              ON CONFLICT DO NOTHING
+              RETURNING orden, momento
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectList
+        - split:
+            expression:
+              simple:
+                expression: "${body}"
+            steps:
+              - log:
+                  message: "COMPLETA la orden ${body[orden]} momento ${body[momento]}: cada canal llegó a lo que se espera de él"
+
+# 2. VENCIDO: un canal de un momento abierto que lleva más que su plazo sin llegar a lo que se espera de él.
+#    Esta versión CIERRA el momento al vencer: lo da por completo para que deje de estorbar.
+#    TODO 2: un vencido se AVISA y no se cierra. En vez de escribir en completitud, escribe una fila en alerta
+#    (orden, momento, canal, tipo 'vencido', estado, espera = r.regla ->> 'llega_a'), una sola vez por canal
+#    (ON CONFLICT DO NOTHING), y deja un WARN en el log por cada aviso nuevo (RETURNING y un split, como en juntar).
+#    Así, si el 997 llega tarde, la siguiente vuelta de juntar completa el momento.
+- route:
+    id: vencidos
+    from:
+      uri: direct:vencidos
+      steps:
+        - to:
+            uri: >-
+              sql:INSERT INTO completitud (orden, momento)
+              SELECT DISTINCT p.orden, p.momento
+              FROM operacion p JOIN jsonb_each(CAST(:#${variable.reglas} AS jsonb)) AS r(canal, regla) ON r.canal = p.canal
+              WHERE p.creada < now() - make_interval(secs => CAST(r.regla ->> 'plazo_s' AS int))
+                AND NOT EXISTS (SELECT 1 FROM completitud c WHERE c.orden = p.orden AND c.momento = p.momento)
+              ON CONFLICT DO NOTHING
+            parameters:
+              dataSource: "#estado"

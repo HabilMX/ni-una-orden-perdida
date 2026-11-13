@@ -1,0 +1,68 @@
+# El sondeo de la bodega, lección 14: la bodega ya no deja un archivo por embarque, sino un LOTE con varios.
+# El sondeo parte el lote (Splitter) y le pasa cada embarque al router por separado:
+#
+#   bodega → buzon/lote-bodega-<n>.json → [sondeo] → split → POST /embarques (uno por embarque) → router
+#
+# Si un embarque del lote no pasa, los demás siguen (stopOnException: false). Al terminar, el lote se aparta a
+# .error/ para que alguien vea cuál falló; lo que sí pasó ya está en sus destinos.
+# Corre en UNA sola copia, igual que en la 13.
+
+# Cuando el router no acepta un embarque, se anota cuál fue y qué contestó, y el Splitter sigue con el siguiente
+- onException:
+    exception:
+      - org.apache.camel.http.base.HttpOperationFailedException
+    steps:
+      - log:
+          loggingLevel: WARN
+          message: "El router no aceptó el embarque de la orden ${variable.orden} del ${variable.lote} (contestó ${exception.statusCode}): sigo con los demás"
+
+- route:
+    id: sondeo-bodega
+    from:
+      uri: file:buzon
+      parameters:
+        include: "lote-bodega-.*\\.json"
+        readLock: changed
+        move: ".camel/${file:name}"
+        moveFailed: ".error/${file:name}"
+        delay: 2000
+      steps:
+        - convertBodyTo:
+            type: String
+        - setVariable:
+            name: lote
+            expression:
+              simple:
+                expression: "${file:name}"
+        - log:
+            message: "Tomé ${variable.lote} del buzón de la bodega; trae ${jsonpath($.embarques.length())} embarques"
+        # Un mensaje por cada elemento de la lista «embarques». Cada parte es un embarque.
+        - split:
+            expression:
+              jsonpath:
+                expression: "$.embarques[*]"
+            stopOnException: false
+            steps:
+              - setVariable:
+                  name: orden
+                  expression:
+                    simple:
+                      expression: "${body[orden]}"
+              # La parte llega como datos (un mapa); al router se le manda como texto JSON
+              - marshal:
+                  json: {}
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: Content-Type
+                  expression:
+                    constant:
+                      expression: application/json
+              - to:
+                  uri: http://orden-router:8080/embarques
+                  parameters:
+                    httpMethod: POST
+              - log:
+                  message: "Embarque de la orden ${variable.orden} del ${variable.lote}: el router lo recibió (contestó ${header.CamelHttpResponseCode})"
+        - log:
+            message: "Terminé el ${variable.lote}"

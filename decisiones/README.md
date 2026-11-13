@@ -37,3 +37,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 26 | [Un cortacircuito por canal, en el router](26-un-cortacircuito-por-canal.md) | 22 en adelante |
 | 27 | [El reproceso a mano es un intento más, con nombre y motivo](27-el-rerun-es-un-intento-manual.md) | 23 en adelante |
 | 28 | [Un tope por copia hacia el ERP, contando lo que va en curso](28-un-tope-por-copia.md) | 24 en adelante |
+| 29 | [Juntar es preguntarle a la base, y un vencido avisa sin cerrar](29-juntar-es-preguntarle-a-la-base.md) | 25 en adelante |

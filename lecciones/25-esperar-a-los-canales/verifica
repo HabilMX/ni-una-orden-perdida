@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Comprueba la lección 25: un momento de la orden queda COMPLETO solo cuando cada canal que le toca llegó a lo que
+# se espera de él (reglas/maquina-de-estados.yaml): la API y el ERP aceptada, el socio confirmada con su 997.
+#   1. La 3001 (tienda propia, sin socio) se completa con la API y el ERP; la 4001 (franquicia) espera su 997.
+#   2. Con el socio sin contestar, la 4002 pasa su plazo: se avisa una vez y sigue abierta.
+#   3. Se reinicia el router; el socio vuelve, el 997 llega tarde y la 4002 se completa (lo juntado vivía en la base).
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (ni pendientes ni estacionadas)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado NOT IN ('pendiente','estacionada')"; }
+ESTACIONADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado = 'estacionada'"; }
+esperar_est() { for i in $(seq 1 20); do [ "$(ESTACIONADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname IN ('completitud','alerta')")" = "2" ] \
+  || { no "A la base de estado le faltan las tablas completitud y alerta (lección 25). Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+trap '[ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"; INFRA start socio-bot >/dev/null 2>&1' EXIT
+EST "TRUNCATE acuse, conflicto, intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+# El router también entra al SFTP del socio desde la 21: a leer los acuses
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+[ "$(INFRA ps --format '{{.Service}} {{.State}}' | awk '$1=="socio-bot"{print $2}')" = "running" ] \
+  || { no "No está arriba socio-bot, el sistema del socio que manda los 997: docker compose -f infra/compose.yaml up -d --wait"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="vigilar|juntar|vencidos|rerun|preparar|llamar-canal|sin-respuesta|sondeo-acuses|correlacionar-acuse|intentar|reconocer|recibir-momento|contestar-reconocido|barrido-http|barrido|decidir|webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 44 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 44 ] && si "Arrancaron el router (con su reloj que junta y vigila), los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+ORDEN() { curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$1"; }
+COMPLETA() { EST "SELECT COUNT(*) FROM completitud WHERE orden='$1' AND momento='creada'"; }
+ESTADO() { EST "SELECT estado FROM operacion WHERE orden='$1' AND momento='creada' AND canal='$2'"; }
+esperar() { for i in $(seq 1 $1); do eval "$2" && return 0; sleep 1; done; return 1; }
+
+# 1. Una tienda propia y una franquicia
+ORDEN "$DATOS/ordenes/lote-30/orden-3001.json"
+ORDEN "$DATOS/ordenes/tramo-2/orden-4001.json"
+esperar 15 '[ "$(ESTADO 4001 edi)" = "aceptada" ] && [ "$(ESTADO 4001 rest)" = "aceptada" ] && [ "$(ESTADO 4001 bd)" = "aceptada" ]'
+sleep 3
+C1=$(COMPLETA 4001); E1=$(ESTADO 4001 edi)
+[ "$C1" = "0" ] && [ "$E1" = "aceptada" ] \
+  && si "La 4001: API y ERP aceptada y el 850 depositado, pero sin 997 todavía no está COMPLETA" \
+  || no "La 4001 con el socio en «$E1» ya quedó COMPLETA ($C1): se cerró antes de su 997"
+esperar 5 '[ "$(COMPLETA 3001)" = "1" ]'
+[ "$(COMPLETA 3001)" = "1" ] && si "La 3001 (tienda propia): COMPLETA con la API y el ERP; el socio no le toca y no se le espera" \
+  || no "La 3001 (tienda propia) no quedó COMPLETA con la API y el ERP aceptada"
+esperar 20 '[ "$(COMPLETA 4001)" = "1" ]'
+[ "$(COMPLETA 4001)" = "1" ] && [ "$(ESTADO 4001 edi)" = "confirmada" ] \
+  && si "La 4001: llegó el 997, el socio quedó confirmada y la orden COMPLETA" \
+  || no "La 4001 quedó con el socio en «$(ESTADO 4001 edi)» y completa=$(COMPLETA 4001) después del 997"
+
+# 2. El socio deja de contestar: la 4002 pasa el plazo del socio (20 s)
+INFRA stop socio-bot >/dev/null 2>&1
+ORDEN "$DATOS/ordenes/tramo-2/orden-4002.json"
+ALERTAS() { EST "SELECT COUNT(*) FROM alerta WHERE orden='4002' AND momento='creada' AND canal='edi' AND tipo='vencido' AND estado='aceptada' AND espera LIKE '%confirmada%'"; }
+esperar 30 '[ "$(ALERTAS)" = "1" ]'
+sleep 4   # unas vueltas más del reloj: el aviso no se repite
+A2=$(EST "SELECT COUNT(*) FROM alerta WHERE orden='4002'"); C2=$(COMPLETA 4002)
+[ "$(ALERTAS)" = "1" ] && [ "$A2" = "1" ] && [ "$C2" = "0" ] \
+  && si "La 4002 sin 997 pasó su plazo: un solo aviso (vencido, en «aceptada», se espera confirmada) y sigue abierta" \
+  || no "La 4002 sin 997: hay $A2 avisos (esperaba 1, de vencido en el socio) y completa=$C2 (esperaba 0: no se cierra a la fuerza)"
+SERV logs orden-router 2>/dev/null | hay "WARN.*VENCIDO orden 4002 momento creada canal edi" \
+  && si "Log: el aviso del vencido está en el log del router" || no "Log: no está el WARN del vencido de la 4002"
+
+# 3. Se reinicia el router y el socio vuelve: el 997 llega tarde y la 4002 se completa
+SERV restart orden-router >/dev/null 2>&1
+T1=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for i in $(seq 1 90); do SERV logs --since "$T1" orden-router 2>/dev/null | hay "Started vigilar " && break; sleep 2; done
+INFRA start socio-bot >/dev/null 2>&1
+esperar 30 '[ "$(COMPLETA 4002)" = "1" ]'
+[ "$(COMPLETA 4002)" = "1" ] && [ "$(ESTADO 4002 edi)" = "confirmada" ] && [ "$(EST "SELECT COUNT(*) FROM alerta WHERE orden='4002'")" = "1" ] \
+  && si "Tras reiniciar el router, el 997 tardío confirmó al socio y la 4002 quedó COMPLETA, con su único aviso como historia" \
+  || no "Tras reiniciar: la 4002 quedó con el socio en «$(ESTADO 4002 edi)», completa=$(COMPLETA 4002) y $(EST "SELECT COUNT(*) FROM alerta WHERE orden='4002'") avisos"
+apagar
+exit $ok
