@@ -71,7 +71,16 @@ K rollout status deploy/int-rest --timeout=180s >/dev/null 2>&1 && K rollout sta
   || { no "int-rest, la API o el cliente no quedaron listos. Así están:"; K get pods 2>&1 | sed 's/^/     /'; exit 1; }
 
 PEDIR() { K exec cliente -- fortio "$@" -H "Content-Type: application/json" -payload-file /ordenes/orden.json http://int-rest:8080/integrar; }
-PEDIR curl -H "ce-subject: 1001" -H "ce-correlationid: l31-prueba" >"$TRABAJO/una.log" 2>&1
+# Que el pod diga «listo» no quiere decir que el Service ya le mande tráfico: la red del clúster se entera unos
+# instantes después. Por eso la primera orden se repite (hasta 30 s) mientras int-rest no conteste un 2xx. Si llega
+# dos veces, la API la reconoce por su llave y la registra una sola vez (lección 18).
+for _ in $(seq 1 30); do
+  PEDIR curl -H "ce-subject: 1001" -H "ce-correlationid: l31-prueba" >"$TRABAJO/una.log" 2>&1
+  hay -E "HTTP/1\.[01] 2[0-9][0-9]" "$TRABAJO/una.log" && break
+  sleep 1
+done
+REGISTRADA() { [ "$(K logs deploy/api-pedidos 2>/dev/null | grep -c "201 llave=1001 ")" -ge 1 ]; }
+esperar 10 REGISTRADA
 N1=$(K logs deploy/api-pedidos 2>/dev/null | grep -c "201 llave=1001 ")
 [ "$N1" = "1" ] && si "Control: la orden 1001 pasó por int-rest y la API la registró una vez (la ruta no cambió ni una letra)" \
   || { no "Control: la orden 1001 no llegó a la API (registros: $N1). Lo que dijo int-rest:"; K logs deploy/int-rest --tail 8 2>&1 | sed 's/^/     /'; exit 1; }
