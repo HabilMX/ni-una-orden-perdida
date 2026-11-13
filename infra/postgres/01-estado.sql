@@ -15,6 +15,7 @@ CREATE TABLE operacion (
   -- estacionada: llegó antes de lo que necesita (una entrega sin su embarque) y espera a que la suelten (lección 17)
   estado       text NOT NULL,              -- pendiente | estacionada | aceptada | rechazada | no_se_sabe | conciliacion_pendiente
   numero_control text,                     -- lo asigna el router con numero_control_seq (lección 15)
+  correlacion  text,                       -- el hilo con el que llegó este momento (lección 09); viaja al reenviarlo
   UNIQUE (orden, momento, canal)
 );
 
