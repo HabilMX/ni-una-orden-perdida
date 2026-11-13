@@ -9,7 +9,9 @@
 #
 # Acepta todo (AK5*A, AK9*A), salvo un documento que pida un producto que el socio no conoce (RECHAZA_SKU, en el
 # PO1, elemento 7): ese lo rechaza (AK3 y AK4 señalan el segmento y el elemento, AK5*R*5, AK9*R).
-# Solo acusa archivos terminados en .edi (los .tmp siguen escribiéndose), y cada uno una vez.
+# Solo acusa archivos terminados en .edi (los .tmp siguen escribiéndose), y cada uno una vez: recuerda el nombre y
+# la suma (cksum) de lo que acusó, mientras el archivo siga en entrada/. Si alguien lo borra, lo olvida: un archivo
+# nuevo con el mismo nombre y el mismo contenido (como el de una corrida anterior de un verifica) se vuelve a acusar.
 set -u
 DIR="${SOCIO_DIR:-/home/socio}"
 ESPERA="${ACUSE_SEGUNDOS:-8}"
@@ -17,6 +19,8 @@ SKU_DESCONOCIDO="${RECHAZA_SKU:-SKU-9999}"
 ESTADO=/var/bot
 mkdir -p "$ESTADO"
 [ -f "$ESTADO/contador" ] || echo 700000000 > "$ESTADO/contador"
+rm -f "$ESTADO"/visto-*          # la forma vieja de recordar, de antes de olvidar lo borrado
+mkdir -p "$ESTADO/visto"
 echo "socio-bot: acuso lo que llegue a $DIR/entrada a los ${ESPERA} s; rechazo el producto $SKU_DESCONOCIDO"
 
 acusar() {
@@ -63,12 +67,18 @@ acusar() {
 while true; do
   for archivo in "$DIR"/entrada/*.edi; do
     [ -f "$archivo" ] || continue
-    marca="$ESTADO/visto-$(cksum < "$archivo" | tr ' ' '-')-$(basename "$archivo")"
-    [ -f "$marca" ] && continue
+    marca="$ESTADO/visto/$(basename "$archivo")"
+    suma=$(cksum < "$archivo")
+    [ -f "$marca" ] && [ "$(cat "$marca")" = "$suma" ] && continue
     edad=$(( $(date +%s) - $(stat -c %Y "$archivo") ))
     [ "$edad" -ge "$ESPERA" ] || continue
     acusar "$archivo"
-    touch "$marca"
+    echo "$suma" > "$marca"
+  done
+  # Lo que ya no está en entrada/ se olvida
+  for marca in "$ESTADO"/visto/*; do
+    [ -f "$marca" ] || continue
+    [ -f "$DIR/entrada/$(basename "$marca")" ] || rm -f "$marca"
   done
   sleep 2
 done

@@ -18,7 +18,33 @@ CREATE TABLE operacion (
   numero_control text,                     -- lo asigna el router con numero_control_seq (lección 15)
   correlacion  text,                       -- el hilo con el que llegó este momento (lección 09); viaja al reenviarlo
   huella       text,                       -- sha256 de lo que llegó en este momento (lección 18): reconoce un repetido
+  creada       timestamptz NOT NULL DEFAULT now(), -- desde cuándo se espera (lección 25): de aquí corre el plazo
   UNIQUE (orden, momento, canal)            -- la llave del momento (su ce-id) + el canal: no hay dos iguales
+);
+
+-- Un momento de la orden está COMPLETO cuando cada canal que le toca llegó a lo que la máquina de estados dice que
+-- espera de él (lección 25): la API y el ERP, «aceptada»; el socio, «confirmada» (su 997). Una fila por momento.
+-- Al truncar orden (como hacen los verifica) se va con ella.
+CREATE TABLE completitud (
+  orden        text NOT NULL REFERENCES orden(orden),
+  momento      text NOT NULL,
+  completa     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (orden, momento)
+);
+
+-- Un canal que pasó su plazo sin llegar a lo que se espera de él (lección 25). Avisa y NO cierra: el momento sigue
+-- abierto, y si lo que faltaba llega tarde, se completa. Un aviso por canal y momento, aunque el barrido lo vea varias
+-- veces.
+CREATE TABLE alerta (
+  id           bigserial PRIMARY KEY,
+  orden        text NOT NULL REFERENCES orden(orden),
+  momento      text NOT NULL,
+  canal        text NOT NULL,
+  tipo         text NOT NULL,              -- vencido
+  estado       text NOT NULL,              -- en qué estado estaba el canal al vencer
+  espera       text NOT NULL,              -- lo que se esperaba de él
+  creada       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (orden, momento, canal, tipo)
 );
 
 -- Un aviso con la llave de uno que ya teníamos, pero con otro contenido (lección 18). No es un repetido: alguien
