@@ -15,7 +15,7 @@ tiene que reprocesarlo a mano. El router carga con la disponibilidad de cada can
   embarca o se entrega. El cuerpo es lo guardado (lo mismo que ya mandaba por HTTP a los tres canales).
 - **La llave del evento es la orden** (`CamelKafkaKey`). Kafka pone en la misma partición todo lo que lleva la misma
   llave, y dentro de una partición respeta el orden: los momentos de una orden se leen en el orden en que se
-  publicaron, y los lee siempre la misma copia de cada integración.
+  publicaron, y los lee la misma copia de cada integración.
 - **Un grupo de consumidores por integración**: `int-rest`, `int-bd`, `int-edi`. Cada grupo recibe todos los eventos
   y lleva su propia cuenta de hasta dónde leyó (su *offset*). Las tres copias de int-bd comparten su grupo y se
   reparten las tres particiones del tópico: entre ellas es *Competing Consumers*; entre integraciones es

@@ -242,7 +242,7 @@
                         resultType: java.lang.String
                 # La LLAVE del evento es la orden: Kafka manda a la misma partición todo lo que tiene la misma llave,
                 # y dentro de una partición el orden se respeta. Los momentos de la 4001 se leen en el orden en que se
-                # publicaron, y siempre los lee la misma copia de cada canal.
+                # publicaron, y los lee la misma copia de cada canal.
                 - setHeader:
                     name: CamelKafkaKey
                     expression:

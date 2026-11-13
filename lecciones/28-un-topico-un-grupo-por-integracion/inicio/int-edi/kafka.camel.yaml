@@ -20,7 +20,7 @@
         brokers: kafka:9092
         # Esta es TU parte de la lección (2 de 2). Tal como viene, las TRES integraciones leen con el mismo
         # grupo, «integraciones»: Kafka trata a int-rest, int-bd e int-edi como copias de una sola cosa y le da
-        # cada evento a UNA de ellas. El evento de la 4001 lo lee, digamos, int-bd, y la API y el socio nunca se
+        # cada evento a UNA de ellas. El evento de la 4001 lo lee, digamos, int-bd, y la API y el socio no se
         # enteran.
         # TODO 2: dale a esta integración su PROPIO grupo (int-edi), y lo mismo en los kafka.camel.yaml de los otros
         #         dos canales. Las copias de int-bd sí comparten el suyo: entre ellas se reparten las particiones.
