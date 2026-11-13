@@ -1,0 +1,159 @@
+# El apéndice opcional (lecciones 31 y 32), en una máquina x86 de GitHub. Se corre A MANO (Actions → apendice →
+# Run workflow), no en cada cambio: crea un clúster kind y compila a nativo, y eso tarda y pesa.
+#
+# Qué hace:
+#   1. Lección 31: corre su verifica con la solución (kind + metrics-server + HPA) y, si se pide, con inicio/
+#      (debe salir en ROJO: es el control de que el verifica mide algo).
+#   2. Lección 32: corre su verifica con la solución (construye la imagen JVM y la nativa, y mide).
+#   3. Mientras corren, toma cada 3 s la memoria usada de la máquina y la CPU y memoria del nodo de kind, y deja
+#      en el resumen del job las mismas cifras de capacidad que lecciones/31-…/CAPACIDAD.md, pero de x86.
+#   4. Si se pide, publica la imagen nativa x86 en ghcr.io con el GITHUB_TOKEN de la corrida (sin otros secretos).
+name: apendice
+
+on:
+  workflow_dispatch:
+    inputs:
+      con_inicio:
+        description: "Correr también la 31 con inicio/ (control: debe salir en rojo)"
+        type: boolean
+        default: false
+      publicar_nativo:
+        description: "Publicar la imagen nativa x86 en ghcr.io"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apendice-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KIND_VERSION: v0.33.0
+  KUBECTL_VERSION: v1.37.0
+
+jobs:
+  leccion-31:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: kind y kubectl, en versiones fijas
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSLo "$HOME/bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          curl -fsSLo "$HOME/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x "$HOME/bin/kind" "$HOME/bin/kubectl"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          "$HOME/bin/kind" version
+          "$HOME/bin/kubectl" version --client
+
+      - name: Muestreo de capacidad (en segundo plano)
+        run: |
+          docker system df > df-antes.txt
+          nohup bash -c 'while [ ! -f alto ]; do
+            echo "$(date +%s) $(free -m | awk "/Mem:/{print \$3}") $(docker stats --no-stream --format "{{.CPUPerc}} {{.MemUsage}}" ni-una-orden-perdida-control-plane 2>/dev/null)" >> muestras.txt
+            sleep 3; done' >/dev/null 2>&1 &
+
+      - name: Lección 31 con la solución
+        run: |
+          cd lecciones/31-de-laboratorio-a-kubernetes
+          ./verifica solucion 2>&1 | tee "$GITHUB_WORKSPACE/salida-31.txt"
+          exit "${PIPESTATUS[0]}"
+
+      - name: Lección 31 con inicio (control, debe salir en rojo)
+        if: ${{ inputs.con_inicio }}
+        run: |
+          cd lecciones/31-de-laboratorio-a-kubernetes
+          cp -R inicio mio
+          if ./verifica mio > "$GITHUB_WORKSPACE/control-31.txt" 2>&1; then
+            cat "$GITHUB_WORKSPACE/control-31.txt"; echo "::error::La 31 salió VERDE con inicio/: el verifica no está midiendo"; exit 1
+          fi
+          cat "$GITHUB_WORKSPACE/control-31.txt"
+          rm -rf mio
+
+      - name: Resumen de la 31
+        if: always()
+        run: |
+          touch alto; sleep 4
+          docker system df > df-despues.txt
+          v=$(grep -c '✅' salida-31.txt || true); r=$(grep -c '❌' salida-31.txt || true)
+          # Columnas de muestras.txt: hora, memoria usada de la máquina (MiB), CPU del nodo (%), memoria del nodo
+          read -r base pico <<< "$(awk 'NR==1{b=$2} {if($2>m)m=$2} END{print b, m}' muestras.txt)"
+          nodo_mem=$(awk '{v=$4; n=v+0; if (v ~ /GiB/) n*=1024; if (n>m) m=n} END{printf "%.0f", m}' muestras.txt)
+          nodo_cpu=$(awk '{c=$3+0; if (c>m) m=c} END{printf "%.0f", m}' muestras.txt)
+          {
+            echo "### Lección 31 (x86, ubuntu-latest): ${v} ✅ · ${r} ❌"
+            echo
+            echo "| Medida | Cifra |"
+            echo "|---|---|"
+            echo "| CPU de la máquina | $(nproc) |"
+            echo "| Memoria usada de la máquina, al empezar → pico | ${base} MiB → ${pico} MiB |"
+            echo "| Nodo de kind: memoria pico (docker stats) | ${nodo_mem} MiB |"
+            echo "| Nodo de kind: CPU pico (docker stats; 100 % = 1 núcleo) | ${nodo_cpu} % |"
+            echo
+            echo '```'
+            echo "Antes:"; cat df-antes.txt; echo "Después:"; cat df-despues.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$v" -gt 0 ] || { echo "::error::Cero checks contados: la corrida no midió nada"; exit 1; }
+
+  leccion-32:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write          # solo se usa si se pidió publicar la imagen nativa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Muestreo de capacidad (en segundo plano)
+        run: |
+          docker system df > df-antes.txt
+          nohup bash -c 'while [ ! -f alto ]; do echo "$(date +%s) $(free -m | awk "/Mem:/{print \$3}")" >> muestras.txt; sleep 3; done' \
+            >/dev/null 2>&1 &
+
+      - name: Lección 32 con la solución
+        run: |
+          cd lecciones/32-jvm-contra-nativo
+          ./verifica solucion 2>&1 | tee "$GITHUB_WORKSPACE/salida-32.txt"
+          exit "${PIPESTATUS[0]}"
+
+      - name: Resumen de la 32
+        if: always()
+        run: |
+          touch alto; sleep 4
+          docker system df > df-despues.txt
+          v=$(grep -c '✅' salida-32.txt || true); r=$(grep -c '❌' salida-32.txt || true)
+          read -r base pico <<< "$(awk 'NR==1{b=$2} {if($2>m)m=$2} END{print b, m}' muestras.txt)"
+          # El compilador nativo dice cuánta memoria usó como máximo (Peak RSS) y cuántos núcleos ocupó (CPU load)
+          rss=$(grep -ho 'Peak RSS: [0-9.]*GB | CPU load: [0-9.]*' lecciones/32-jvm-contra-nativo/solucion/build-nativo.log | tail -1)
+          {
+            echo "### Lección 32 (x86, ubuntu-latest): ${v} ✅ · ${r} ❌"
+            echo
+            echo "| Medida | Cifra |"
+            echo "|---|---|"
+            echo "| CPU de la máquina | $(nproc) |"
+            echo "| Memoria usada de la máquina, al empezar → pico | ${base} MiB → ${pico} MiB |"
+            echo "| Compilación nativa (lo que reporta native-image) | ${rss:-no se encontró} |"
+            echo
+            cat lecciones/32-jvm-contra-nativo/solucion/cifras.md 2>/dev/null || echo "(no se escribieron las cifras)"
+            echo
+            echo '```'
+            echo "Antes:"; cat df-antes.txt; echo "Después:"; cat df-despues.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$v" -gt 0 ] || { echo "::error::Cero checks contados: la corrida no midió nada"; exit 1; }
+
+      - name: Publicar la imagen nativa x86 en ghcr.io
+        if: ${{ inputs.publicar_nativo && success() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          destino="ghcr.io/${GITHUB_REPOSITORY,,}/int-rest:nativo-amd64"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag ni-una-orden-perdida/int-rest:nativo "$destino"
+          docker push "$destino"
+          echo "Imagen nativa x86 publicada: \`$destino\`" >> "$GITHUB_STEP_SUMMARY"
