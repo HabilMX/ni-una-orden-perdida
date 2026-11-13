@@ -23,6 +23,9 @@ golpea mientras arranca. Y si cada pieza (router, int-rest) reintenta por su cue
 ## Por qué
 
 - **Un reintento en el lugar conserva el orden.** El embarque de la 4001 no le llega a la API antes que la orden.
+  Desde la 24 el reparto atiende varias órdenes a la vez (`concurrentConsumers: 10`): el orden se conserva
+  DENTRO de cada orden, que sigue saliendo en fila, pero ya no entre órdenes distintas. Lo que llega antes de
+  tiempo se estaciona al recibirse (lección 17).
 - **La espera creciente le da tiempo al destino** para volver, sin golpearlo mientras arranca; el azar evita que dos
   routers reintenten justo al mismo tiempo.
 - **Un renglón por intento** deja ver en la base cuántas veces se intentó, cuándo, y qué pasó cada vez.

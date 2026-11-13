@@ -3,7 +3,8 @@
 #
 #   bodega → buzon/lote-bodega-<n>.json → [sondeo] → split → POST /embarques (uno por embarque) → router
 #
-# Si un embarque del lote no pasa, los demás siguen (stopOnException: false). Al terminar, el lote se aparta a
+# ¿Qué pasa con los demás embarques del lote si uno no pasa? Lo decides tú (TODO 2).
+# Al terminar, el lote se aparta a
 # .error/ para que alguien vea cuál falló; lo que sí pasó ya está en sus destinos.
 # Corre en UNA sola copia, igual que en la 13.
 
