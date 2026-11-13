@@ -79,7 +79,7 @@ EDI=$(EST "SELECT string_agg(estado, ' ' ORDER BY orden) FROM operacion WHERE mo
 # 2. Vuelve el SFTP (pasada la espera del cortacircuito); la API se pone lenta y llega la 4005
 INFRA start socio-sftp >/dev/null 2>&1; INFRA up -d --wait socio-sftp >/dev/null 2>&1
 sleep 12
-[ "$(MODO '{"modo":"lento","espera_ms":10000}')" = "200" ] || { no "No pude poner la API en modo lento (¿es la 1.4.0? recréala con la 00)"; apagar; exit 1; }
+[ "$(MODO '{"modo":"lento","espera_ms":10000}')" = "200" ] || { no "No pude poner la API en modo lento (¿es la 1.5.0? recréala con la 00)"; apagar; exit 1; }
 ORDEN 4005; T5=$(date +%s)
 # Se espera a que el router se rinda: o se agotaron los reintentos (conciliacion_pendiente), o el cortacircuito de
 # rest se abrió y el último intento ya no se envió (pendiente con un intento no_enviado)

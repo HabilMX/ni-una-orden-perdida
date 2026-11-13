@@ -48,7 +48,7 @@ Imágenes que se quedan en tu Docker después de la 31 (además de las de las le
 | `kindest/node:v1.37.0` | 1.30 GB | El nodo del clúster |
 | `quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:25.0.5.0-Final-java25` | 1.92 GB | Compilar (JVM y nativo) |
 | `ni-una-orden-perdida/int-rest:jvm` | 655 MB | int-rest para la JVM (comparte capas con su base) |
-| `ni-una-orden-perdida/api-demo:1.4.0` | 529 MB | La API dentro del clúster (comparte capas con la de la lección 00) |
+| `ni-una-orden-perdida/api-demo:1.5.0` | 529 MB | La API dentro del clúster (comparte capas con la de la lección 00) |
 | `fortio/fortio:1.76.0` | 25 MB | El cliente que manda la carga |
 | Caché de construcción (incluye el de Maven, 157 MB) | hasta ~2.6 GB | Que la segunda construcción no baje ni repita nada |
 

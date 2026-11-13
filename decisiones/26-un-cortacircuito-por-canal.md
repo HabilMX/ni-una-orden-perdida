@@ -17,6 +17,7 @@ reciben nada, aunque estén bien. Un canal caído frena a los otros dos.
   operación sigue `pendiente`: no le pasó nada en el destino. No se reintenta en el lugar, así que la cola sigue.
 - **Medio abierto**: pasados los 10 s, se deja pasar una llamada de prueba; si sale bien, se cierra.
 - Cuenta como falla del canal un 5xx o la falta de respuesta. Un 4xx no: es un «no» del destino, y el canal está bien.
+  Tampoco un 429: el canal contestó, y su «prueba después» lo atiende el reintento con espera (ficha 24).
 - Lo que quedó pendiente con el cortacircuito abierto se reprocesa por la misma puerta que lo demás (lección 23).
 
 ## Por qué

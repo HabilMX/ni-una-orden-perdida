@@ -61,6 +61,21 @@ class ModoResourceTest {
     }
 
     @Test
+    void enModoSaturaContesta429ConRetryAfterYDespuesRegistra() {
+        modo("{\"modo\":\"satura\",\"veces\":2,\"retry_after_s\":4}");
+        String p = pedido();
+        for (int i = 0; i < 2; i++) {
+            given().contentType(ContentType.JSON).header("Idempotency-Key", p).body(cuerpo(p))
+                    .when().post("/pedidos").then().statusCode(429).header("Retry-After", "4")
+                    .body("type", equalTo(PedidosResource.SATURADA));
+        }
+        given().when().get("/pedidos/" + p).then().statusCode(404);
+        given().contentType(ContentType.JSON).header("Idempotency-Key", p).body(cuerpo(p))
+                .when().post("/pedidos").then().statusCode(201);
+        given().when().get("/admin/modo").then().statusCode(200).body("quedan_429", equalTo(0));
+    }
+
+    @Test
     void elGetDiceElModoVigente() {
         modo("{\"modo\":\"lento\",\"espera_ms\":5}");
         given().when().get("/admin/modo").then().statusCode(200).body("modo", equalTo("lento"))

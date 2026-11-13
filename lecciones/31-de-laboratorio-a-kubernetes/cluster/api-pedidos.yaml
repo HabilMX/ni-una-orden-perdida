@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api-pedidos
-          image: ni-una-orden-perdida/api-demo:1.4.0
+          image: ni-una-orden-perdida/api-demo:1.5.0
           imagePullPolicy: Never    # la imagen la subió «kind load» al nodo; no hay registro de dónde bajarla
           ports:
             - containerPort: 8080

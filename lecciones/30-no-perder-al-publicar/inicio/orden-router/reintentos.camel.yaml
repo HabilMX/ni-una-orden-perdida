@@ -8,8 +8,9 @@
 # (desenlaces.camel.yaml), y lo que se repite es la PUBLICACIÓN del evento, solo para ese canal, después de esperar.
 # Mientras tanto no se detiene nada: los otros canales y las otras órdenes siguen.
 #
-# Solo se repite lo que quedó «no se sabe» (sin respuesta o 5xx). Un 4xx es un «no» del destino y no se repite. A los
-# seis intentos la operación pasa a conciliacion_pendiente (lección 20).
+# Solo se repite lo que quedó «no se sabe» (sin respuesta, un 5xx, o un 408, 425 o 429). Si el destino pidió una
+# espera (Retry-After), desenlaces.camel.yaml la usa como espera, con un tope de 10 s. Cualquier otro 4xx es un «no»
+# del destino y no se repite. A los seis intentos la operación pasa a conciliacion_pendiente (lección 20).
 - route:
     id: reintentar
     from:

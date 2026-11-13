@@ -14,8 +14,10 @@ import org.jboss.logging.Logger;
 /**
  * {@code /admin/modo}: el control que usan las lecciones para que la API se porte como un destino con problemas.
  *
- * <p>{@code POST /admin/modo} con {@code {"modo":"normal"|"lento"|"rechaza"}} y, opcional, {@code "espera_ms"} para
- * el modo lento (10000 por omisión). {@code GET /admin/modo} dice el modo vigente. Un modo desconocido es un 400.
+ * <p>{@code POST /admin/modo} con {@code {"modo":"normal"|"lento"|"rechaza"|"satura"}} y, opcionales,
+ * {@code "espera_ms"} para el modo lento (10000 por omisión), y {@code "veces"} (2) y {@code "retry_after_s"} (3) para
+ * el modo satura. {@code GET /admin/modo} dice el modo vigente y cuántos 429 le quedan. Un modo desconocido es un
+ * 400.
  */
 @Path("/admin/modo")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,7 +31,8 @@ public class AdminResource {
 
     @GET
     public Map<String, Object> leer() {
-        return Map.of("modo", modo.actual(), "espera_ms", modo.esperaMs());
+        return Map.of("modo", modo.actual(), "espera_ms", modo.esperaMs(), "quedan_429", modo.quedan429(),
+                "retry_after_s", modo.retryAfterS());
     }
 
     @POST
@@ -38,14 +41,22 @@ public class AdminResource {
         String nuevo = pedido == null ? null : String.valueOf(pedido);
         if (!Modo.valido(nuevo)) {
             return Response.status(400)
-                    .entity(Map.of("error", "modo desconocido: " + nuevo + " (normal, lento o rechaza)")).build();
+                    .entity(Map.of("error", "modo desconocido: " + nuevo + " (normal, lento, rechaza o satura)")).build();
         }
         long espera = Modo.ESPERA_LENTO_MS;
         if (cuerpo.get("espera_ms") instanceof Number n) {
             espera = n.longValue();
         }
-        modo.cambiar(nuevo, espera);
-        LOG.infof("modo=%s espera_ms=%d", nuevo, espera);
+        int veces = Modo.VECES_SATURA;
+        if (cuerpo.get("veces") instanceof Number n) {
+            veces = n.intValue();
+        }
+        int retryAfter = Modo.RETRY_AFTER_S;
+        if (cuerpo.get("retry_after_s") instanceof Number n) {
+            retryAfter = n.intValue();
+        }
+        modo.cambiar(nuevo, espera, veces, retryAfter);
+        LOG.infof("modo=%s espera_ms=%d veces=%d retry_after_s=%d", nuevo, espera, veces, retryAfter);
         return Response.ok(leer()).build();
     }
 }

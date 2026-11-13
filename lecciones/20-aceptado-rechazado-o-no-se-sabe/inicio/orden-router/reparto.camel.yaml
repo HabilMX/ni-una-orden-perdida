@@ -6,7 +6,7 @@
 #      Si el router se cae justo después de enviar, en la base queda que lo intentó y no sabe cómo le fue.
 #      («En la 20 verás por qué.»)
 #   3. se llama al servicio del canal y se anota el desenlace en el intento y en la operación:
-#      2xx aceptada · 4xx rechazada · otro código o sin respuesta: no_se_sabe.
+#      2xx aceptada · otro 4xx rechazada · 408, 425, 429, otro código o sin respuesta: no_se_sabe.
 #
 # Esta parte viene hecha. No la tienes que escribir; sí léela: es lo que hace el router después del 202.
 # Desde la 19, cada intento es su propia ruta (intentar), para que un «no se sabe» se repita completo, con su
@@ -195,6 +195,12 @@
         # 3. La llamada al canal, y su desenlace
         - doTry:
             steps:
+              # Lo que pida esperar el destino (Retry-After) se lee de su respuesta; si no contesta, no pidió nada
+              - setVariable:
+                  name: espera_pedida
+                  expression:
+                    constant:
+                      expression: ""
               - toD:
                   uri: "http://${variable.servicio}:8080/${variable.paso}"
                   parameters:
@@ -205,6 +211,11 @@
                   expression:
                     simple:
                       expression: "${header.CamelHttpResponseCode}"
+              - setVariable:
+                  name: espera_pedida
+                  expression:
+                    simple:
+                      expression: "${header.Retry-After}"
               - setVariable:
                   name: version
                   expression:
@@ -232,7 +243,10 @@
         # Esta es TU parte de la lección: decidir el desenlace por la evidencia.
         # Tal como viene, todo lo que no es 2xx se toma como un «no». Un tiempo límite vencido también: y la API lenta
         # sí registra el pedido, después de que cortamos.
-        # TODO 1: un 4xx es «rechazada»: el destino dijo que no, y repetirlo da la misma respuesta.
+        # TODO 1: un 4xx es «rechazada»: el destino dijo que no, y repetirlo da la misma respuesta. Salvo tres:
+        #         429 (me mandaste demasiadas), 408 (tardaste en mandarla) y 425 (es muy pronto) dicen «ahora no,
+        #         prueba después», y son «no_se_sabe». Pista: el choice se queda con el PRIMER when que se cumple;
+        #         esos tres van en un when antes del de los 4xx (el operador «in» de Simple compara contra una lista).
         # TODO 2: un 5xx, un 504 o la falta de respuesta (codigo 0) es «no_se_sabe»: no es un «no». Ese desenlace es el
         #         que intentar convierte en error para que se reintente (ver el final de esta ruta).
         - choice:
@@ -253,6 +267,36 @@
                     expression:
                       constant:
                         expression: rechazada
+        # Si el destino contestó 408, 425 o 429 y dijo cuánto esperar (Retry-After, en segundos), el siguiente
+        # reintento espera eso en vez de la espera creciente de reintentos.camel.yaml: es el destino el que sabe cuándo
+        # puede atender. Con un tope de 10 s, de la práctica: así un Retry-After de una hora no detiene la práctica; un
+        # sistema real fija su tope según cuánto puede esperar. Si viene como fecha y no en segundos, o no viene, se usa
+        # la espera de siempre. CamelRedeliveryDelay es el encabezado con el que Camel deja cambiar esa espera.
+        - removeHeader:
+            name: CamelRedeliveryDelay
+        - filter:
+            expression:
+              simple:
+                expression: "${variable.codigo} in '408,425,429' && ${variable.espera_pedida} regex '[0-9]{1,6}'"
+            steps:
+              - setHeader:
+                  name: CamelRedeliveryDelay
+                  expression:
+                    simple:
+                      # De segundos a milisegundos: 3 → 3000
+                      expression: "${variable.espera_pedida}000"
+              - filter:
+                  expression:
+                    simple:
+                      expression: "${variable.espera_pedida} > 10"
+                  steps:
+                    - setHeader:
+                        name: CamelRedeliveryDelay
+                        expression:
+                          constant:
+                            expression: "10000"
+              - log:
+                  message: "${variable.servicio} contestó ${variable.codigo} y pidió esperar ${variable.espera_pedida} s (Retry-After): el siguiente intento de la orden ${variable.orden} sale en ${header.CamelRedeliveryDelay} ms"
         - to:
             uri: >-
               sql:UPDATE intento SET desenlace = :#${variable.desenlace}, version_mapeo = :#${variable.version},

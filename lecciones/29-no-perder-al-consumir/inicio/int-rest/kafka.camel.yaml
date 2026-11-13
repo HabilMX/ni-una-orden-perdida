@@ -154,6 +154,12 @@
             expression:
               constant:
                 expression: ""
+        # Lo que pidió esperar la API (Retry-After), si lo pidió: el router decide con eso cuándo reintentar
+        - setVariable:
+            name: espera_pedida
+            expression:
+              constant:
+                expression: ""
         - doTry:
             steps:
               - toD:
@@ -171,6 +177,16 @@
                   expression:
                     simple:
                       expression: "${header.X-Version-Mapeo}"
+              - filter:
+                  expression:
+                    simple:
+                      expression: "${header.Retry-After} != null"
+                  steps:
+                    - setVariable:
+                        name: espera_pedida
+                        expression:
+                          simple:
+                            expression: "${header.Retry-After}"
             doCatch:
               - exception:
                   - java.lang.Exception
@@ -214,6 +230,11 @@
             expression:
               simple:
                 expression: "${variable.version}"
+        - setHeader:
+            name: espera_pedida
+            expression:
+              simple:
+                expression: "${variable.espera_pedida}"
         - to:
             uri: kafka:desenlaces
             parameters:

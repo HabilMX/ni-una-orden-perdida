@@ -8,7 +8,10 @@
 # cómo les fue. Cada desenlace trae su operación, su intento, el código que contestó el canal, la versión del mapeo y
 # el cuerpo de la respuesta. El desenlace se decide aquí, por la EVIDENCIA, igual que desde la 20:
 #   2xx                         → aceptada
-#   4xx                         → rechazada: el destino dijo que no; repetir da lo mismo, no se reintenta
+#   408, 425, 429               → no_se_sabe: son 4xx, pero no son un «no» sino «ahora no, prueba después»
+#                                 (429 me mandaste demasiadas, 408 tardaste en mandarla, 425 es muy pronto).
+#                                 Si el destino dice cuánto esperar (Retry-After), se espera eso, con tope de 10 s
+#   otro 4xx                    → rechazada: el destino dijo que no; repetir da lo mismo, no se reintenta
 #   5xx, 504, sin respuesta (0) → no_se_sabe: se vuelve a publicar con espera creciente (reintentos.camel.yaml)
 #
 # Desde la 29, el router confirma A MANO hasta dónde leyó (su offset), DESPUÉS de anotar el desenlace en la base: si
@@ -74,6 +77,12 @@
               simple:
                 expression: "${header.version}"
         - setVariable:
+            name: espera_pedida
+            expression:
+              simple:
+                # Lo que pidió esperar el destino (Retry-After, en segundos), si lo pidió: lo trae el canal
+                expression: "${header.espera_pedida}"
+        - setVariable:
             name: respuesta
             expression:
               simple:
@@ -131,6 +140,18 @@
                               expression:
                                 constant:
                                   expression: aceptada
+                      # 408, 425 y 429 son 4xx, pero no son un «no»: dicen «ahora no,
+                      # prueba después» (ver arriba). Van ANTES del 400..499 porque el
+                      # choice se queda con el primer when que se cumple.
+                      - expression:
+                          simple:
+                            expression: "${variable.codigo} in '408,425,429'"
+                        steps:
+                          - setVariable:
+                              name: desenlace
+                              expression:
+                                constant:
+                                  expression: no_se_sabe
                       - expression:
                           simple:
                             expression: "${variable.codigo} range '400..499'"
@@ -215,6 +236,32 @@
                                             expression:
                                               simple:
                                                 expression: "${variable.fila[espera]}"
+                                        # Si el destino contestó 408, 425 o 429 y dijo cuánto esperar
+                                        # (Retry-After, en segundos), se espera eso en vez de la espera
+                                        # creciente: es el destino el que sabe cuándo puede atender. Tope de
+                                        # 10 s, de la práctica; un sistema real fija el suyo. Si viene como
+                                        # fecha y no en segundos, o no viene, se usa la espera de siempre.
+                                        - filter:
+                                            expression:
+                                              simple:
+                                                expression: "${variable.codigo} in '408,425,429' && ${variable.espera_pedida} regex '[0-9]{1,6}'"
+                                            steps:
+                                              - setVariable:
+                                                  name: espera
+                                                  expression:
+                                                    simple:
+                                                      # De segundos a milisegundos: 3 → 3000
+                                                      expression: "${variable.espera_pedida}000"
+                                              - filter:
+                                                  expression:
+                                                    simple:
+                                                      expression: "${variable.espera_pedida} > 10"
+                                                  steps:
+                                                    - setVariable:
+                                                        name: espera
+                                                        expression:
+                                                          constant:
+                                                            expression: "10000"
                                         - log:
                                             loggingLevel: WARN
                                             message: "No se sabe si llegó la orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} (intento ${variable.fila[n]}): la vuelvo a publicar en ${variable.espera} ms"

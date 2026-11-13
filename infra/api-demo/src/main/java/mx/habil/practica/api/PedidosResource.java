@@ -45,7 +45,9 @@ import org.jboss.logging.Logger;
  * devuelve el pedido con su {@code estatus} y su {@code guia}. Los eventos también exigen {@code Idempotency-Key}.
  *
  * <p>Desde la 1.4.0, {@code POST /admin/modo} hace que crear un pedido sea lento o se rechace por negocio (ver
- * {@link Modo}): así las lecciones 19 y 20 tienen un destino que tarda y uno que dice que no.
+ * {@link Modo}): así las lecciones 19 y 20 tienen un destino que tarda y uno que dice que no. Desde la 1.5.0 también
+ * puede contestar {@code 429 Too Many Requests} con {@code Retry-After} (modo satura): un destino que dice «ahora no,
+ * prueba después», que no es lo mismo que un «no».
  *
  * <p>Si la llamada trae {@code X-Correlation-Id}, la API lo anota en su bitácora junto a cada respuesta
  * ({@code correlacion=...}; un guion si no vino). Así se puede seguir una orden hasta aquí solo con ese id.
@@ -70,6 +72,7 @@ public class PedidosResource {
     static final String FUERA_DE_ORDEN = "tag:habil.mx,2026:ni-una-orden-perdida/fuera-de-orden";
     static final String GUIA_DISTINTA = "tag:habil.mx,2026:ni-una-orden-perdida/guia-distinta";
     static final String RECHAZADO_POR_NEGOCIO = "tag:habil.mx,2026:ni-una-orden-perdida/rechazado-por-negocio";
+    static final String SATURADA = "tag:habil.mx,2026:ni-una-orden-perdida/saturada";
 
     /** Los estatus por los que pasa un pedido, en este orden. */
     static final String CREADO = "CREADO";
@@ -90,7 +93,7 @@ public class PedidosResource {
     private final Map<String, Avance> avancePorPedido = new ConcurrentHashMap<>();
     private final Map<String, Evento> eventosPorLlave = new ConcurrentHashMap<>();
 
-    /** El modo de la API (normal, lento o rechaza): lo cambia {@code POST /admin/modo}. Solo afecta a crear. */
+    /** El modo de la API (normal, lento, rechaza o satura): lo cambia {@code POST /admin/modo}. Solo afecta a crear. */
     @jakarta.inject.Inject
     Modo modo;
 
@@ -107,6 +110,15 @@ public class PedidosResource {
             LOG.infof("422 llave=%s correlacion=%s motivo=rechazado por negocio (modo rechaza)", llave, correlacion);
             return error(422, RECHAZADO_POR_NEGOCIO, "El pedido se rechazó por una regla de negocio",
                     "La API está en modo rechaza: este pedido no se registra, y repetirlo da la misma respuesta");
+        }
+        if (modo.tocaUn429()) {
+            int retryAfter = modo.retryAfterS();
+            LOG.infof("429 llave=%s correlacion=%s motivo=saturada (modo satura, quedan %d) retry_after=%d",
+                    llave, correlacion, modo.quedan429(), retryAfter);
+            // Retry-After en segundos (RFC 9110, sección 10.2.3): cuánto pide el destino que se espere antes de repetir
+            return Response.fromResponse(error(429, SATURADA, "Demasiadas peticiones",
+                    "La API está en modo satura: este pedido no se registra; repítelo en " + retryAfter + " s"))
+                    .header("Retry-After", String.valueOf(retryAfter)).build();
         }
         if (Modo.LENTO.equals(modo.actual())) {
             esperar(modo.esperaMs());

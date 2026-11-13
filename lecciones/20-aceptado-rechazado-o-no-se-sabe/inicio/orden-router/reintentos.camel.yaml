@@ -7,9 +7,20 @@
 # detrás (el embarque de la misma orden, otra orden) espera su turno. Eso conserva el orden, y cuesta: mientras un
 # destino no contesta, nadie más avanza.
 #
-# Solo se repite lo que quedó «no se sabe» (sin respuesta o 5xx): direct:intentar lanza una IOException en ese caso.
-# Un 4xx es un «no» del destino y no se repite. Agotados los reintentos, la operación pasa a
-# conciliacion_pendiente (lección 20).
+# Solo se repite lo que quedó «no se sabe» (sin respuesta, un 5xx, o un 408, 425 o 429): direct:intentar lanza una
+# IOException en ese caso. Si el destino pidió una espera (Retry-After), intentar la deja en el encabezado
+# CamelRedeliveryDelay y se espera eso, con un tope de 10 s. Cualquier otro 4xx es un «no» del destino y no se
+# repite. Agotados los reintentos, la operación pasa a conciliacion_pendiente (lección 20).
+
+# El cliente HTTP de Camel, por su cuenta, repite en silencio una llamada que recibe un 429 o un 503, y espera lo que
+# diga su Retry-After. Aquí se apaga: solo el router reintenta, a la vista, cada vez con su renglón en intento. Si el
+# cliente también repitiera, un 429 serían varias llamadas al destino que la base no muestra.
+- beans:
+    - name: http
+      type: org.apache.camel.component.http.HttpComponent
+      properties:
+        automaticRetriesDisabled: true
+
 - routeConfiguration:
     id: reintentar-en-el-lugar
     onException:

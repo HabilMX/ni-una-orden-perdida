@@ -6,7 +6,7 @@
 #      Si el router se cae justo después de enviar, en la base queda que lo intentó y no sabe cómo le fue.
 #      («En la 20 verás por qué.»)
 #   3. se llama al servicio del canal y se anota el desenlace en el intento y en la operación:
-#      2xx aceptada · 4xx rechazada · otro código o sin respuesta: no_se_sabe.
+#      2xx aceptada · otro 4xx rechazada · 408, 425, 429, otro código o sin respuesta: no_se_sabe.
 #
 # Esta parte viene hecha. No la tienes que escribir; sí léela: es lo que hace el router después del 202.
 # Desde la 19, cada intento es su propia ruta (intentar), para que un «no se sabe» se repita completo, con su
@@ -273,7 +273,12 @@
                               uri: direct:sin-respuesta
         # El desenlace se decide por la EVIDENCIA, no por lo que uno espera (lección 20):
         #   2xx               → aceptada:   el destino dijo que sí.
-        #   4xx               → rechazada:  el destino dijo que no (una regla de negocio, una llave reusada). Repetir
+        #   408, 425, 429     → no_se_sabe: son 4xx, pero no son un «no»: dicen «ahora no, prueba después».
+        #                                   429, «me mandaste demasiadas en poco tiempo» (RFC 6585); 408, «me
+        #                                   cansé de esperar a que terminaras de mandarla» (RFC 9110); 425, «es muy
+        #                                   pronto para atender esto» (RFC 8470). Repetir, esperando, sí sirve; si
+        #                                   el destino dice cuánto esperar (Retry-After), se espera eso (abajo).
+        #   otro 4xx          → rechazada:  el destino dijo que no (una regla de negocio, una llave reusada). Repetir
         #                                   da la misma respuesta: no se reintenta.
         #   5xx, 504, sin respuesta (codigo 0) → no_se_sabe: el destino no dijo nada claro. Pudo haber escrito
         #                                   (la API lenta registra DESPUÉS de que cortamos). No es un fallo:
@@ -299,6 +304,17 @@
                       expression:
                         constant:
                           expression: aceptada
+              # 408, 425 y 429 son 4xx, pero no son un «no»: dicen «ahora no, prueba después» (ver arriba). Van ANTES
+              # del 400..499 porque el choice se queda con el primer when que se cumple.
+              - expression:
+                  simple:
+                    expression: "${variable.codigo} in '408,425,429'"
+                steps:
+                  - setVariable:
+                      name: desenlace
+                      expression:
+                        constant:
+                          expression: no_se_sabe
               - expression:
                   simple:
                     expression: "${variable.codigo} range '400..499'"
@@ -315,6 +331,36 @@
                     expression:
                       constant:
                         expression: no_se_sabe
+        # Si el destino contestó 408, 425 o 429 y dijo cuánto esperar (Retry-After, en segundos), el siguiente
+        # reintento espera eso en vez de la espera creciente de reintentos.camel.yaml: es el destino el que sabe cuándo
+        # puede atender. Con un tope de 10 s, de la práctica: así un Retry-After de una hora no detiene la práctica; un
+        # sistema real fija su tope según cuánto puede esperar. Si viene como fecha y no en segundos, o no viene, se usa
+        # la espera de siempre. CamelRedeliveryDelay es el encabezado con el que Camel deja cambiar esa espera.
+        - removeHeader:
+            name: CamelRedeliveryDelay
+        - filter:
+            expression:
+              simple:
+                expression: "${variable.codigo} in '408,425,429' && ${variable.espera_pedida} regex '[0-9]{1,6}'"
+            steps:
+              - setHeader:
+                  name: CamelRedeliveryDelay
+                  expression:
+                    simple:
+                      # De segundos a milisegundos: 3 → 3000
+                      expression: "${variable.espera_pedida}000"
+              - filter:
+                  expression:
+                    simple:
+                      expression: "${variable.espera_pedida} > 10"
+                  steps:
+                    - setHeader:
+                        name: CamelRedeliveryDelay
+                        expression:
+                          constant:
+                            expression: "10000"
+              - log:
+                  message: "${variable.servicio} contestó ${variable.codigo} y pidió esperar ${variable.espera_pedida} s (Retry-After): el siguiente intento de la orden ${variable.orden} sale en ${header.CamelRedeliveryDelay} ms"
         - to:
             uri: >-
               sql:UPDATE intento SET desenlace = :#${variable.desenlace}, version_mapeo = :#${variable.version},
@@ -341,13 +387,20 @@
                   message: "No se sabe si ${variable.servicio} recibió la orden ${variable.orden} momento ${variable.momento} (contestó ${variable.codigo})"
 
 # La llamada a un canal, dentro de su cortacircuito. Un 5xx cuenta como falla del canal (lanza un error que el
-# cortacircuito anota); un 4xx no: es un «no» del destino, y el canal está bien. No maneja sus errores.
+# cortacircuito anota); un 4xx no, ni siquiera un 429: el canal contestó, y su «prueba después» lo atiende el
+# reintento con espera. No maneja sus errores.
 - route:
     id: llamar-canal
     routeConfigurationId: sin-manejo
     from:
       uri: direct:llamar-canal
       steps:
+        # Lo que pida esperar el destino (Retry-After) se lee de su respuesta; si no contesta, no pidió nada
+        - setVariable:
+            name: espera_pedida
+            expression:
+              constant:
+                expression: ""
         - toD:
             uri: "http://${variable.servicio}:8080/${variable.paso}"
             parameters:
@@ -358,6 +411,11 @@
             expression:
               simple:
                 expression: "${header.CamelHttpResponseCode}"
+        - setVariable:
+            name: espera_pedida
+            expression:
+              simple:
+                expression: "${header.Retry-After}"
         - setVariable:
             name: version
             expression:

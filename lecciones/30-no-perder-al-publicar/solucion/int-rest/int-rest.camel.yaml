@@ -1,6 +1,16 @@
 # int-rest: el servicio que sabe hablar con la API de pedidos.
 # Recibe la orden del router, la traduce al formato de la API y la entrega.
 # El hilo: lee ce-correlationid del sobre y se lo pasa a la API como X-Correlation-Id.
+
+# El cliente HTTP de Camel, por su cuenta, repite en silencio una llamada que recibe un 429 o un 503, y espera lo que
+# diga su Retry-After. Aquí se apaga: int-rest le cuenta al router lo que contestó la API y ya; el que reintenta es el
+# router (si los dos repitieran, los reintentos se multiplicarían).
+- beans:
+    - name: http
+      type: org.apache.camel.component.http.HttpComponent
+      properties:
+        automaticRetriesDisabled: true
+
 - route:
     id: int-rest
     from:

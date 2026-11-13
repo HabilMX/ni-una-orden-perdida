@@ -2,7 +2,9 @@
 # Comprueba la lección 20: cada respuesta de la API se clasifica por su evidencia. Con la API en modo «rechaza», la
 # 4001 queda rechazada al primer intento: no se repite un «no». Con la API en modo «lento» (tarda 10 s y el tiempo
 # límite es de 3 s), la 4002 se reintenta, cada intento escrito ANTES de enviar, y al agotarse queda en
-# conciliacion_pendiente con sus intentos en no_se_sabe. No es un fallo: la API sí la registró.
+# conciliacion_pendiente con sus intentos en no_se_sabe. No es un fallo: la API sí la registró. Con la API en modo
+# «satura» (dos 429 con Retry-After de 3 s, y luego atiende), la 4003 se reintenta esperando lo que pidió la API, cada
+# vez al menos 3 s según la bitácora de la API, y queda aceptada: un 429 es «ahora no», no un «no».
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -55,7 +57,7 @@ REST() { EST "SELECT estado FROM operacion WHERE orden='$1' AND momento='creada'
 esperar_rest() { for i in $(seq 1 $2); do case "$(REST "$1")" in aceptada|rechazada|conciliacion_pendiente) return 0;; esac; sleep 2; done; return 1; }
 
 # 1. La API dice que no: modo rechaza
-[ "$(MODO '{"modo":"rechaza"}')" = "200" ] || { no "No pude poner la API en modo rechaza (¿es la 1.4.0? recréala con la 00)"; apagar; exit 1; }
+[ "$(MODO '{"modo":"rechaza"}')" = "200" ] || { no "No pude poner la API en modo rechaza (¿es la 1.5.0? recréala con la 00)"; apagar; exit 1; }
 curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
 esperar_rest 4001 15; esperar_ops 4001 creada 3
 F=$(EST "SELECT p.estado, COUNT(i.id), MAX(i.respuesta->>'codigo') FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.orden='4001' AND p.momento='creada' AND p.canal='rest' GROUP BY p.estado")
@@ -82,6 +84,28 @@ MODO '{"modo":"normal"}' >/dev/null
 [ "$(CAMPO 4002 estatus)" = "CREADO" ] && [ "$(REST 4002)" != "rechazada" ] \
   && si "Y la API sí tiene la 4002 (CREADO): por eso no era un fallo ni un rechazo, era «no se sabe»" \
   || no "La API tiene la 4002 en «$(CAMPO 4002 estatus)» y el estado dice «$(REST 4002)»: si la API la tiene, no fue un rechazo"
+
+# 3. La API dice «ahora no, prueba después»: modo satura, dos 429 con Retry-After de 3 s y luego atiende
+[ "$(MODO '{"modo":"satura","veces":2,"retry_after_s":3}')" = "200" ] || { no "No pude poner la API en modo satura (¿es la 1.5.0? recréala con la 00)"; apagar; exit 1; }
+DESDE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4003.json"
+esperar_rest 4003 30; esperar_ops 4003 creada 3
+F=$(EST "SELECT p.estado, COUNT(i.id), COUNT(*) FILTER (WHERE i.desenlace = 'no_se_sabe' AND i.respuesta->>'codigo' = '429'), MAX(i.respuesta->>'codigo') FILTER (WHERE i.desenlace = 'aceptada') FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.orden='4003' AND p.momento='creada' AND p.canal='rest' GROUP BY p.estado")
+[ "$F" = "$(printf 'aceptada\t3\t2\t201')" ] \
+  && si "Ahora no: la 4003 recibió dos 429 (no_se_sabe), se reintentó y quedó aceptada al tercer intento (201): un 429 no es un «no»" \
+  || no "Ahora no: esperaba aceptada con 3 intentos, 2 de ellos 429 en no_se_sabe, y el último 201; hay «${F:-nada}» (estado, intentos, 429, código final)"
+# La espera se mide donde se ve: en la bitácora de la API, la hora a la que le llegó cada llamada de la 4003
+ESPERAS=$(INFRA logs --no-log-prefix --since "$DESDE" -t api-pedidos 2>/dev/null | grep -E ' (429|201) llave=4003 ' | python3 -c '
+import sys, datetime
+t = [datetime.datetime.fromisoformat(l.split()[0][:26].rstrip("Z")) for l in sys.stdin if l.strip()]
+print(" ".join("%.2f" % (b - a).total_seconds() for a, b in zip(t, t[1:])))' 2>/dev/null)
+# 50 ms de holgura: la hora de cada renglón la pone Docker al recibirlo, no la API al contestar
+python3 -c 'import sys; e = [float(x) for x in sys.argv[1:]]; sys.exit(0 if len(e) == 2 and min(e) >= 2.95 else 1)' $ESPERAS \
+  && si "Y respetó el Retry-After: entre una llamada y la siguiente pasaron $ESPERAS s, ninguna antes de los 3 s que pidió la API" \
+  || no "Retry-After: esperaba dos esperas de al menos 3 s entre las llamadas de la 4003 en la bitácora de la API; hubo «${ESPERAS:-nada}» s"
+MODO '{"modo":"normal"}' >/dev/null
+[ "$(CAMPO 4003 estatus)" = "CREADO" ] && si "La API tiene la 4003 (CREADO): los 429 no la registraron, el reintento sí" \
+  || no "La API tiene la 4003 en «$(CAMPO 4003 estatus)»"
 OTROS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden IN ('4001','4002') AND momento='creada' AND canal <> 'rest'")
 [ "$OTROS" = "bd=aceptada bd=aceptada edi=aceptada edi=aceptada" ] && si "Los otros canales siguieron: ERP y socio aceptaron las dos órdenes" \
   || no "Los otros canales quedaron «${OTROS:-nada}»"
