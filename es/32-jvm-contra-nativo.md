@@ -198,6 +198,7 @@ número sea el correcto. El método es lo que lo sostiene.
 
 Lo que decidimos en esta lección, con lo que descartamos y qué nos haría cambiar de idea:
 
+- [int-rest se exporta con camel export a Camel Quarkus, sin cambiarle la ruta](../decisiones/36-int-rest-exportado-con-camel-export.md)
 - [El nativo se compila con Mandrel dentro de un contenedor](../decisiones/38-el-nativo-se-compila-en-un-contenedor.md)
 - [JVM contra nativo se mide en tu máquina, con un método fijo y sin umbrales](../decisiones/39-se-mide-en-tu-maquina-sin-umbrales.md)
 
