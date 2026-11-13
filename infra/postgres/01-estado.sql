@@ -16,7 +16,22 @@ CREATE TABLE operacion (
   estado       text NOT NULL,              -- pendiente | estacionada | aceptada | rechazada | no_se_sabe | conciliacion_pendiente
   numero_control text,                     -- lo asigna el router con numero_control_seq (lección 15)
   correlacion  text,                       -- el hilo con el que llegó este momento (lección 09); viaja al reenviarlo
-  UNIQUE (orden, momento, canal)
+  huella       text,                       -- sha256 de lo que llegó en este momento (lección 18): reconoce un repetido
+  UNIQUE (orden, momento, canal)            -- la llave del momento (su ce-id) + el canal: no hay dos iguales
+);
+
+-- Un aviso con la llave de uno que ya teníamos, pero con otro contenido (lección 18). No es un repetido: alguien
+-- cambió algo. No se reparte ni pisa lo guardado; queda aquí, a la vista, para que una persona decida.
+CREATE TABLE conflicto (
+  id             bigserial PRIMARY KEY,
+  llave          text NOT NULL,            -- el ce-id del momento: orden-<orden>-<momento>
+  orden          text NOT NULL,
+  momento        text NOT NULL,
+  huella_guardada text NOT NULL,
+  huella_nueva   text NOT NULL,
+  cuerpo         jsonb NOT NULL,           -- lo que llegó la segunda vez, completo
+  correlacion    text,
+  recibido       timestamptz NOT NULL DEFAULT now()
 );
 
 -- El número de control del sobre X12 (ISA13, GS06) de cada documento que sale al socio. Desde la lección 15 lo
