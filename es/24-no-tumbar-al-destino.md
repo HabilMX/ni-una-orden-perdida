@@ -1,6 +1,6 @@
 # Lección 24 — No tumbar al destino
 
-> **Lo que vas a lograr:** que el ERP nunca reciba más registros al mismo tiempo de los que aguanta, aunque int-bd
+> **Lo que vas a lograr:** que el ERP no reciba más registros al mismo tiempo del tope que le fijas, aunque int-bd
 > corra en tres copias y la tienda mande 30 órdenes de golpe. Lo que pase del tope espera su turno: no se rechaza.
 
 **Antes de empezar necesitas:** las lecciones 12 y 22 terminadas y el ambiente de la 00 encendido.
@@ -133,7 +133,7 @@ la vez. Está terminada cuando ves las cinco marcas verdes:
 El último renglón no es una marca: te dice cuántos registros hizo cada copia. Las tres trabajaron.
 
 Compara la segunda marca con la de `inicio/`. Con el tope, las 30 tardan más: en nuestras corridas, unos 16 segundos
-contra unos 6. **Eso es lo que cuesta cuidar al ERP**, y es un precio razonable: el ERP sigue sirviendo a los demás.
+contra unos 6; tu verifica imprime los tuyos. **Eso es lo que cuesta cuidar al ERP**, y es un precio razonable: el ERP sigue sirviendo a los demás.
 
 Mira la cuenta del ERP tú mismo:
 

@@ -140,7 +140,7 @@ pausa entre cada una, para que el router tenga ocasión de abrir conexiones nuev
 ✅ API: tiene las 30 órdenes (crecer int-bd no tocó a los demás)
    Reparto: practica-retail-l12-int-bd-1=12 practica-retail-l12-int-bd-2=12 practica-retail-l12-int-bd-3=6
 ✅ Entre todas las copias registraron 30 órdenes: ni una de más, ni una de menos
-✅ 3 de 3 copias de int-bd registraron órdenes: el trabajo se repartió
+✅ (…) de 3 copias de int-bd registraron órdenes: el trabajo se repartió
 ```
 
 **Tu reparto va a ser distinto**, y cambia en cada corrida: al probarla vimos 12/12/6 y 6/11/13. Quien elige la copia

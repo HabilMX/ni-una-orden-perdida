@@ -96,8 +96,9 @@ de Camel toma la llave del encabezado `CamelKafkaKey`. La orden ya está en la v
 ```
 
 Kafka manda a la **misma partición** todo lo que lleva la misma llave, y dentro de una partición el orden se
-respeta. Así, el creada, el embarcada y el entregada de la 4001 se leen en el orden en que se publicaron, y los lee la
-**misma** copia de int-bd. Sin llave, cada evento cae donde sea, y dos copias distintas podrían atender dos momentos
+respeta. Así, el creada, el embarcada y el entregada de la 4001 se leen en el orden en que se publicaron. Una
+partición la lee una sola copia de cada grupo a la vez: si el grupo se reacomoda (una copia se cae o llega otra), la
+puede seguir otra copia, pero en el mismo orden. Sin llave, cada evento cae donde sea, y dos copias distintas podrían atender dos momentos
 de la misma orden, cada una a su paso.
 
 ### TODO 2: un grupo por integración

@@ -141,7 +141,7 @@ Antes, predice: el rastro ahora tapa más. ¿Eso es mejor?
 
 Salen en rojo la primera marca (el caso dorado esperaba el CP) y la última: el rastro ya no dice el CP. Si una entrega
 falla porque el CP no existe, el rastro ya no te deja verlo. **Tapar de más también es un error**: el rastro existe
-para diagnosticar, y uno que no dice nada no sirve. Un CP solo, sin calle ni nombre, no dice quién es la clienta.
+para diagnosticar, y uno que no dice nada no sirve. Un CP solo, sin calle ni nombre, difícilmente señala a la clienta.
 Regrésalo como estaba.
 
 ## 5. Comprueba
@@ -167,7 +167,8 @@ terminada cuando ves las siete marcas verdes:
 Mira la tercera. Antes de contar ceros, la verifica busca los mismos cuatro datos donde **sí** tienen que estar, en
 la tabla `orden`, y los encuentra. Si no los encontrara ahí, el «0» de las marcas siguientes no probaría nada: podría
 ser que la búsqueda estuviera mal escrita. A eso se le llama un **control positivo**: antes de creerle a un cero,
-comprueba que la búsqueda sabe encontrar.
+comprueba que la búsqueda sabe encontrar. Y lee el cero con su alcance: «0 datos personales» quiere decir 0
+apariciones de los cuatro datos que la verifica busca, en los lugares donde los busca.
 
 **¿No te corre?** `./verifica solucion` prueba la nuestra, y
 `diff mio/orden-router/mappings/rastro/mascara/v1/mapeo.jsonata solucion/orden-router/mappings/rastro/mascara/v1/mapeo.jsonata`
@@ -191,8 +192,9 @@ paquetería necesita la dirección. El rastro es para diagnosticar, y lo leen m�
 la clienta. Por eso se tapa ahí y no en el envío.
 
 **Tapar es un diseño, no un borrado.** Las iniciales, el dominio del correo, los dos últimos dígitos y el CP dicen lo
-suficiente para reconocer y diagnosticar, y no lo suficiente para identificar a la persona. Decidir qué se queda es
-la parte difícil.
+suficiente para reconocer y diagnosticar, y mucho menos que el dato completo. Decidir qué se queda es la parte difícil.
+Y tapar campos no es anonimizar: juntos, o con otras fuentes, algunos datos pueden volver a señalar a la persona (el
+ejercicio 2 lo explora). Un rastro real necesita además decidir quién lo puede leer y cuánto tiempo se guarda.
 
 **La huella sigue siendo la de lo real.** El rastro guarda lo tapado, pero la huella de la 18 se saca de lo que salió
 de verdad. Así se sigue reconociendo un repetido sin guardar el dato.

@@ -119,7 +119,8 @@ metrics:
         averageUtilization: 50
 ```
 
-Cada 15 segundos, el HPA hace esta cuenta, y la deja entre el mínimo y el máximo:
+Cada 15 segundos (el periodo que trae Kubernetes por omisión; se puede configurar), el HPA hace esta cuenta, y la
+deja entre el mínimo y el máximo:
 
 ```
 copias que quiere = copias que hay × (CPU promedio ÷ meta), redondeado hacia arriba
@@ -149,7 +150,7 @@ porcentaje sin base no es un número.** Regresa la línea.
 `verifica` crea el clúster, construye int-rest, lo despliega con **tus** archivos, manda la orden 1001 como control y
 luego una carga de 150 órdenes por segundo durante dos minutos. Cuenta las copias **listas** del Deployment (no lo que
 dice la ruta), revisa que el Service repartió entre ellas y que la API contestó todas las órdenes. Después espera a que
-bajen. Tarda unos 4 minutos. Está terminada cuando ves las marcas verdes:
+bajen. En la máquina de `CAPACIDAD.md` tardó unos 4 minutos; la tuya dirá. Está terminada cuando ves las marcas verdes:
 
 ```
 ✅ Clúster kind «ni-una-orden-perdida» creado (Kubernetes …)
@@ -205,8 +206,11 @@ la reserva está mal, la decisión de escalar también.
 recuerda la 24: si int-bd escalara solo, el tope hacia el ERP tendría que pensarse con el **máximo** de copias, no con
 las de hoy.
 
-**Escalar no es perder.** Mientras subían las copias, ninguna orden se quedó sin respuesta: el Service solo le manda
-trabajo a una copia cuando dice que está lista, y al quitar una, Quarkus termina lo que traía antes de irse.
+**Escalar sin perder se diseña, y se prueba.** En esta corrida, todas las órdenes de la carga tuvieron respuesta
+mientras aparecían copias nuevas: el Service no le manda trabajo nuevo a una copia que todavía no dice que está lista.
+Al quitar una copia, Kubernetes le da una ventana de gracia y Quarkus intenta terminar lo que traía, pero la verifica
+no prueba ese momento con órdenes en el aire. Para estar seguro de que no se corta nada al bajar, hay que probarlo con
+carga, con los tiempos reales de cada servicio.
 
 ## Ejercicio: las cajas del supermercado
 

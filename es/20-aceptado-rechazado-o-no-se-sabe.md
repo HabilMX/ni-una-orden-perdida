@@ -150,7 +150,9 @@ se cortan a la mitad. El destino pudo haber escrito o no. Llamarle «fallo» lle
 la 4002 diez segundos después de que el canal cortó.
 
 **Un 4xx y un 5xx no se tratan igual.** El 4xx es el destino diciendo «lo que me mandaste está mal, o no lo acepto».
-El 5xx es el destino diciendo «algo me pasó a mí». El primero no cambia si lo repites; el segundo, a veces sí.
+El 5xx es el destino diciendo «algo me pasó a mí». El primero no cambia si lo repites; el segundo, a veces sí. Ojo: no todo 4xx es igual. Un 408 (se acabó el tiempo) o
+un 429 (vas demasiado rápido) piden repetir más tarde. Aquí se trata todo el rango como rechazo porque la API de la
+práctica solo contesta el 422 de negocio; con un destino real, cada código se clasifica según lo que diga su contrato.
 
 **El intento se escribe antes de enviar.** Es la única manera de que, después de una caída, se pueda encontrar lo que
 quedó en el aire. Los bancos hacen lo mismo con una transferencia: primero la anotan como «en proceso», después la

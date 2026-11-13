@@ -60,7 +60,7 @@ Escribe en un papel, **antes** de medir:
 2. ¿Cuál de los dos crees que tarda más en **construirse**?
 3. Quarkus dice en su bitácora `started in 0.05s`. ¿Es eso lo que tarda la copia en poder atender una orden?
 
-Mira cómo está hoy (tarda unos 7 minutos: construye las dos imágenes desde cero):
+Mira cómo está hoy (construye las dos imágenes desde cero; en la máquina de `CAPACIDAD.md` tardó unos 7 minutos):
 
 ```bash
 ./verifica inicio

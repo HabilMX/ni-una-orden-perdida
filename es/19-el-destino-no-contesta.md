@@ -39,7 +39,7 @@ Y tres reglas que ya están en el código:
 | Regla | Qué significa | Dónde vive |
 |---|---|---|
 | **Solo el router reintenta** | Los canales (int-rest, int-bd, int-edi) contestan lo que les pasó y ya | Los canales no tienen reintentos |
-| **Solo se repite lo que quedó «no se sabe»** | Sin respuesta, o un error 5xx. Un 4xx es un «no» del destino y no se repite | `direct:intentar` lanza una `IOException` solo en ese caso |
+| **Solo se repite lo que quedó «no se sabe»** | Sin respuesta, o un error 5xx. Un 4xx de esta API (su 422) es un «no» del destino y no se repite | `direct:intentar` lanza una `IOException` solo en ese caso |
 | **Cada intento deja su renglón** | Antes de llamar al canal, `intentar` escribe en la tabla `intento`; después anota cómo le fue | `reparto.camel.yaml`, desde la 15 |
 
 ## 2. Predice

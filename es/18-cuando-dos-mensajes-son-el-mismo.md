@@ -165,8 +165,9 @@ distintas.
 
 ## Lo que esto enseña fuera de la práctica
 
-**En integración, un mensaje llega «al menos una vez», no «exactamente una vez».** Los reintentos protegen contra
-la pérdida, y a cambio traen repetidos. Quien recibe se encarga de reconocerlos. Por eso casi toda API seria de
+**Diseña como si un mensaje pudiera llegar más de una vez.** En muchos flujos con reintentos, como éste, se garantiza
+que llegue «al menos una vez», no «exactamente una vez»: los reintentos protegen contra la pérdida, y a cambio traen
+repetidos. Quien recibe se encarga de reconocerlos. Por eso casi toda API seria de
 pagos o de envíos pide una llave de idempotencia.
 
 **La llave sale del negocio, no del azar.** Un número al azar nuevo en cada envío haría que cada reenvío pareciera

@@ -142,11 +142,9 @@ un error de hoy no te detenga en las lecciones siguientes.
 
 ## 8. El mapa del viaje
 
-<!-- PENDIENTE: el mapa de los 22 EIP, con sus ilustraciones (D24). Se ordena por el viaje de la orden: creación,
-embarque, entrega y que no falle. Cada EIP lleva su ilustración, su nombre y el número de su lección, sin definición. -->
-
-**No tienes que entender esto hoy.** Es el mapa de lo que vas a construir: cada pieza llega en su lección, y en cada
-una vas a volver aquí para ver dónde estás.
+**No tienes que entender esto hoy.** El mapa de lo que vas a construir es el temario del
+[README de la práctica](../README.md): va en el orden en que viaja la orden, de que se crea a que no se pierda. Cada
+pieza llega en su lección; hoy solo necesitas la ruta, el endpoint y el mensaje.
 
 *Por qué Camel:* partimos de premisas, no de gustos. Buscamos algo ligero, que escale por servicio, que se defina por
 configuración y que tenga licencia abierta. Al final de la práctica vas a medir tú mismo qué gana y qué cede. El
