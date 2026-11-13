@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Mide el MISMO int-rest en la JVM y en nativo, en TU máquina, y escribe las cifras en cifras.md (junto a este
+# archivo). Para cada modo mide cuatro cosas:
+#   1. construir         cuánto tarda en construirse la imagen desde cero (sin reusar lo de la vez anterior)
+#   2. arranque          cuánto tarda desde que se pide el contenedor hasta que dice que está sano
+#                        (/q/health/ready), y lo que el propio Quarkus dice en su bitácora («started in …»)
+#   3. memoria en reposo cuánta memoria ocupa ya arrancado, sin trabajo
+#   4. memoria con carga la más alta que se vio durante una carga corta de órdenes
+# No compara contra ninguna cifra «buena»: las cifras son de tu máquina, tu Docker y lo que tenías corriendo.
+# Uso (desde la carpeta de la lección):  ./mio/medir      Tarda unos 6 minutos: el nativo es la parte cara.
+set -uo pipefail
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+cd "$AQUI/.."
+CIFRAS="$AQUI/cifras.md"
+C() { docker compose "$@"; }
+# La hora en milisegundos. perl viene en macOS, en Linux y en Git Bash; «date +%N» no existe en macOS.
+ms() { perl -MTime::HiRes=time -e 'printf "%.0f\n", time*1000'; }
+puerto() { [ "$1" = "jvm" ] && echo 8091 || echo 8092; }
+
+# Cuánta memoria usa un contenedor, en MiB. docker stats la da como «145.8MiB / 512MiB» (o KiB, o GiB).
+memoria() {
+  docker stats --no-stream --format '{{.MemUsage}}' "$1" 2>/dev/null | awk '{
+    v=$1; n=v+0
+    if (v ~ /GiB/) n=n*1024; else if (v ~ /KiB/) n=n/1024; else if (v ~ /kB/) n=n/1000; else if (v ~ /MB/) n=n*1000/1024
+    printf "%.1f\n", n }'
+}
+
+# Pide el contenedor y cuenta los milisegundos hasta que /q/health/ready contesta 200 (UP).
+hasta_sano() {
+  local modo=$1 t0 p
+  p=$(puerto "$modo"); t0=$(ms)
+  C up -d --force-recreate "int-rest-$modo" >/dev/null 2>&1
+  for _ in $(seq 1 1200); do                        # a lo más 60 s, preguntando cada 50 ms
+    curl -sf -o /dev/null --max-time 1 "localhost:$p/q/health/ready" && { echo $(( $(ms) - t0 )); return 0; }
+    sleep 0.05
+  done
+  echo "—"
+}
+
+# La carga corta: 100 órdenes por segundo durante 20 s, y mientras tanto se toma la memoria cada segundo.
+# Se queda la más alta.
+memoria_con_carga() {
+  local modo=$1 cont tope=0 m
+  cont=$(C ps -q "int-rest-$modo")
+  C --profile carga run --rm carga load -qps 100 -c 4 -t 20s -keepalive=false \
+    -H "ce-subject: carga-$modo" -H "Content-Type: application/json" -payload-file /ordenes/orden-1001.json \
+    "http://int-rest-$modo:8080/integrar" >"$AQUI/carga-$modo.log" 2>&1 &
+  local carga=$!
+  while kill -0 "$carga" 2>/dev/null; do
+    m=$(memoria "$cont"); awk -v a="$m" -v b="$tope" 'BEGIN{exit !(a+0 > b+0)}' && tope=$m
+    sleep 1
+  done
+  wait "$carga"
+  echo "$tope"
+}
+
+echo "1. Construyendo las dos imágenes desde cero (la nativa tarda varios minutos)…"
+C build api-pedidos >/dev/null 2>&1 || { echo "No pude construir la API"; exit 1; }
+declare -a FILAS
+for modo in jvm nativo; do
+  t0=$(ms)
+  if C build --no-cache "int-rest-$modo" >"$AQUI/build-$modo.log" 2>&1; then
+    construir=$(awk -v d=$(( $(ms) - t0 )) 'BEGIN{printf "%.1f", d/1000}')
+  else
+    echo "   No se pudo construir int-rest-$modo. Lo último que dijo:"; tail -10 "$AQUI/build-$modo.log"; construir="—"
+  fi
+  echo "   $modo: $construir s"
+  FILAS+=("$modo|$construir")
+done
+
+C up -d --wait api-pedidos >/dev/null 2>&1 || C up -d api-pedidos >/dev/null 2>&1
+sleep 3
+echo "2. Arranque, memoria en reposo y memoria con carga, un modo a la vez…"
+SALIDA=()
+for fila in "${FILAS[@]}"; do
+  modo=${fila%%|*}; construir=${fila#*|}
+  C stop int-rest-jvm int-rest-nativo >/dev/null 2>&1    # uno a la vez: que el otro no le quite CPU
+  sano=$(hasta_sano "$modo")
+  quarkus=$(C logs "int-rest-$modo" 2>/dev/null | sed -n 's/.*started in \([0-9.]*\)s.*/\1/p' | tail -1)
+  sleep 10                                               # que se asiente antes de medir en reposo
+  reposo=$(memoria "$(C ps -q "int-rest-$modo")")
+  carga=$(memoria_con_carga "$modo")
+  imagen=$(docker image inspect -f '{{.Size}}' "ni-una-orden-perdida/int-rest:$modo" 2>/dev/null | awk '{printf "%.0f", $1/1000000}')
+  echo "   $modo: sano en ${sano} ms (Quarkus: ${quarkus:-—} s), reposo ${reposo:-—} MiB, con carga ${carga:-—} MiB"
+  SALIDA+=("| $modo | $construir | ${quarkus:-—} | ${sano:-—} | ${reposo:-—} | ${carga:-—} | ${imagen:-—} |")
+done
+C stop int-rest-jvm int-rest-nativo >/dev/null 2>&1
+
+{
+  echo "# Cifras de la lección 32"
+  echo
+  echo "Medido el $(date '+%Y-%m-%d %H:%M') en $(uname -s) $(uname -m), con Docker $(docker version -f '{{.Server.Version}}' 2>/dev/null)," \
+       "$(docker info -f '{{.NCPU}}' 2>/dev/null) CPU y $(docker info -f '{{.MemTotal}}' 2>/dev/null | awk '{printf "%.1f", $1/1073741824}') GiB para Docker."
+  echo "Cada contenedor con el mismo techo: 1 CPU y 512 MiB. Carga: 100 órdenes por segundo durante 20 s."
+  echo
+  echo "| Modo | Construir (s) | Quarkus dice «started in» (s) | Hasta sano (ms) | Memoria en reposo (MiB) | Memoria con carga (MiB) | Imagen (MB) |"
+  echo "|---|---|---|---|---|---|---|"
+  printf '%s\n' "${SALIDA[@]}"
+} >"$CIFRAS"
+echo "Listo: las cifras quedaron en ${CIFRAS#"$PWD"/}"

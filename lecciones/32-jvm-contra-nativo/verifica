@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Comprueba la lección 32: el mismo int-rest corre en la JVM y en nativo, y TUS cifras se midieron y se escribieron.
+#   1. Corre tu $DONDE/medir, que construye las dos imágenes desde cero y mide cada una.
+#   2. Las dos imágenes arrancan y contestan: a cada una se le manda una orden, y la API la registra (se mide en la
+#      bitácora de la API, no en lo que dice int-rest). La nativa, además, no trae JVM (control).
+#   3. $DONDE/cifras.md se escribió en ESTA corrida y tiene las seis cifras de cada modo, y cada una es un número.
+# No compara las cifras contra ningún umbral: las de tu máquina son las tuyas. Solo exige que existan.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita Docker; no usa el ambiente de la 00.
+# Tarda unos 7 minutos (lecciones/31-…/CAPACIDAD.md): la compilación nativa es la parte cara.
+set -uo pipefail
+cd "$(dirname "$0")" || exit 1
+DONDE="${1:-mio}"
+[ -x "$DONDE/medir" ] || { echo "❌ No existe $DONDE/medir (o no se puede ejecutar). Copia inicio/ a mio/ primero: cp -R inicio mio"; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+C() { docker compose "$@"; }
+apagar() { C --profile carga down >/dev/null 2>&1; }
+trap apagar EXIT
+for p in 8091 8092; do
+  curl -s -o /dev/null --max-time 2 "localhost:$p" && { no "El puerto $p está ocupado: apaga lo que dejaste corriendo y vuelve a intentar"; exit 1; }
+done
+apagar
+rm -f "$DONDE/cifras.md"
+MARCA=$(mktemp "${TMPDIR:-/tmp}/leccion32.XXXXXX"); trap 'apagar; rm -f "$MARCA"' EXIT   # «antes de medir»
+
+# 1. Tus mediciones
+"./$DONDE/medir" || no "Tu $DONDE/medir terminó con error (código $?)"
+
+# 2. Las dos imágenes arrancan y contestan. La orden lleva una llave distinta por modo, y se cuenta en la API
+C up -d --wait api-pedidos >/dev/null 2>&1 || { no "La API de la lección no levantó"; exit 1; }
+DESDE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for modo in jvm nativo; do
+  p=8091; llave=3201; [ "$modo" = "nativo" ] && { p=8092; llave=3202; }
+  if ! docker image inspect "ni-una-orden-perdida/int-rest:$modo" >/dev/null 2>&1; then
+    no "No existe la imagen ni-una-orden-perdida/int-rest:$modo: no se construyó"; continue
+  fi
+  C up -d "int-rest-$modo" >/dev/null 2>&1
+  for _ in $(seq 1 60); do curl -sf -o /dev/null --max-time 1 "localhost:$p/q/health/ready" && break; sleep 1; done
+  curl -s -o /dev/null --max-time 10 -XPOST "localhost:$p/integrar" -H "ce-subject: $llave" -H "ce-correlationid: l32-$modo" \
+    -H 'Content-Type: application/json' -d @../../datos/ordenes/orden-1001.json
+  sleep 1
+  if C logs --since "$DESDE" api-pedidos 2>/dev/null | hay "201 llave=$llave "; then
+    si "La imagen $modo arrancó, contestó y su orden ($llave) llegó a la API"
+  else
+    no "La imagen $modo no entregó su orden ($llave) a la API. Lo último que dijo:"; C logs --tail 6 "int-rest-$modo" 2>&1 | sed 's/^/     /'
+  fi
+done
+# Control: la nativa de verdad no trae JVM, sino un ejecutable. Si trajera java, mediríamos dos veces lo mismo
+if docker image inspect ni-una-orden-perdida/int-rest:nativo >/dev/null 2>&1; then
+  EJE=$(docker run --rm --entrypoint sh ni-una-orden-perdida/int-rest:nativo -c 'test -x /work/application && wc -c < /work/application' 2>/dev/null)
+  JAVA=$(docker run --rm --entrypoint sh ni-una-orden-perdida/int-rest:nativo -c 'command -v java || echo no' 2>/dev/null)
+  if [ -n "$EJE" ] && [ "$JAVA" = "no" ]; then
+    si "Control: la imagen nativa no trae JVM; corre un ejecutable de $(awk -v b="$EJE" 'BEGIN{printf "%.0f", b/1000000}') MB"
+  else
+    no "Control: la imagen nativa debía traer un ejecutable y no traer java (ejecutable: «$EJE», java: «$JAVA»)"
+  fi
+fi
+
+# 3. Las cifras: escritas en esta corrida, con las seis columnas de cada modo, y cada una un número
+F="$DONDE/cifras.md"
+if [ ! -f "$F" ]; then
+  no "Tu medir no escribió $F"
+elif [ ! "$F" -nt "$MARCA" ]; then
+  no "$F no se escribió en esta corrida"
+else
+  NOMBRES=("construir" "lo que dice Quarkus al arrancar" "hasta sano" "memoria en reposo" "memoria con carga" "tamaño de la imagen")
+  for modo in jvm nativo; do
+    fila=$(grep -E "^\| *$modo *\|" "$F" | head -1)
+    [ -n "$fila" ] || { no "En $F no hay renglón de $modo"; continue; }
+    faltan=""
+    for i in 0 1 2 3 4 5; do
+      v=$(echo "$fila" | awk -F'|' -v c=$((i + 3)) '{gsub(/ /, "", $c); print $c}')
+      echo "$v" | hay -E '^[0-9]+(\.[0-9]+)?$' && awk -v x="$v" 'BEGIN{exit !(x+0 > 0)}' || faltan="$faltan, ${NOMBRES[$i]}"
+    done
+    [ -z "$faltan" ] && si "Cifras de $modo medidas: $(echo "$fila" | awk -F'|' '{printf "construir %ss · Quarkus %ss · sano %s ms · reposo %s MiB · carga %s MiB · imagen %s MB", $3, $4, $5, $6, $7, $8}' | tr -s ' ')" \
+      || no "A las cifras de $modo les falta (o no es un número): ${faltan#, }"
+  done
+fi
+exit $ok
