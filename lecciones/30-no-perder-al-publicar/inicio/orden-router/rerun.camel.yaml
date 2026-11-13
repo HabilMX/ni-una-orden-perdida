@@ -8,6 +8,7 @@
 #   ¿ya está aceptada o confirmada? sí  → 409: no se reprocesa lo que salió bien (solo el paso que falló)
 #   ¿está estacionada?              sí  → 409: esa la suelta el barrido, cuando llegue lo que espera (lección 17)
 #   ¿está enviada?                  sí  → 409: ya va en Kafka y espera su desenlace (lección 28)
+#   ¿ya tiene fila en el outbox?    sí  → 409: ya va a salir en la siguiente vuelta del sondeo (lección 30)
 #   pendiente · no_se_sabe · conciliacion_pendiente · rechazada → UN intento manual, ahora mismo
 #
 # El intento sale con lo que hoy está desplegado: el mapeo y la plantilla vigentes, no los del primer intento. Por
@@ -145,7 +146,8 @@
         #    qué. Uno solo, sin reintentos: si el canal no sabe cómo le fue, la operación vuelve a
         #    conciliacion_pendiente (desenlaces.camel.yaml) y quien lo pidió decide.
         #    Desde la 30 también pasa por el outbox: se deja la fila (con quién y por qué) y el sondeo la publica. Se
-        #    contesta 202 «en el outbox»; el intento y su desenlace se ven después en el recorrido.
+        #    contesta 202 «en el outbox»; el intento y su desenlace se ven después en el recorrido. Si la operación ya
+        #    tiene una fila esperando, no se deja otra (saldría dos veces): se contesta 409.
         - setVariable:
             name: antes
             expression:
@@ -159,12 +161,40 @@
         - to:
             uri: >-
               sql:INSERT INTO outbox (operacion, tipo, pedido_por, motivo)
-              VALUES (CAST(:#${variable.operacion} AS bigint), 'manual', :#${variable.pedido_por}, :#${variable.motivo})
+              SELECT CAST(:#${variable.operacion} AS bigint), 'manual', :#${variable.pedido_por}, :#${variable.motivo}
+              WHERE NOT EXISTS (SELECT 1 FROM outbox x
+                                WHERE x.operacion = CAST(:#${variable.operacion} AS bigint) AND x.publicado IS NULL)
               RETURNING id
             variableReceive: fila
             parameters:
               dataSource: "#estado"
               outputType: SelectOne
+        - filter:
+            expression:
+              simple:
+                expression: "${variable.fila} == null"
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: Content-Type
+                  expression:
+                    constant:
+                      expression: application/json
+              - setHeader:
+                  name: CamelHttpResponseCode
+                  expression:
+                    constant:
+                      expression: "409"
+                      resultType: java.lang.Integer
+              - setBody:
+                  expression:
+                    simple:
+                      expression: '{"resultado":"no reprocesado","estado":"${variable.antes}","motivo":"ya tiene una fila en el outbox: sale en la siguiente vuelta del sondeo"}'
+              - log:
+                  loggingLevel: WARN
+                  message: "Rerun rechazado: orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} ya tiene una fila en el outbox (lo pidió ${variable.pedido_por})"
+              - stop: {}
         - log:
             message: "Rerun manual de la orden ${variable.orden} momento ${variable.momento} canal ${variable.canal}, pedido por ${variable.pedido_por} («${variable.motivo}»): estaba ${variable.antes}; queda en el outbox"
         - removeHeaders:

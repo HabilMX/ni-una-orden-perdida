@@ -32,17 +32,21 @@
 #   guardar (transacción: orden + operaciones + outbox) → 202 a la tienda
 #   cada 1 s: outbox pendiente → publicar en Kafka → ¿lo recibió? sí → publicado · no → se queda para la siguiente vuelta
 #
-# Si el router se cae después de publicar y antes de anotar «publicado», la fila sale otra vez: un evento repetido,
-# que cada destino reconoce con su llave (lección 18). Se prefiere repetir a perder.
+# Una fila sin «publicado» se vuelve a publicar, aunque su operación diga «enviada». Si el router se cae con el envío
+# en el aire (antes de saber si Kafka lo recibió) o justo después (antes de anotar «publicado»), al volver la fila sale
+# otra vez: puede ser un evento repetido, y cada destino lo reconoce con su llave (lección 18). Se prefiere repetir a
+# perder. Solo no se vuelve a publicar lo que ya llegó a su destino (aceptada, confirmada) o lo que espera al barrido
+# (estacionada): ahí la fila queda publicada sin mandar nada.
+#
+# Una operación tiene a lo más UNA fila esperando: el reintento y el reproceso a mano no dejan otra si ya hay una
+# (reintentos.camel.yaml, rerun.camel.yaml). Así un mismo pendiente no sale dos veces en la misma vuelta.
 #
 # Las filas de un mismo momento (y de quien lo pidió) salen juntas, en UN evento, como en la 28.
 #
 # UNA vuelta a la vez (synchronous). Kafka contesta en otro hilo: sin esta opción, el reloj no espera esa respuesta y
-# arranca la siguiente vuelta al segundo, con la anterior todavía esperando a Kafka (hasta 5 s si está caído). Esa
-# segunda vuelta encuentra las operaciones en «enviada», cree que ya salieron y marca la fila como publicada. Cuando
-# Kafka por fin dice que no, la operación vuelve a «pendiente», pero su fila ya no está pendiente en el outbox: nadie
-# la vuelve a publicar, y la orden se queda sin salir. Con synchronous, la siguiente vuelta empieza cuando esta
-# terminó, con la respuesta de Kafka ya en la mano.
+# arranca la siguiente vuelta al segundo, con la anterior todavía esperando a Kafka (hasta 5 s si está caído). Las dos
+# vueltas tomarían las mismas filas: lo mismo saldría dos veces, y lo de una orden podría salir en desorden. Con
+# synchronous, la siguiente vuelta empieza cuando esta terminó, con la respuesta de Kafka ya en la mano.
 - route:
     id: sondeo-outbox
     routeConfigurationId: outbox-atorado
@@ -108,9 +112,8 @@
                       expression: "${body[motivo]}"
               - to:
                   uri: direct:publicar
-              # Salió (o ya había salido: nada que publicar): la fila queda publicada. Si Kafka no lo recibió, no.
-              # «Nada que publicar» solo se cree porque las vueltas van una a la vez (synchronous, arriba): así una
-              # operación en «enviada» no es una que esta misma vuelta tiene todavía en el aire.
+              # Salió (o ya llegó a su destino: nada que publicar): la fila queda publicada. Si Kafka no lo recibió,
+              # no.
               - choice:
                   when:
                     - expression:
@@ -218,8 +221,9 @@
         # 2. En UNA sentencia: las operaciones que salen pasan a «enviada», y cada una recibe su intento ANTES de
         #    publicar. Devuelve una sola fila con lo que el evento necesita: para cada canal, su operación y su intento
         #    (vacío si no le toca), el número de control del socio y el hilo.
-        #    Con «solo» se publican esas operaciones, si no van ya en camino ni salió bien (enviada, aceptada, confirmada)
-        #    ni espera a que la suelten (estacionada).
+        #    Con «solo» (las del outbox) se publican esas operaciones aunque digan «enviada»: si su fila sigue sin
+        #    «publicado», nadie sabe si Kafka la recibió. No salen las que ya llegaron (aceptada, confirmada) ni las que
+        #    esperan a que las suelten (estacionada).
         #    Ojo: la consulta va dentro de una dirección (URI), y ahí un «+» se lee como espacio: se escribe %2B.
         - to:
             uri: >-
@@ -228,7 +232,7 @@
                 WHERE orden = :#${variable.orden} AND momento = :#${variable.momento}
                   AND ((CAST(:#${variable.solo} AS text) IS NULL AND estado = 'pendiente')
                     OR (CAST(id AS text) = ANY(string_to_array(CAST(:#${variable.solo} AS text), ','))
-                        AND estado NOT IN ('enviada', 'aceptada', 'confirmada', 'estacionada')))
+                        AND estado NOT IN ('aceptada', 'confirmada', 'estacionada')))
                 RETURNING id, canal, numero_control, correlacion
               ), nuevos AS (
                 INSERT INTO intento (operacion, n, tipo, pedido_por, motivo, tamano, sha256)
@@ -262,7 +266,7 @@
                     expression: "${variable.salida[intentos]} == null"
                 steps:
                   - log:
-                      message: "Orden ${variable.orden} momento ${variable.momento}: no hay nada que publicar (ya va en camino o ya salió)"
+                      message: "Orden ${variable.orden} momento ${variable.momento}: no hay nada que publicar (ya llegó a su destino o espera al barrido)"
             otherwise:
               steps:
                 - setVariable:

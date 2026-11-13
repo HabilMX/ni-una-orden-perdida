@@ -24,11 +24,13 @@
               simple:
                 expression: "${variable.espera}"
         # Se vuelve a publicar SOLO esa operación, si sigue sin saberse (un reproceso a mano pudo ganarle). Desde la
-        # 30 no se publica aquí: se deja en el outbox, y sale con su sondeo.
+        # 30 no se publica aquí: se deja en el outbox, y sale con su sondeo. Si ya tiene una fila esperando (un
+        # reproceso a mano le ganó), no se deja otra: saldría dos veces.
         - to:
             uri: >-
               sql:INSERT INTO outbox (operacion)
-              SELECT id FROM operacion WHERE id = CAST(:#${variable.operacion} AS bigint) AND estado = 'no_se_sabe'
+              SELECT o.id FROM operacion o WHERE o.id = CAST(:#${variable.operacion} AS bigint) AND o.estado = 'no_se_sabe'
+                AND NOT EXISTS (SELECT 1 FROM outbox x WHERE x.operacion = o.id AND x.publicado IS NULL)
             parameters:
               dataSource: "#estado"
 
