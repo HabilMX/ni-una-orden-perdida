@@ -5,8 +5,10 @@
 #   1. Levanta el ambiente de la 00 (infra/compose.yaml) y corre su verifica.
 #   2. Recorre las lecciones en orden y corre `./verifica solucion` en cada una. Salta las del apéndice
 #      (las que traen un archivo .apendice): piden kind y una compilación nativa, y las corre apendice.yml a mano.
-#   3. Control positivo: la primera lección con `inicio/` debe salir en ROJO. Si saliera verde,
-#      el verifica no está midiendo nada y la corrida falla.
+#   3. Control positivo: la primera lección en la que el alumno escribe algo debe salir en ROJO con `inicio/`.
+#      Si saliera verde, el verifica no está midiendo nada y la corrida falla. La 01 y la 02 no sirven de
+#      control: se entregan resueltas a propósito (la 01 es idéntica a su solución; en la 02 el alumno lee,
+#      predice y corre), así que salen verdes con `inicio/`. Hoy el control cae en la 03.
 #   4. Cuenta los ✅ y ❌ de la salida. El total se lee de ahí, no del código de salida.
 #
 # No usa ningún secreto: el token de la corrida es de solo lectura.
@@ -59,8 +61,15 @@ jobs:
 
       - name: Control positivo (inicio debe salir en rojo)
         run: |
-          d=$(ls -d lecciones/[0-9][0-9]-*/ | while read l; do [ -d "$l/inicio" ] && [ -x "$l/verifica" ] && { echo "$l"; break; }; done)
-          [ -n "$d" ] || { echo "::error::No hay ninguna lección con inicio/ para el control positivo"; exit 1; }
+          # Lo que crea la corrida (entrada/, salida/, .camel-jbang/) no cuenta como diferencia.
+          distinto() { ! diff -rq -x entrada -x salida -x .camel-jbang -x mio "$1/inicio" "$1/solucion" >/dev/null; }
+          # La 01 y la 02 se entregan resueltas: el alumno no escribe nada, así que no miden trabajo suyo.
+          resuelta() { case "$1" in lecciones/01-*|lecciones/02-*) return 0 ;; *) return 1 ;; esac; }
+          d=$(ls -d lecciones/[0-9][0-9]-*/ | while read l; do
+                resuelta "$l" && continue
+                [ -d "$l/inicio" ] && [ -d "$l/solucion" ] && [ -x "$l/verifica" ] && distinto "$l" && { echo "$l"; break; }
+              done)
+          [ -n "$d" ] || { echo "::error::No hay ninguna lección con inicio/ distinto de solucion/ para el control"; exit 1; }
           if ( cd "$d" && ./verifica inicio ) > control.txt 2>&1; then
             cat control.txt; echo "::error::$d salió VERDE con inicio/: el verifica no está midiendo"; exit 1
           fi
