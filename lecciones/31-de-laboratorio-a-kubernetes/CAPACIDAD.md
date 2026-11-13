@@ -52,6 +52,11 @@ Imágenes que se quedan en tu Docker después de la 31 (además de las de las le
 | `fortio/fortio:1.76.0` | 25 MB | El cliente que manda la carga |
 | Caché de construcción (incluye el de Maven, 157 MB) | hasta ~2.6 GB | Que la segunda construcción no baje ni repita nada |
 
+¿Por qué la 32 da otro tamaño para la misma imagen? Son dos herramientas que no miden lo mismo: `docker images`
+suma lo que la imagen ocupa en tu disco, con sus capas ya desempacadas, y `docker image inspect` (el que usa el
+`medir` de la 32) da el tamaño de su contenido. Las dos son correctas; para comparar JVM contra nativo, usa siempre
+la misma.
+
 ## Lección 32, con detalle
 
 | Medida | Cifra |
