@@ -1,0 +1,92 @@
+# int-bd: el servicio que sabe hablar con el ERP. Es la ruta de la 05, ahora detrás del router:
+#   recibe la orden por /integrar → traducir a filas → cabecera + detalle + registrar_pedido, todo o nada.
+# Del sobre toma el hilo (ce-correlationid) y lo guarda en la cabecera del pedido, en la columna correlacion.
+# El controlador de MariaDB y las transacciones vienen en dependencias.txt (y en el compose, con --dep).
+
+- beans:
+    - name: erp
+      type: org.mariadb.jdbc.MariaDbDataSource
+      properties:
+        url: "jdbc:mariadb://erp:3306/erp"
+        user: integracion
+        password: "{{env:ERP_CLAVE:practica}}"
+    - name: transacciones
+      type: org.springframework.jdbc.datasource.DataSourceTransactionManager
+      properties:
+        dataSource: "#erp"
+    - name: todoONada
+      type: org.apache.camel.spring.spi.SpringTransactionPolicy
+      properties:
+        transactionManager: "#transacciones"
+        propagationBehaviorName: PROPAGATION_REQUIRED
+
+- route:
+    id: int-bd
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - to:
+            uri: jsonata:mappings/erp/pedido/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: cabecera
+            expression:
+              simple:
+                expression: "${body[cabecera]}"
+        - setVariable:
+            name: detalle
+            expression:
+              simple:
+                expression: "${body[detalle]}"
+        - transacted:
+            ref: todoONada
+        - log:
+            message: "Registrando en el ERP el pedido ${variable.cabecera[pedido]} correlacion=${variable.correlacion}"
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
+        - to:
+            uri: "sql:INSERT INTO pedido_cabecera (pedido, tienda, fecha, total, correlacion) VALUES (:#pedido, :#tienda, :#fecha, :#total, :#${variable.correlacion})"
+            parameters:
+              dataSource: "#erp"
+        - split:
+            expression:
+              simple:
+                expression: "${variable.detalle}"
+            steps:
+              - to:
+                  uri: sql:INSERT INTO pedido_detalle (pedido, posicion, sku, cantidad, precio) VALUES (:#pedido, :#posicion, :#sku, :#cantidad, :#precio)
+                  parameters:
+                    dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
+        - to:
+            uri: sql:CALL registrar_pedido(:#pedido)
+            parameters:
+              dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"erp","pedido":"${variable.cabecera[pedido]}","resultado":"REGISTRADO"}'
+        # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: erp/pedido/v1
+        - log:
+            message: "El ERP registró el pedido ${variable.cabecera[pedido]} correlacion=${variable.correlacion}"

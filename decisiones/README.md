@@ -32,3 +32,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 21 | [Lo que llega antes de tiempo se estaciona, no se rechaza](21-estacionar-lo-que-llega-antes.md) | 17 |
 | 22 | [Un mensaje se reconoce por su llave, y su contenido por su huella](22-la-llave-y-la-huella.md) | 18 en adelante |
 | 23 | [Se reintenta en el lugar, solo en el router, con espera creciente](23-reintentar-en-el-lugar.md) | 19 en adelante |
+| 24 | [Tres desenlaces, decididos por la evidencia: aceptado, rechazado o no se sabe](24-tres-desenlaces.md) | 20 en adelante |

@@ -1,0 +1,9 @@
+{"isa":{"emisor":"TIENDANORTE    ","receptor":"SOCIO01        ","fecha":"261112","hora":"1630","control":"000001005"},
+ "gs":{"emisor":"TIENDANORTE","receptor":"SOCIO01","fecha":"20261112","hora":"1630","control":"1005"},
+ "st":{"control":"0001"},
+ "beg":{"orden":"1005","fecha":"20261112"},
+ "tienda":{"nombre":"Tienda T-031","clave":"T-031"},
+ "lineas":[{"n":1,"cantidad":4,"precio":"120.00","sku":"SKU-0200","descripcion":"Taza & plato"},
+           {"n":2,"cantidad":1,"precio":"599.90","sku":"SKU-0201","descripcion":"Juego 4 6   cristal"}],
+ "ctt":2,
+ "se":{"segmentos":9}}

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Comprueba la lección 20: cada respuesta de la API se clasifica por su evidencia. Con la API en modo «rechaza», la
+# 4001 queda rechazada al primer intento: no se repite un «no». Con la API en modo «lento» (tarda 10 s y el tiempo
+# límite es de 3 s), la 4002 se reintenta, cada intento escrito ANTES de enviar, y al agotarse queda en
+# conciliacion_pendiente con sus intentos en no_se_sabe. No es un fallo: la API sí la registró.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (ni pendientes ni estacionadas)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado NOT IN ('pendiente','estacionada')"; }
+ESTACIONADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado = 'estacionada'"; }
+esperar_est() { for i in $(seq 1 20); do [ "$(ESTACIONADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+EST "TRUNCATE conflicto, intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts"' EXIT
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="intentar|reconocer|recibir-momento|contestar-reconocido|barrido-http|barrido|decidir|webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 29 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 29 ] && si "Arrancaron el router, los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+MODO() { curl -s -o /dev/null -w "%{http_code}" --max-time 5 -XPOST localhost:8081/admin/modo -H 'Content-Type: application/json' -d "$1"; }
+# Pase lo que pase, la API vuelve a modo normal al salir
+trap 'MODO "{\"modo\":\"normal\"}" >/dev/null; [ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts"' EXIT
+REST() { EST "SELECT estado FROM operacion WHERE orden='$1' AND momento='creada' AND canal='rest'"; }
+esperar_rest() { for i in $(seq 1 $2); do case "$(REST "$1")" in aceptada|rechazada|conciliacion_pendiente) return 0;; esac; sleep 2; done; return 1; }
+
+# 1. La API dice que no: modo rechaza
+[ "$(MODO '{"modo":"rechaza"}')" = "200" ] || { no "No pude poner la API en modo rechaza (¿es la 1.4.0? recréala con la 00)"; apagar; exit 1; }
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
+esperar_rest 4001 15; esperar_ops 4001 creada 3
+F=$(EST "SELECT p.estado, COUNT(i.id), MAX(i.respuesta->>'codigo') FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.orden='4001' AND p.momento='creada' AND p.canal='rest' GROUP BY p.estado")
+[ "$F" = "$(printf 'rechazada\t1\t422')" ] \
+  && si "Rechazo de negocio: la 4001 quedó rechazada con un solo intento (422): un «no» no se repite" \
+  || no "Rechazo de negocio: esperaba rechazada, 1 intento y 422; hay «${F:-nada}» (estado, intentos, código)"
+
+# 2. La API tarda más que el tiempo límite: modo lento, 10 s contra 3 s
+MODO '{"modo":"lento","espera_ms":10000}' >/dev/null
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4002.json"
+T4002=$(date +%s)
+sleep 2
+ENVUELO=$(EST "SELECT COUNT(*) FROM intento i JOIN operacion p ON p.id = i.operacion WHERE p.orden='4002' AND p.momento='creada' AND p.canal='rest' AND i.desenlace IS NULL AND i.sha256 IS NOT NULL")
+[ "$ENVUELO" = "1" ] && si "Mientras la llamada va en camino, su intento ya está en la base (con huella y sin desenlace): se escribe antes de enviar" \
+  || no "Con la llamada en camino esperaba un intento sin desenlace; hay $ENVUELO"
+esperar_rest 4002 50
+F=$(EST "SELECT p.estado, COUNT(i.id), COUNT(*) FILTER (WHERE i.desenlace = 'no_se_sabe' AND i.respuesta->>'codigo' = '504'), COUNT(*) FILTER (WHERE i.desenlace <> 'no_se_sabe') FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.orden='4002' AND p.momento='creada' AND p.canal='rest' GROUP BY p.estado")
+[ "$F" = "$(printf 'conciliacion_pendiente\t6\t6\t0')" ] \
+  && si "No se sabe: la 4002 se intentó 6 veces, las 6 sin respuesta a tiempo (504, no_se_sabe), y quedó en conciliacion_pendiente" \
+  || no "No se sabe: esperaba conciliacion_pendiente con 6 intentos, todos no_se_sabe con 504; hay «${F:-nada}» (estado, intentos, no_se_sabe, otros)"
+# La API lenta registra a los 10 s de la primera llamada: se le da ese tiempo antes de preguntarle
+while [ $(( $(date +%s) - T4002 )) -lt 12 ]; do sleep 1; done
+MODO '{"modo":"normal"}' >/dev/null
+[ "$(CAMPO 4002 estatus)" = "CREADO" ] && [ "$(REST 4002)" != "rechazada" ] \
+  && si "Y la API sí tiene la 4002 (CREADO): por eso no era un fallo ni un rechazo, era «no se sabe»" \
+  || no "La API tiene la 4002 en «$(CAMPO 4002 estatus)» y el estado dice «$(REST 4002)»: si la API la tiene, no fue un rechazo"
+OTROS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden IN ('4001','4002') AND momento='creada' AND canal <> 'rest'")
+[ "$OTROS" = "bd=aceptada bd=aceptada edi=aceptada edi=aceptada" ] && si "Los otros canales siguieron: ERP y socio aceptaron las dos órdenes" \
+  || no "Los otros canales quedaron «${OTROS:-nada}»"
+apagar
+exit $ok
