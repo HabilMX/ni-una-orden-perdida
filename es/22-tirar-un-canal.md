@@ -120,8 +120,8 @@ Cada línea de la configuración es una fila de la tabla de estados:
 Escribes la configuración tres veces, igual. Se podría escribir una vez y reusarla; aquí va completa en cada canal
 para que cada pastilla se lea sola.
 
-Una nota para más adelante: si corres esta ruta en modo nativo (el apéndice), el cortacircuito lo da otra librería,
-pero el `circuitBreaker` del YAML es el mismo y no cambias nada.
+Una nota para más adelante: si un día compilas esta ruta a nativo con Camel Quarkus, el cortacircuito lo da otra
+librería, pero el `circuitBreaker` del YAML es el mismo y no cambias nada.
 
 ## 4. Rompe uno a propósito
 

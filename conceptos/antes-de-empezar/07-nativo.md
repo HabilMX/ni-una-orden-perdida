@@ -5,8 +5,10 @@ nativo es una de las opciones. En la lección 32 lo mides tú mismo contra la JV
 
 ## Lo que ves (en la lección 32)
 
-Vas a correr el mismo servicio de dos formas, una en la JVM y otra en nativo, y vas a comparar dos cosas en su bitácora:
-cuánto tardó en decir `started` y cuánta memoria ocupa ya corriendo. No te damos aquí las cifras: las vas a medir.
+Vas a construir y correr el mismo servicio de dos formas, una en la JVM y otra en nativo, y vas a medir lo mismo en
+las dos: cuánto tarda en construirse, cuánto tarda en estar sano (no solo en decir `started` en su bitácora), cuánta
+memoria usa en reposo y con carga, según `docker stats`, y cuánto pesa su imagen. No te damos aquí las cifras: las vas a
+medir.
 
 ## Una imagen de la vida diaria
 
