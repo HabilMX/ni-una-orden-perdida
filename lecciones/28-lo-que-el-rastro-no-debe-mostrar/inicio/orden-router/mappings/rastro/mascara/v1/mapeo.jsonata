@@ -1,0 +1,16 @@
+/* Versión 1 (lección 28): lo que sale a un canal, con los datos personales tapados, para guardarlo en el rastro.
+   El rastro (payload, y lo que muestra el recorrido) es para diagnosticar: ahí hacen falta la orden, la tienda, los
+   renglones y los totales, no quién es la clienta. Lo que se manda al destino NO pasa por aquí: sale completo.
+
+   Esta versión deja todo como llega: el rastro guarda el nombre, el correo, el teléfono y la calle de la clienta.
+
+   TODO 1. Escribe la función $mascara($v, $modo), que tape un valor y deje ver solo lo que ayuda a diagnosticar:
+             iniciales   «Ana Ejemplo Prueba»      → «A. E. P.»
+             correo      «ana.prueba@example.com»  → «a***@example.com»
+             telefono    «+52 55 0000 0428»        → «*** **** **28»
+             todo        «Calle de Ejemplo 28»     → «***»
+           Si el valor no viene, que siga sin venir.
+   TODO 2. Aplícala con el operador de transformación de JSONata ( ~> | ruta | {cambios} | ): en cliente (nombre,
+           correo, telefono), en cliente.direccion (calle) y en la raíz (recibio, el que recibe una entrega).
+           Lo que no es personal queda igual. Los casos dorados de cases/ dicen qué se espera. */
+$

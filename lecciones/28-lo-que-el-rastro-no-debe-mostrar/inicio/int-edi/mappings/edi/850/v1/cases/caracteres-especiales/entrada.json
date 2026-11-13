@@ -1,0 +1,10 @@
+{
+  "orden": "1005",
+  "tienda": "T-031",
+  "cliente": { "nombre": "Cliente de ejemplo", "correo": "cliente5@example.com" },
+  "creada": "2026-11-12T16:30:00-06:00",
+  "renglones": [
+    { "renglon": 1, "sku": "SKU-0200", "descripcion": "Taza & plato", "cantidad": 4, "precio": 120.00 },
+    { "renglon": 2, "sku": "SKU-0201", "descripcion": "Juego 4*6 ~ cristal", "cantidad": 1, "precio": 599.90 }
+  ]
+}

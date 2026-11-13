@@ -1,0 +1,207 @@
+# Reprocesar a mano (lección 23): POST /rerun con {orden, momento, canal, pedido_por, motivo}.
+#
+# Lo pide una PERSONA, después de ver qué se quedó atorado (un canal que estuvo caído, un «no se sabe» que se agotó)
+# y de arreglar la causa. Por eso el intento queda como «manual», con su nombre y su motivo: quien lea el rastro
+# mañana tiene que saber que esto no lo hizo el reparto solo, quién lo pidió y por qué.
+#
+#   ¿existe la operación?           no  → 404
+#   ¿ya está aceptada o confirmada? sí  → 409: no se reprocesa lo que salió bien (solo el paso que falló)
+#   ¿está estacionada?              sí  → 409: esa la suelta el barrido, cuando llegue lo que espera (lección 17)
+#   pendiente · no_se_sabe · conciliacion_pendiente · rechazada → UN intento manual, ahora mismo
+#
+# El intento sale con lo que hoy está desplegado: el mapeo y la plantilla vigentes, no los del primer intento. Por
+# eso la versión que contestó el canal queda anotada en el intento (version_mapeo).
+#
+# ¿Y si el destino sí lo había recibido? Ahí cuida cada destino con su llave: la API contesta 200 «reenvío» a la
+# misma Idempotency-Key con el mismo contenido, el ERP contesta 200 «ya registrado» a un pedido que ya tiene, y el
+# 850 sale con el MISMO número de control de la operación: es lo que el X12 le da al socio para reconocer un repetido.
+
+- route:
+    id: rerun
+    from:
+      uri: platform-http:/rerun
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # 1. Qué se pide y quién lo pide. Sin nombre o sin motivo no se reprocesa: el rastro quedaría mudo.
+        - doTry:
+            steps:
+              - unmarshal:
+                  json: {}
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      expression:
+                        constant:
+                          expression: "{}"
+                  - unmarshal:
+                      json: {}
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${body[orden]}"
+        - setVariable:
+            name: momento
+            expression:
+              simple:
+                expression: "${body[momento]}"
+        - setVariable:
+            name: canal
+            expression:
+              simple:
+                expression: "${body[canal]}"
+        - setVariable:
+            name: pedido_por
+            expression:
+              simple:
+                expression: "${body[pedido_por]}"
+        - setVariable:
+            name: motivo
+            expression:
+              simple:
+                expression: "${body[motivo]}"
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - filter:
+            expression:
+              simple:
+                expression: >-
+                  ${variable.orden} == null || ${variable.orden} == '' || ${variable.momento} == null ||
+                  ${variable.momento} == '' || ${variable.canal} == null || ${variable.canal} == '' ||
+                  ${variable.pedido_por} == null || ${variable.pedido_por} == '' ||
+                  ${variable.motivo} == null || ${variable.motivo} == ''
+            steps:
+              - setHeader:
+                  name: CamelHttpResponseCode
+                  expression:
+                    constant:
+                      expression: "400"
+                      resultType: java.lang.Integer
+              - setBody:
+                  expression:
+                    constant:
+                      expression: '{"resultado":"no reprocesado","motivo":"faltan datos: orden, momento, canal, pedido_por y motivo"}'
+              - stop: {}
+        # 2. La operación, leída de la BASE con la misma consulta del reparto (repartir), más su estado
+        - to:
+            uri: >-
+              sql:SELECT p.id, p.canal, p.momento, p.numero_control, p.correlacion, p.estado,
+              CASE p.momento WHEN 'creada' THEN (o.datos - 'embarque' - 'entrega')::text
+                             WHEN 'embarcada' THEN (o.datos -> 'embarque')::text
+                             ELSE (o.datos -> 'entrega')::text END AS datos,
+              CASE p.momento WHEN 'creada' THEN '/tiendas/' || (o.datos ->> 'tienda')
+                             WHEN 'embarcada' THEN '/bodegas/' || (o.datos -> 'embarque' ->> 'bodega')
+                             ELSE '/paqueterias/' || (o.datos -> 'entrega' ->> 'paqueteria') END AS fuente
+              FROM operacion p JOIN orden o ON o.orden = p.orden
+              WHERE p.orden = :#${variable.orden} AND p.momento = :#${variable.momento} AND p.canal = :#${variable.canal}
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${body} == null"
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      expression:
+                        constant:
+                          expression: "404"
+                          resultType: java.lang.Integer
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: '{"resultado":"no reprocesado","motivo":"no hay operación ${variable.canal} del momento ${variable.momento} de la orden ${variable.orden}"}'
+                  - stop: {}
+              - expression:
+                  simple:
+                    expression: "${body[estado]} in 'aceptada,confirmada,estacionada'"
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      expression:
+                        constant:
+                          expression: "409"
+                          resultType: java.lang.Integer
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: '{"resultado":"no reprocesado","estado":"${body[estado]}","motivo":"solo se reprocesa lo que falló; lo estacionado lo suelta el barrido"}'
+                  - log:
+                      loggingLevel: WARN
+                      message: "Rerun rechazado: orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} está ${body[estado]} (lo pidió ${variable.pedido_por})"
+                  - stop: {}
+        # 3. Un intento MANUAL: el mismo que haría el reparto (preparar + intentar), con quién y por qué.
+        #    Uno solo, sin reintentos en el lugar: quien lo pidió ve el desenlace en la respuesta y decide.
+        - setVariable:
+            name: antes
+            expression:
+              simple:
+                expression: "${body[estado]}"
+        - setVariable:
+            name: tipo
+            expression:
+              constant:
+                expression: manual
+        - to:
+            uri: direct:preparar
+        - doTry:
+            steps:
+              - to:
+                  uri: direct:intentar
+            doCatch:
+              # El canal no dio respuesta clara (no_se_sabe). Un intento manual no se repite solo: vuelve a
+              # conciliacion_pendiente, a la vista, para que alguien vaya a ver al destino.
+              - exception:
+                  - java.io.IOException
+                steps:
+                  - to:
+                      uri: "sql:UPDATE operacion SET estado = 'conciliacion_pendiente' WHERE id = :#${variable.operacion}"
+                      parameters:
+                        dataSource: "#estado"
+              # Otro intento de la misma operación arrancó al mismo tiempo (el reparto la está reintentando): el
+              # número n del intento es único por operación y este no entró. No se envió nada.
+              - exception:
+                  - org.springframework.dao.DataIntegrityViolationException
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      expression:
+                        constant:
+                          expression: "409"
+                          resultType: java.lang.Integer
+                  - setBody:
+                      expression:
+                        constant:
+                          expression: '{"resultado":"no reprocesado","motivo":"otro intento de esta operación va en camino"}'
+                  - stop: {}
+        # Aceptado: igual que en el reparto, puede que algo estacionado lo estuviera esperando
+        - filter:
+            expression:
+              simple:
+                expression: "${variable.desenlace} == 'aceptada'"
+            steps:
+              - to:
+                  uri: direct:barrido
+        - log:
+            message: "Rerun manual de la orden ${variable.orden} momento ${variable.momento} canal ${variable.canal}, pedido por ${variable.pedido_por} («${variable.motivo}»): estaba ${variable.antes}, el intento quedó ${variable.desenlace} (contestó ${variable.codigo}, versión ${variable.version})"
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - setBody:
+            expression:
+              simple:
+                expression: '{"resultado":"reprocesado","operacion":${variable.operacion},"intento":${variable.intento},"antes":"${variable.antes}","desenlace":"${variable.desenlace}","codigo":${variable.codigo},"version":"${variable.version}"}'

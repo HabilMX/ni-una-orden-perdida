@@ -39,3 +39,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 28 | [Un tope por copia hacia el ERP, contando lo que va en curso](28-un-tope-por-copia.md) | 24 en adelante |
 | 29 | [Juntar es preguntarle a la base, y un vencido avisa sin cerrar](29-juntar-es-preguntarle-a-la-base.md) | 25 en adelante |
 | 30 | [El recorrido es una vista por número de orden, y los cuerpos van enteros aparte](30-el-recorrido-es-una-vista.md) | 27 en adelante |
+| 31 | [El rastro se guarda con los datos personales tapados; al destino sale completo](31-el-rastro-se-guarda-tapado.md) | 28 en adelante |

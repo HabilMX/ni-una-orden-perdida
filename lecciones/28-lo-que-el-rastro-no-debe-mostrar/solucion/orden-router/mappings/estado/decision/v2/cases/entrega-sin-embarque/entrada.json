@@ -1,0 +1,37 @@
+{
+  "maquina": {
+    "canales": {
+      "rest": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      },
+      "bd": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      },
+      "edi": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      }
+    },
+    "momentos": [
+      "creada",
+      "embarcada",
+      "entregada"
+    ]
+  },
+  "momento": "entregada",
+  "canal": "bd",
+  "operaciones": [
+    {
+      "momento": "creada",
+      "canal": "bd",
+      "estado": "aceptada"
+    },
+    {
+      "momento": "creada",
+      "canal": "rest",
+      "estado": "aceptada"
+    }
+  ]
+}
