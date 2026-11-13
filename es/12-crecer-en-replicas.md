@@ -207,7 +207,7 @@ Lo que decidimos en esta lección, con lo que descartamos y qué nos haría camb
 
 ## Repaso
 
-1. ¿Qué es una réplica, y por qué int-bd se puede copiar sin cuidado?
+1. ¿Qué es una réplica, y por qué int-bd se puede copiar sin que una orden se registre dos veces?
 2. Con `replicas: 3` y nada más, ¿cómo se repartieron las órdenes? ¿Por qué?
 3. ¿Qué hace `connectionTimeToLive`, y qué hace `sun.net.inetaddr.ttl`? ¿Por qué con una sola no basta?
 4. ¿Por qué el verifica no pide 10/10/10, y qué pide en su lugar?
