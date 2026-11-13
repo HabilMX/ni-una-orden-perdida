@@ -24,3 +24,9 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 13 | [La orden sale a todos los canales, y el router cuenta lo que pasó](13-multicast-que-no-inventa.md) | 10 |
 | 14 | [Quién recibe qué se decide por el contenido, en un solo lugar](14-quien-recibe-se-decide-en-un-lugar.md) | 11 |
 | 15 | [Tres copias no reparten solas: el reparto es por conexión](15-repartir-por-conexion.md) | 12 |
+| 16 | [Una carpeta, un solo sondeo](16-un-solo-sondeo-por-carpeta.md) | 13 |
+| 17 | [Un archivo de la bodega se parte en sus embarques, y uno malo no detiene a los demás](17-partir-el-archivo.md) | 14 |
+| 18 | [Guardar antes de contestar](18-guardar-antes-de-contestar.md) | 15 en adelante |
+| 19 | [El número de control del X12 lo asigna el router](19-el-numero-de-control-lo-asigna-el-router.md) | 15 en adelante |
+| 20 | [El webhook de la paquetería contesta 202 en cuanto guardó](20-el-webhook-contesta-202.md) | 16 |
+| 21 | [Lo que llega antes de tiempo se estaciona, no se rechaza](21-estacionar-lo-que-llega-antes.md) | 17 |
