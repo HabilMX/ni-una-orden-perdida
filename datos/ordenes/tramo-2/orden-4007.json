@@ -1,0 +1,1061 @@
+{
+  "orden": "4007",
+  "tienda": "T-502",
+  "cliente": {
+    "nombre": "Cliente de ejemplo",
+    "correo": "cliente4007@example.com"
+  },
+  "creada": "2026-11-12T09:10:00-06:00",
+  "renglones": [
+    {
+      "renglon": 1,
+      "sku": "SKU-0101",
+      "descripcion": "Artículo de ejemplo número 1, caja de surtido",
+      "cantidad": 2,
+      "precio": 11.5
+    },
+    {
+      "renglon": 2,
+      "sku": "SKU-0102",
+      "descripcion": "Artículo de ejemplo número 2, caja de surtido",
+      "cantidad": 3,
+      "precio": 13.0
+    },
+    {
+      "renglon": 3,
+      "sku": "SKU-0103",
+      "descripcion": "Artículo de ejemplo número 3, caja de surtido",
+      "cantidad": 1,
+      "precio": 14.5
+    },
+    {
+      "renglon": 4,
+      "sku": "SKU-0104",
+      "descripcion": "Artículo de ejemplo número 4, caja de surtido",
+      "cantidad": 2,
+      "precio": 16.0
+    },
+    {
+      "renglon": 5,
+      "sku": "SKU-0105",
+      "descripcion": "Artículo de ejemplo número 5, caja de surtido",
+      "cantidad": 3,
+      "precio": 17.5
+    },
+    {
+      "renglon": 6,
+      "sku": "SKU-0106",
+      "descripcion": "Artículo de ejemplo número 6, caja de surtido",
+      "cantidad": 1,
+      "precio": 19.0
+    },
+    {
+      "renglon": 7,
+      "sku": "SKU-0107",
+      "descripcion": "Artículo de ejemplo número 7, caja de surtido",
+      "cantidad": 2,
+      "precio": 20.5
+    },
+    {
+      "renglon": 8,
+      "sku": "SKU-0108",
+      "descripcion": "Artículo de ejemplo número 8, caja de surtido",
+      "cantidad": 3,
+      "precio": 22.0
+    },
+    {
+      "renglon": 9,
+      "sku": "SKU-0109",
+      "descripcion": "Artículo de ejemplo número 9, caja de surtido",
+      "cantidad": 1,
+      "precio": 23.5
+    },
+    {
+      "renglon": 10,
+      "sku": "SKU-0110",
+      "descripcion": "Artículo de ejemplo número 10, caja de surtido",
+      "cantidad": 2,
+      "precio": 25.0
+    },
+    {
+      "renglon": 11,
+      "sku": "SKU-0111",
+      "descripcion": "Artículo de ejemplo número 11, caja de surtido",
+      "cantidad": 3,
+      "precio": 26.5
+    },
+    {
+      "renglon": 12,
+      "sku": "SKU-0112",
+      "descripcion": "Artículo de ejemplo número 12, caja de surtido",
+      "cantidad": 1,
+      "precio": 28.0
+    },
+    {
+      "renglon": 13,
+      "sku": "SKU-0113",
+      "descripcion": "Artículo de ejemplo número 13, caja de surtido",
+      "cantidad": 2,
+      "precio": 29.5
+    },
+    {
+      "renglon": 14,
+      "sku": "SKU-0114",
+      "descripcion": "Artículo de ejemplo número 14, caja de surtido",
+      "cantidad": 3,
+      "precio": 31.0
+    },
+    {
+      "renglon": 15,
+      "sku": "SKU-0115",
+      "descripcion": "Artículo de ejemplo número 15, caja de surtido",
+      "cantidad": 1,
+      "precio": 32.5
+    },
+    {
+      "renglon": 16,
+      "sku": "SKU-0116",
+      "descripcion": "Artículo de ejemplo número 16, caja de surtido",
+      "cantidad": 2,
+      "precio": 34.0
+    },
+    {
+      "renglon": 17,
+      "sku": "SKU-0117",
+      "descripcion": "Artículo de ejemplo número 17, caja de surtido",
+      "cantidad": 3,
+      "precio": 35.5
+    },
+    {
+      "renglon": 18,
+      "sku": "SKU-0118",
+      "descripcion": "Artículo de ejemplo número 18, caja de surtido",
+      "cantidad": 1,
+      "precio": 37.0
+    },
+    {
+      "renglon": 19,
+      "sku": "SKU-0119",
+      "descripcion": "Artículo de ejemplo número 19, caja de surtido",
+      "cantidad": 2,
+      "precio": 38.5
+    },
+    {
+      "renglon": 20,
+      "sku": "SKU-0120",
+      "descripcion": "Artículo de ejemplo número 20, caja de surtido",
+      "cantidad": 3,
+      "precio": 40.0
+    },
+    {
+      "renglon": 21,
+      "sku": "SKU-0121",
+      "descripcion": "Artículo de ejemplo número 21, caja de surtido",
+      "cantidad": 1,
+      "precio": 41.5
+    },
+    {
+      "renglon": 22,
+      "sku": "SKU-0122",
+      "descripcion": "Artículo de ejemplo número 22, caja de surtido",
+      "cantidad": 2,
+      "precio": 43.0
+    },
+    {
+      "renglon": 23,
+      "sku": "SKU-0123",
+      "descripcion": "Artículo de ejemplo número 23, caja de surtido",
+      "cantidad": 3,
+      "precio": 44.5
+    },
+    {
+      "renglon": 24,
+      "sku": "SKU-0124",
+      "descripcion": "Artículo de ejemplo número 24, caja de surtido",
+      "cantidad": 1,
+      "precio": 46.0
+    },
+    {
+      "renglon": 25,
+      "sku": "SKU-0125",
+      "descripcion": "Artículo de ejemplo número 25, caja de surtido",
+      "cantidad": 2,
+      "precio": 47.5
+    },
+    {
+      "renglon": 26,
+      "sku": "SKU-0126",
+      "descripcion": "Artículo de ejemplo número 26, caja de surtido",
+      "cantidad": 3,
+      "precio": 49.0
+    },
+    {
+      "renglon": 27,
+      "sku": "SKU-0127",
+      "descripcion": "Artículo de ejemplo número 27, caja de surtido",
+      "cantidad": 1,
+      "precio": 50.5
+    },
+    {
+      "renglon": 28,
+      "sku": "SKU-0128",
+      "descripcion": "Artículo de ejemplo número 28, caja de surtido",
+      "cantidad": 2,
+      "precio": 52.0
+    },
+    {
+      "renglon": 29,
+      "sku": "SKU-0129",
+      "descripcion": "Artículo de ejemplo número 29, caja de surtido",
+      "cantidad": 3,
+      "precio": 53.5
+    },
+    {
+      "renglon": 30,
+      "sku": "SKU-0130",
+      "descripcion": "Artículo de ejemplo número 30, caja de surtido",
+      "cantidad": 1,
+      "precio": 55.0
+    },
+    {
+      "renglon": 31,
+      "sku": "SKU-0131",
+      "descripcion": "Artículo de ejemplo número 31, caja de surtido",
+      "cantidad": 2,
+      "precio": 56.5
+    },
+    {
+      "renglon": 32,
+      "sku": "SKU-0132",
+      "descripcion": "Artículo de ejemplo número 32, caja de surtido",
+      "cantidad": 3,
+      "precio": 58.0
+    },
+    {
+      "renglon": 33,
+      "sku": "SKU-0133",
+      "descripcion": "Artículo de ejemplo número 33, caja de surtido",
+      "cantidad": 1,
+      "precio": 59.5
+    },
+    {
+      "renglon": 34,
+      "sku": "SKU-0134",
+      "descripcion": "Artículo de ejemplo número 34, caja de surtido",
+      "cantidad": 2,
+      "precio": 61.0
+    },
+    {
+      "renglon": 35,
+      "sku": "SKU-0135",
+      "descripcion": "Artículo de ejemplo número 35, caja de surtido",
+      "cantidad": 3,
+      "precio": 62.5
+    },
+    {
+      "renglon": 36,
+      "sku": "SKU-0136",
+      "descripcion": "Artículo de ejemplo número 36, caja de surtido",
+      "cantidad": 1,
+      "precio": 64.0
+    },
+    {
+      "renglon": 37,
+      "sku": "SKU-0137",
+      "descripcion": "Artículo de ejemplo número 37, caja de surtido",
+      "cantidad": 2,
+      "precio": 65.5
+    },
+    {
+      "renglon": 38,
+      "sku": "SKU-0138",
+      "descripcion": "Artículo de ejemplo número 38, caja de surtido",
+      "cantidad": 3,
+      "precio": 67.0
+    },
+    {
+      "renglon": 39,
+      "sku": "SKU-0139",
+      "descripcion": "Artículo de ejemplo número 39, caja de surtido",
+      "cantidad": 1,
+      "precio": 68.5
+    },
+    {
+      "renglon": 40,
+      "sku": "SKU-0140",
+      "descripcion": "Artículo de ejemplo número 40, caja de surtido",
+      "cantidad": 2,
+      "precio": 70.0
+    },
+    {
+      "renglon": 41,
+      "sku": "SKU-0141",
+      "descripcion": "Artículo de ejemplo número 41, caja de surtido",
+      "cantidad": 3,
+      "precio": 71.5
+    },
+    {
+      "renglon": 42,
+      "sku": "SKU-0142",
+      "descripcion": "Artículo de ejemplo número 42, caja de surtido",
+      "cantidad": 1,
+      "precio": 73.0
+    },
+    {
+      "renglon": 43,
+      "sku": "SKU-0143",
+      "descripcion": "Artículo de ejemplo número 43, caja de surtido",
+      "cantidad": 2,
+      "precio": 74.5
+    },
+    {
+      "renglon": 44,
+      "sku": "SKU-0144",
+      "descripcion": "Artículo de ejemplo número 44, caja de surtido",
+      "cantidad": 3,
+      "precio": 76.0
+    },
+    {
+      "renglon": 45,
+      "sku": "SKU-0145",
+      "descripcion": "Artículo de ejemplo número 45, caja de surtido",
+      "cantidad": 1,
+      "precio": 77.5
+    },
+    {
+      "renglon": 46,
+      "sku": "SKU-0146",
+      "descripcion": "Artículo de ejemplo número 46, caja de surtido",
+      "cantidad": 2,
+      "precio": 79.0
+    },
+    {
+      "renglon": 47,
+      "sku": "SKU-0147",
+      "descripcion": "Artículo de ejemplo número 47, caja de surtido",
+      "cantidad": 3,
+      "precio": 80.5
+    },
+    {
+      "renglon": 48,
+      "sku": "SKU-0148",
+      "descripcion": "Artículo de ejemplo número 48, caja de surtido",
+      "cantidad": 1,
+      "precio": 82.0
+    },
+    {
+      "renglon": 49,
+      "sku": "SKU-0149",
+      "descripcion": "Artículo de ejemplo número 49, caja de surtido",
+      "cantidad": 2,
+      "precio": 83.5
+    },
+    {
+      "renglon": 50,
+      "sku": "SKU-0150",
+      "descripcion": "Artículo de ejemplo número 50, caja de surtido",
+      "cantidad": 3,
+      "precio": 85.0
+    },
+    {
+      "renglon": 51,
+      "sku": "SKU-0151",
+      "descripcion": "Artículo de ejemplo número 51, caja de surtido",
+      "cantidad": 1,
+      "precio": 86.5
+    },
+    {
+      "renglon": 52,
+      "sku": "SKU-0152",
+      "descripcion": "Artículo de ejemplo número 52, caja de surtido",
+      "cantidad": 2,
+      "precio": 88.0
+    },
+    {
+      "renglon": 53,
+      "sku": "SKU-0153",
+      "descripcion": "Artículo de ejemplo número 53, caja de surtido",
+      "cantidad": 3,
+      "precio": 89.5
+    },
+    {
+      "renglon": 54,
+      "sku": "SKU-0154",
+      "descripcion": "Artículo de ejemplo número 54, caja de surtido",
+      "cantidad": 1,
+      "precio": 91.0
+    },
+    {
+      "renglon": 55,
+      "sku": "SKU-0155",
+      "descripcion": "Artículo de ejemplo número 55, caja de surtido",
+      "cantidad": 2,
+      "precio": 92.5
+    },
+    {
+      "renglon": 56,
+      "sku": "SKU-0156",
+      "descripcion": "Artículo de ejemplo número 56, caja de surtido",
+      "cantidad": 3,
+      "precio": 94.0
+    },
+    {
+      "renglon": 57,
+      "sku": "SKU-0157",
+      "descripcion": "Artículo de ejemplo número 57, caja de surtido",
+      "cantidad": 1,
+      "precio": 95.5
+    },
+    {
+      "renglon": 58,
+      "sku": "SKU-0158",
+      "descripcion": "Artículo de ejemplo número 58, caja de surtido",
+      "cantidad": 2,
+      "precio": 97.0
+    },
+    {
+      "renglon": 59,
+      "sku": "SKU-0159",
+      "descripcion": "Artículo de ejemplo número 59, caja de surtido",
+      "cantidad": 3,
+      "precio": 98.5
+    },
+    {
+      "renglon": 60,
+      "sku": "SKU-0160",
+      "descripcion": "Artículo de ejemplo número 60, caja de surtido",
+      "cantidad": 1,
+      "precio": 100.0
+    },
+    {
+      "renglon": 61,
+      "sku": "SKU-0161",
+      "descripcion": "Artículo de ejemplo número 61, caja de surtido",
+      "cantidad": 2,
+      "precio": 101.5
+    },
+    {
+      "renglon": 62,
+      "sku": "SKU-0162",
+      "descripcion": "Artículo de ejemplo número 62, caja de surtido",
+      "cantidad": 3,
+      "precio": 103.0
+    },
+    {
+      "renglon": 63,
+      "sku": "SKU-0163",
+      "descripcion": "Artículo de ejemplo número 63, caja de surtido",
+      "cantidad": 1,
+      "precio": 104.5
+    },
+    {
+      "renglon": 64,
+      "sku": "SKU-0164",
+      "descripcion": "Artículo de ejemplo número 64, caja de surtido",
+      "cantidad": 2,
+      "precio": 106.0
+    },
+    {
+      "renglon": 65,
+      "sku": "SKU-0165",
+      "descripcion": "Artículo de ejemplo número 65, caja de surtido",
+      "cantidad": 3,
+      "precio": 107.5
+    },
+    {
+      "renglon": 66,
+      "sku": "SKU-0166",
+      "descripcion": "Artículo de ejemplo número 66, caja de surtido",
+      "cantidad": 1,
+      "precio": 109.0
+    },
+    {
+      "renglon": 67,
+      "sku": "SKU-0167",
+      "descripcion": "Artículo de ejemplo número 67, caja de surtido",
+      "cantidad": 2,
+      "precio": 110.5
+    },
+    {
+      "renglon": 68,
+      "sku": "SKU-0168",
+      "descripcion": "Artículo de ejemplo número 68, caja de surtido",
+      "cantidad": 3,
+      "precio": 112.0
+    },
+    {
+      "renglon": 69,
+      "sku": "SKU-0169",
+      "descripcion": "Artículo de ejemplo número 69, caja de surtido",
+      "cantidad": 1,
+      "precio": 113.5
+    },
+    {
+      "renglon": 70,
+      "sku": "SKU-0170",
+      "descripcion": "Artículo de ejemplo número 70, caja de surtido",
+      "cantidad": 2,
+      "precio": 115.0
+    },
+    {
+      "renglon": 71,
+      "sku": "SKU-0171",
+      "descripcion": "Artículo de ejemplo número 71, caja de surtido",
+      "cantidad": 3,
+      "precio": 116.5
+    },
+    {
+      "renglon": 72,
+      "sku": "SKU-0172",
+      "descripcion": "Artículo de ejemplo número 72, caja de surtido",
+      "cantidad": 1,
+      "precio": 118.0
+    },
+    {
+      "renglon": 73,
+      "sku": "SKU-0173",
+      "descripcion": "Artículo de ejemplo número 73, caja de surtido",
+      "cantidad": 2,
+      "precio": 119.5
+    },
+    {
+      "renglon": 74,
+      "sku": "SKU-0174",
+      "descripcion": "Artículo de ejemplo número 74, caja de surtido",
+      "cantidad": 3,
+      "precio": 121.0
+    },
+    {
+      "renglon": 75,
+      "sku": "SKU-0175",
+      "descripcion": "Artículo de ejemplo número 75, caja de surtido",
+      "cantidad": 1,
+      "precio": 122.5
+    },
+    {
+      "renglon": 76,
+      "sku": "SKU-0176",
+      "descripcion": "Artículo de ejemplo número 76, caja de surtido",
+      "cantidad": 2,
+      "precio": 124.0
+    },
+    {
+      "renglon": 77,
+      "sku": "SKU-0177",
+      "descripcion": "Artículo de ejemplo número 77, caja de surtido",
+      "cantidad": 3,
+      "precio": 125.5
+    },
+    {
+      "renglon": 78,
+      "sku": "SKU-0178",
+      "descripcion": "Artículo de ejemplo número 78, caja de surtido",
+      "cantidad": 1,
+      "precio": 127.0
+    },
+    {
+      "renglon": 79,
+      "sku": "SKU-0179",
+      "descripcion": "Artículo de ejemplo número 79, caja de surtido",
+      "cantidad": 2,
+      "precio": 128.5
+    },
+    {
+      "renglon": 80,
+      "sku": "SKU-0180",
+      "descripcion": "Artículo de ejemplo número 80, caja de surtido",
+      "cantidad": 3,
+      "precio": 130.0
+    },
+    {
+      "renglon": 81,
+      "sku": "SKU-0181",
+      "descripcion": "Artículo de ejemplo número 81, caja de surtido",
+      "cantidad": 1,
+      "precio": 131.5
+    },
+    {
+      "renglon": 82,
+      "sku": "SKU-0182",
+      "descripcion": "Artículo de ejemplo número 82, caja de surtido",
+      "cantidad": 2,
+      "precio": 133.0
+    },
+    {
+      "renglon": 83,
+      "sku": "SKU-0183",
+      "descripcion": "Artículo de ejemplo número 83, caja de surtido",
+      "cantidad": 3,
+      "precio": 134.5
+    },
+    {
+      "renglon": 84,
+      "sku": "SKU-0184",
+      "descripcion": "Artículo de ejemplo número 84, caja de surtido",
+      "cantidad": 1,
+      "precio": 136.0
+    },
+    {
+      "renglon": 85,
+      "sku": "SKU-0185",
+      "descripcion": "Artículo de ejemplo número 85, caja de surtido",
+      "cantidad": 2,
+      "precio": 137.5
+    },
+    {
+      "renglon": 86,
+      "sku": "SKU-0186",
+      "descripcion": "Artículo de ejemplo número 86, caja de surtido",
+      "cantidad": 3,
+      "precio": 139.0
+    },
+    {
+      "renglon": 87,
+      "sku": "SKU-0187",
+      "descripcion": "Artículo de ejemplo número 87, caja de surtido",
+      "cantidad": 1,
+      "precio": 140.5
+    },
+    {
+      "renglon": 88,
+      "sku": "SKU-0188",
+      "descripcion": "Artículo de ejemplo número 88, caja de surtido",
+      "cantidad": 2,
+      "precio": 142.0
+    },
+    {
+      "renglon": 89,
+      "sku": "SKU-0189",
+      "descripcion": "Artículo de ejemplo número 89, caja de surtido",
+      "cantidad": 3,
+      "precio": 143.5
+    },
+    {
+      "renglon": 90,
+      "sku": "SKU-0190",
+      "descripcion": "Artículo de ejemplo número 90, caja de surtido",
+      "cantidad": 1,
+      "precio": 145.0
+    },
+    {
+      "renglon": 91,
+      "sku": "SKU-0191",
+      "descripcion": "Artículo de ejemplo número 91, caja de surtido",
+      "cantidad": 2,
+      "precio": 146.5
+    },
+    {
+      "renglon": 92,
+      "sku": "SKU-0192",
+      "descripcion": "Artículo de ejemplo número 92, caja de surtido",
+      "cantidad": 3,
+      "precio": 148.0
+    },
+    {
+      "renglon": 93,
+      "sku": "SKU-0193",
+      "descripcion": "Artículo de ejemplo número 93, caja de surtido",
+      "cantidad": 1,
+      "precio": 149.5
+    },
+    {
+      "renglon": 94,
+      "sku": "SKU-0194",
+      "descripcion": "Artículo de ejemplo número 94, caja de surtido",
+      "cantidad": 2,
+      "precio": 151.0
+    },
+    {
+      "renglon": 95,
+      "sku": "SKU-0195",
+      "descripcion": "Artículo de ejemplo número 95, caja de surtido",
+      "cantidad": 3,
+      "precio": 152.5
+    },
+    {
+      "renglon": 96,
+      "sku": "SKU-0196",
+      "descripcion": "Artículo de ejemplo número 96, caja de surtido",
+      "cantidad": 1,
+      "precio": 154.0
+    },
+    {
+      "renglon": 97,
+      "sku": "SKU-0197",
+      "descripcion": "Artículo de ejemplo número 97, caja de surtido",
+      "cantidad": 2,
+      "precio": 155.5
+    },
+    {
+      "renglon": 98,
+      "sku": "SKU-0198",
+      "descripcion": "Artículo de ejemplo número 98, caja de surtido",
+      "cantidad": 3,
+      "precio": 157.0
+    },
+    {
+      "renglon": 99,
+      "sku": "SKU-0199",
+      "descripcion": "Artículo de ejemplo número 99, caja de surtido",
+      "cantidad": 1,
+      "precio": 158.5
+    },
+    {
+      "renglon": 100,
+      "sku": "SKU-0200",
+      "descripcion": "Artículo de ejemplo número 100, caja de surtido",
+      "cantidad": 2,
+      "precio": 160.0
+    },
+    {
+      "renglon": 101,
+      "sku": "SKU-0201",
+      "descripcion": "Artículo de ejemplo número 101, caja de surtido",
+      "cantidad": 3,
+      "precio": 161.5
+    },
+    {
+      "renglon": 102,
+      "sku": "SKU-0202",
+      "descripcion": "Artículo de ejemplo número 102, caja de surtido",
+      "cantidad": 1,
+      "precio": 163.0
+    },
+    {
+      "renglon": 103,
+      "sku": "SKU-0203",
+      "descripcion": "Artículo de ejemplo número 103, caja de surtido",
+      "cantidad": 2,
+      "precio": 164.5
+    },
+    {
+      "renglon": 104,
+      "sku": "SKU-0204",
+      "descripcion": "Artículo de ejemplo número 104, caja de surtido",
+      "cantidad": 3,
+      "precio": 166.0
+    },
+    {
+      "renglon": 105,
+      "sku": "SKU-0205",
+      "descripcion": "Artículo de ejemplo número 105, caja de surtido",
+      "cantidad": 1,
+      "precio": 167.5
+    },
+    {
+      "renglon": 106,
+      "sku": "SKU-0206",
+      "descripcion": "Artículo de ejemplo número 106, caja de surtido",
+      "cantidad": 2,
+      "precio": 169.0
+    },
+    {
+      "renglon": 107,
+      "sku": "SKU-0207",
+      "descripcion": "Artículo de ejemplo número 107, caja de surtido",
+      "cantidad": 3,
+      "precio": 170.5
+    },
+    {
+      "renglon": 108,
+      "sku": "SKU-0208",
+      "descripcion": "Artículo de ejemplo número 108, caja de surtido",
+      "cantidad": 1,
+      "precio": 172.0
+    },
+    {
+      "renglon": 109,
+      "sku": "SKU-0209",
+      "descripcion": "Artículo de ejemplo número 109, caja de surtido",
+      "cantidad": 2,
+      "precio": 173.5
+    },
+    {
+      "renglon": 110,
+      "sku": "SKU-0210",
+      "descripcion": "Artículo de ejemplo número 110, caja de surtido",
+      "cantidad": 3,
+      "precio": 175.0
+    },
+    {
+      "renglon": 111,
+      "sku": "SKU-0211",
+      "descripcion": "Artículo de ejemplo número 111, caja de surtido",
+      "cantidad": 1,
+      "precio": 176.5
+    },
+    {
+      "renglon": 112,
+      "sku": "SKU-0212",
+      "descripcion": "Artículo de ejemplo número 112, caja de surtido",
+      "cantidad": 2,
+      "precio": 178.0
+    },
+    {
+      "renglon": 113,
+      "sku": "SKU-0213",
+      "descripcion": "Artículo de ejemplo número 113, caja de surtido",
+      "cantidad": 3,
+      "precio": 179.5
+    },
+    {
+      "renglon": 114,
+      "sku": "SKU-0214",
+      "descripcion": "Artículo de ejemplo número 114, caja de surtido",
+      "cantidad": 1,
+      "precio": 181.0
+    },
+    {
+      "renglon": 115,
+      "sku": "SKU-0215",
+      "descripcion": "Artículo de ejemplo número 115, caja de surtido",
+      "cantidad": 2,
+      "precio": 182.5
+    },
+    {
+      "renglon": 116,
+      "sku": "SKU-0216",
+      "descripcion": "Artículo de ejemplo número 116, caja de surtido",
+      "cantidad": 3,
+      "precio": 184.0
+    },
+    {
+      "renglon": 117,
+      "sku": "SKU-0217",
+      "descripcion": "Artículo de ejemplo número 117, caja de surtido",
+      "cantidad": 1,
+      "precio": 185.5
+    },
+    {
+      "renglon": 118,
+      "sku": "SKU-0218",
+      "descripcion": "Artículo de ejemplo número 118, caja de surtido",
+      "cantidad": 2,
+      "precio": 187.0
+    },
+    {
+      "renglon": 119,
+      "sku": "SKU-0219",
+      "descripcion": "Artículo de ejemplo número 119, caja de surtido",
+      "cantidad": 3,
+      "precio": 188.5
+    },
+    {
+      "renglon": 120,
+      "sku": "SKU-0220",
+      "descripcion": "Artículo de ejemplo número 120, caja de surtido",
+      "cantidad": 1,
+      "precio": 190.0
+    },
+    {
+      "renglon": 121,
+      "sku": "SKU-0221",
+      "descripcion": "Artículo de ejemplo número 121, caja de surtido",
+      "cantidad": 2,
+      "precio": 191.5
+    },
+    {
+      "renglon": 122,
+      "sku": "SKU-0222",
+      "descripcion": "Artículo de ejemplo número 122, caja de surtido",
+      "cantidad": 3,
+      "precio": 193.0
+    },
+    {
+      "renglon": 123,
+      "sku": "SKU-0223",
+      "descripcion": "Artículo de ejemplo número 123, caja de surtido",
+      "cantidad": 1,
+      "precio": 194.5
+    },
+    {
+      "renglon": 124,
+      "sku": "SKU-0224",
+      "descripcion": "Artículo de ejemplo número 124, caja de surtido",
+      "cantidad": 2,
+      "precio": 196.0
+    },
+    {
+      "renglon": 125,
+      "sku": "SKU-0225",
+      "descripcion": "Artículo de ejemplo número 125, caja de surtido",
+      "cantidad": 3,
+      "precio": 197.5
+    },
+    {
+      "renglon": 126,
+      "sku": "SKU-0226",
+      "descripcion": "Artículo de ejemplo número 126, caja de surtido",
+      "cantidad": 1,
+      "precio": 199.0
+    },
+    {
+      "renglon": 127,
+      "sku": "SKU-0227",
+      "descripcion": "Artículo de ejemplo número 127, caja de surtido",
+      "cantidad": 2,
+      "precio": 200.5
+    },
+    {
+      "renglon": 128,
+      "sku": "SKU-0228",
+      "descripcion": "Artículo de ejemplo número 128, caja de surtido",
+      "cantidad": 3,
+      "precio": 202.0
+    },
+    {
+      "renglon": 129,
+      "sku": "SKU-0229",
+      "descripcion": "Artículo de ejemplo número 129, caja de surtido",
+      "cantidad": 1,
+      "precio": 203.5
+    },
+    {
+      "renglon": 130,
+      "sku": "SKU-0230",
+      "descripcion": "Artículo de ejemplo número 130, caja de surtido",
+      "cantidad": 2,
+      "precio": 205.0
+    },
+    {
+      "renglon": 131,
+      "sku": "SKU-0231",
+      "descripcion": "Artículo de ejemplo número 131, caja de surtido",
+      "cantidad": 3,
+      "precio": 206.5
+    },
+    {
+      "renglon": 132,
+      "sku": "SKU-0232",
+      "descripcion": "Artículo de ejemplo número 132, caja de surtido",
+      "cantidad": 1,
+      "precio": 208.0
+    },
+    {
+      "renglon": 133,
+      "sku": "SKU-0233",
+      "descripcion": "Artículo de ejemplo número 133, caja de surtido",
+      "cantidad": 2,
+      "precio": 209.5
+    },
+    {
+      "renglon": 134,
+      "sku": "SKU-0234",
+      "descripcion": "Artículo de ejemplo número 134, caja de surtido",
+      "cantidad": 3,
+      "precio": 211.0
+    },
+    {
+      "renglon": 135,
+      "sku": "SKU-0235",
+      "descripcion": "Artículo de ejemplo número 135, caja de surtido",
+      "cantidad": 1,
+      "precio": 212.5
+    },
+    {
+      "renglon": 136,
+      "sku": "SKU-0236",
+      "descripcion": "Artículo de ejemplo número 136, caja de surtido",
+      "cantidad": 2,
+      "precio": 214.0
+    },
+    {
+      "renglon": 137,
+      "sku": "SKU-0237",
+      "descripcion": "Artículo de ejemplo número 137, caja de surtido",
+      "cantidad": 3,
+      "precio": 215.5
+    },
+    {
+      "renglon": 138,
+      "sku": "SKU-0238",
+      "descripcion": "Artículo de ejemplo número 138, caja de surtido",
+      "cantidad": 1,
+      "precio": 217.0
+    },
+    {
+      "renglon": 139,
+      "sku": "SKU-0239",
+      "descripcion": "Artículo de ejemplo número 139, caja de surtido",
+      "cantidad": 2,
+      "precio": 218.5
+    },
+    {
+      "renglon": 140,
+      "sku": "SKU-0240",
+      "descripcion": "Artículo de ejemplo número 140, caja de surtido",
+      "cantidad": 3,
+      "precio": 220.0
+    },
+    {
+      "renglon": 141,
+      "sku": "SKU-0241",
+      "descripcion": "Artículo de ejemplo número 141, caja de surtido",
+      "cantidad": 1,
+      "precio": 221.5
+    },
+    {
+      "renglon": 142,
+      "sku": "SKU-0242",
+      "descripcion": "Artículo de ejemplo número 142, caja de surtido",
+      "cantidad": 2,
+      "precio": 223.0
+    },
+    {
+      "renglon": 143,
+      "sku": "SKU-0243",
+      "descripcion": "Artículo de ejemplo número 143, caja de surtido",
+      "cantidad": 3,
+      "precio": 224.5
+    },
+    {
+      "renglon": 144,
+      "sku": "SKU-0244",
+      "descripcion": "Artículo de ejemplo número 144, caja de surtido",
+      "cantidad": 1,
+      "precio": 226.0
+    },
+    {
+      "renglon": 145,
+      "sku": "SKU-0245",
+      "descripcion": "Artículo de ejemplo número 145, caja de surtido",
+      "cantidad": 2,
+      "precio": 227.5
+    },
+    {
+      "renglon": 146,
+      "sku": "SKU-0246",
+      "descripcion": "Artículo de ejemplo número 146, caja de surtido",
+      "cantidad": 3,
+      "precio": 229.0
+    },
+    {
+      "renglon": 147,
+      "sku": "SKU-0247",
+      "descripcion": "Artículo de ejemplo número 147, caja de surtido",
+      "cantidad": 1,
+      "precio": 230.5
+    },
+    {
+      "renglon": 148,
+      "sku": "SKU-0248",
+      "descripcion": "Artículo de ejemplo número 148, caja de surtido",
+      "cantidad": 2,
+      "precio": 232.0
+    },
+    {
+      "renglon": 149,
+      "sku": "SKU-0249",
+      "descripcion": "Artículo de ejemplo número 149, caja de surtido",
+      "cantidad": 3,
+      "precio": 233.5
+    },
+    {
+      "renglon": 150,
+      "sku": "SKU-0250",
+      "descripcion": "Artículo de ejemplo número 150, caja de surtido",
+      "cantidad": 1,
+      "precio": 235.0
+    }
+  ]
+}

@@ -83,6 +83,16 @@ CREATE TABLE intento (
   UNIQUE (operacion, n)
 );
 
+-- Lo que salió en cada intento, completo (lección 27). El intento guarda su huella (sha256) y su tamaño; el cuerpo
+-- vive aquí, una vez por huella: si dos intentos mandan lo mismo, comparten la fila. Es text, sin límite de largo:
+-- no se recorta, por grande que sea.
+CREATE TABLE payload (
+  sha256       text PRIMARY KEY,
+  cuerpo       text NOT NULL,
+  tamano       int NOT NULL,
+  guardado     timestamptz NOT NULL DEFAULT now()
+);
+
 -- Cada acuse 997 que mandó el socio (lección 21), tal como se leyó, y a qué operación correspondió. El 997 cita
 -- lo que acusa por el grupo (AK1: GS01 y GS06) y el documento (AK2: ST01 y ST02). Si no corresponde a ninguna
 -- operación esperándolo, operacion queda vacía: el acuse no se pierde, y se ve.
