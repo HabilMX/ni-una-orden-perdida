@@ -1,0 +1,48 @@
+# La entrega: la paquetería avisa por webhook que entregó la orden. Es un Event Message: nadie se lo pidió, solo
+# cuenta que algo ya pasó («entregué el paquete con la guía tal»). El router no le contesta qué hacer: le dice
+# que lo recibió (202), y lo demás pasa después, como con la orden y el embarque.
+#
+#   paquetería → POST /webhooks/paqueteria → [router] → GUARDA (momento «entregada») → 202
+#                                                 └─ seda:repartir → API (entregado) · ERP (registrar_entrega) · 214
+- route:
+    id: webhook-paqueteria
+    from:
+      uri: platform-http:/webhooks/paqueteria
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - convertBodyTo:
+            type: String
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: momento
+            expression:
+              constant:
+                expression: entregada
+        - to:
+            uri: direct:hilo
+        # La orden tiene que ser una que conocemos: de ahí sale su tienda, y con ella sus canales
+        - to:
+            uri: direct:cargar-orden
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.tienda} == null"
+                steps:
+                  - to:
+                      uri: direct:no-existe
+            otherwise:
+              steps:
+                - to:
+                    uri: direct:canales
+                - to:
+                    uri: direct:guardar-momento
+                - log:
+                    message: "Entrega de la orden ${variable.orden} (guía ${jsonpath($.guia)}) correlacion=${variable.correlacion}: guardada con sus canales ${variable.canales}"
+                - to:
+                    uri: direct:contestar-y-repartir

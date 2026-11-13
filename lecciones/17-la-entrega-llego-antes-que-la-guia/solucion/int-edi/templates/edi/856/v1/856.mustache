@@ -1,0 +1,19 @@
+ISA*00*          *00*          *ZZ*{{{body.isa.emisor}}}*ZZ*{{{body.isa.receptor}}}*{{{body.isa.fecha}}}*{{{body.isa.hora}}}*U*00401*{{{body.isa.control}}}*0*P*>~
+GS*SH*{{{body.gs.emisor}}}*{{{body.gs.receptor}}}*{{{body.gs.fecha}}}*{{{body.gs.hora}}}*{{{body.gs.control}}}*X*004010~
+ST*856*{{{body.st.control}}}~
+BSN*00*{{{body.bsn.embarque}}}*{{{body.bsn.fecha}}}*{{{body.bsn.hora}}}*0004~
+HL*1**S*1~
+TD5**2*{{{body.envio.paqueteria}}}*U~
+REF*CN*{{{body.envio.guia}}}~
+DTM*011*{{{body.envio.fecha}}}*{{{body.envio.hora}}}~
+HL*2*1*O*1~
+PRF*{{{body.orden}}}~
+{{#body.lineas}}
+HL*{{{hl}}}*2*I*0~
+LIN*{{{n}}}*VN*{{{sku}}}~
+SN1**{{{cantidad}}}*EA~
+{{/body.lineas}}
+CTT*{{{body.ctt}}}~
+SE*{{{body.se.segmentos}}}*{{{body.st.control}}}~
+GE*1*{{{body.gs.control}}}~
+IEA*1*{{{body.isa.control}}}~

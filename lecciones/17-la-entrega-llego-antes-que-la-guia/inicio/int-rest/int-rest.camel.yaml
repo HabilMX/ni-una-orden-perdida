@@ -1,0 +1,58 @@
+# int-rest: el servicio que sabe hablar con la API de pedidos.
+# Recibe la orden del router, la traduce al formato de la API y la entrega.
+# El hilo: lee ce-correlationid del sobre y se lo pasa a la API como X-Correlation-Id.
+- route:
+    id: int-rest
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # Del sobre se guarda lo que hace falta ANTES de limpiar encabezados
+        - setVariable:
+            name: llave
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - log:
+            message: "Recibí del router la orden ${variable.llave} correlacion=${variable.correlacion} (sobre ${header.ce-id}, tipo ${header.ce-type})"
+        - to:
+            uri: jsonata:mappings/api/pedido/v2/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Idempotency-Key
+            expression:
+              simple:
+                expression: "${variable.llave}"
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - to:
+            uri: http://api-pedidos:8080/pedidos
+            parameters:
+              httpMethod: POST
+              throwExceptionOnFailure: false
+        # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: api/pedido/v2
+        - log:
+            message: "La API contestó ${header.CamelHttpResponseCode} para la orden ${variable.llave} correlacion=${variable.correlacion}"

@@ -1,0 +1,14 @@
+/* Traduce la orden de la tienda al pedido que espera la API.
+   Viene hecho en la 02; en la 03 lo escribes tú.
+   Los corchetes de "partidas" importan: con un solo renglón, sin ellos saldría un objeto y no una lista. */
+{
+  "pedido": orden,
+  "tienda": tienda,
+  "fecha": creada,
+  "partidas": [renglones.{
+    "posicion": renglon,
+    "sku": sku,
+    "cantidad": cantidad,
+    "precio": precio
+  }]
+}

@@ -1,0 +1,88 @@
+# El barrido suelta lo estacionado que ya puede salir. Lo dispara un EVENTO: cada vez que un canal acepta un
+# momento (ver el final de reparto.camel.yaml), porque eso es lo que puede destrabar a otro. También se puede
+# pedir a mano: POST /barrido (con curl, o desde el verifica).
+#
+#   entrega (antes del embarque) → estacionada ··· embarque aceptado en ese canal → barrido → pendiente → reparto
+#
+# Para cada operación estacionada, la MISMA máquina de estados vuelve a decidir con lo que hoy está guardado.
+# Si ahora dice «procesa», la operación pasa a «pendiente» y se encola en seda:repartir, como cualquier otra.
+# El cambio de estado se hace solo si sigue estacionada (AND estado = 'estacionada'): si dos barridos corren a la
+# vez, solo uno la suelta, y nada sale dos veces.
+- route:
+    id: barrido-http
+    from:
+      uri: platform-http:/barrido
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - to:
+            uri: direct:barrido
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              constant:
+                expression: '{"resultado":"barrido hecho"}'
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+
+- route:
+    id: barrido
+    from:
+      uri: direct:barrido
+      steps:
+        # Lo estacionado, en el orden en que llegó
+        - to:
+            uri: "sql:SELECT id, orden, momento, canal FROM operacion WHERE estado = 'estacionada' ORDER BY id"
+            parameters:
+              dataSource: "#estado"
+        - split:
+            expression:
+              simple:
+                expression: "${body}"
+            steps:
+              - setVariable:
+                  name: operacion
+                  expression:
+                    simple:
+                      expression: "${body[id]}"
+              - setVariable:
+                  name: orden
+                  expression:
+                    simple:
+                      expression: "${body[orden]}"
+              - setVariable:
+                  name: momento
+                  expression:
+                    simple:
+                      expression: "${body[momento]}"
+              - setVariable:
+                  name: canal
+                  expression:
+                    simple:
+                      expression: "${body[canal]}"
+              - to:
+                  uri: direct:decidir
+              - filter:
+                  expression:
+                    simple:
+                      expression: "${variable.decision} == 'procesa'"
+                  steps:
+                    - to:
+                        uri: "sql:UPDATE operacion SET estado = 'pendiente' WHERE id = :#${variable.operacion} AND estado = 'estacionada'"
+                        parameters:
+                          dataSource: "#estado"
+                    # Solo quien la cambió la suelta: si otro barrido ganó, aquí se cambiaron 0 filas
+                    - filter:
+                        expression:
+                          simple:
+                            expression: "${header.CamelSqlUpdateCount} == 1"
+                        steps:
+                          - log:
+                              message: "Suelto la operación ${variable.operacion}: orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} (${variable.motivo})"
+                          - to:
+                              uri: seda:repartir
+                              pattern: InOnly

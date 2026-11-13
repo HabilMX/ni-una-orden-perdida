@@ -1,0 +1,48 @@
+# El barrido suelta lo estacionado que ya puede salir. Esta es TU parte de la lección.
+#
+#   entrega (antes del embarque) → estacionada ··· embarque aceptado en ese canal → barrido → pendiente → reparto
+#
+# Lo demás ya está: guardar-momento (estado.camel.yaml) estaciona lo que llega antes de tiempo, la máquina de
+# estados (reglas/maquina-de-estados.yaml + direct:decidir) dice si algo ya puede salir, y el reparto
+# (reparto.camel.yaml) llama a direct:barrido cada vez que un canal acepta un momento.
+#
+# Tal como viene, el barrido no suelta nada: la entrega que llegó antes del embarque se queda estacionada.
+
+# POST /barrido: para pedirlo a mano (con curl, o desde el verifica). Este ya está.
+- route:
+    id: barrido-http
+    from:
+      uri: platform-http:/barrido
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - to:
+            uri: direct:barrido
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              constant:
+                expression: '{"resultado":"barrido hecho"}'
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+
+- route:
+    id: barrido
+    from:
+      uri: direct:barrido
+      steps:
+        # TODO 1: lee de la base las operaciones en estado 'estacionada', en el orden en que llegaron (ORDER BY id).
+        #         Te sirve la misma forma de consulta que usa repartir (reparto.camel.yaml): id, orden, momento, canal.
+        # TODO 2: recórrelas con un split. Para cada una, deja en variables operacion, orden, momento y canal, y
+        #         llama a direct:decidir: deja en ${variable.decision} «procesa», «estaciona» o «invalido».
+        # TODO 3: si dice «procesa», pásala a 'pendiente' con un UPDATE que SOLO cambie la fila si sigue
+        #         estacionada (… WHERE id = … AND estado = 'estacionada'). Si dos barridos corren a la vez, solo
+        #         uno la cambia: mira ${header.CamelSqlUpdateCount}.
+        # TODO 4: si la cambiaste tú (CamelSqlUpdateCount = 1), encola el reparto: seda:repartir, pattern InOnly.
+        #         repartir lee orden y momento de las variables, como cuando llega un momento nuevo.
+        - log:
+            message: "Barrido: todavía no suelto nada (TODO 1 a 4)"

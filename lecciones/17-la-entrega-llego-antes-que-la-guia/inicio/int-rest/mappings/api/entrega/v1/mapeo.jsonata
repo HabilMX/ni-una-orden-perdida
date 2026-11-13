@@ -1,0 +1,7 @@
+/* El aviso de entrega de la paquetería, convertido en el evento «entregado» que espera la API de pedidos.
+   La guía va para que la API compruebe que es la misma con la que salió el pedido. */
+{
+  "tipo": "entregado",
+  "guia": guia,
+  "fecha": entregada
+}
