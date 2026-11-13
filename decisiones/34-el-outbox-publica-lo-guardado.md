@@ -20,6 +20,11 @@ guardar deja un evento de una orden que, si la base falla, no existe.
   que entró, y junta en un solo evento las filas del mismo momento (como en la 28). Le pone `publicado` solo cuando
   Kafka recibió el evento. Si no lo recibió, la fila se queda, y las que vienen detrás esperan a la siguiente vuelta:
   así lo de una orden no sale en desorden.
+- **El sondeo da una vuelta a la vez** (`synchronous: true` en su `timer`). Kafka contesta en otro hilo; sin esa
+  opción, la vuelta siguiente arranca mientras la anterior espera a Kafka, ve las operaciones en «enviada», las da por
+  publicadas y marca su fila. Si Kafka luego dice que no, la operación vuelve a «pendiente» con su fila ya marcada, y
+  nadie la publica. Se midió así: con Kafka sin contestar, las 6 filas de la 4002 y la 4003 quedaron publicadas en
+  menos de 3 s y sus 6 operaciones en «pendiente».
 - **Todo lo que sale a Kafka sale por el outbox**: el barrido que suelta lo estacionado (una sola sentencia que la
   cambia a «pendiente» y escribe su fila), el reintento de un «no se sabe» y el reproceso a mano, que ahora contesta
   202 «en el outbox».
@@ -45,6 +50,7 @@ guardar deja un evento de una orden que, si la base falla, no existe.
 | Publicar justo después de guardar (la 28 y la 29) | Con Kafka caído en ese momento, lo guardado se queda sin salir (el `inicio/` lo muestra) |
 | Publicar antes de guardar | Si la base falla, sale un evento de una orden que no existe |
 | Una transacción que abarque la base y Kafka (en dos fases) | Pide un coordinador entre los dos y más viajes por cada orden, para lo que una tabla resuelve |
+| Dejar que el reloj arranque una vuelta por segundo aunque la anterior no termine (lo de omisión) | Dos vueltas toman las mismas filas, y la segunda marca publicado lo que la primera aún no sabe si salió |
 | Reintentar la publicación en la memoria del router | Si el router se reinicia mientras Kafka está caído, se pierde lo que esperaba |
 | Leer el registro de cambios de PostgreSQL (CDC) | Agrega una pieza más (un conector) para lo que una tabla y un sondeo resuelven aquí |
 

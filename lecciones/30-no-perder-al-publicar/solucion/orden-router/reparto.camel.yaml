@@ -36,6 +36,13 @@
 # que cada destino reconoce con su llave (lección 18). Se prefiere repetir a perder.
 #
 # Las filas de un mismo momento (y de quien lo pidió) salen juntas, en UN evento, como en la 28.
+#
+# UNA vuelta a la vez (synchronous). Kafka contesta en otro hilo: sin esta opción, el reloj no espera esa respuesta y
+# arranca la siguiente vuelta al segundo, con la anterior todavía esperando a Kafka (hasta 5 s si está caído). Esa
+# segunda vuelta encuentra las operaciones en «enviada», cree que ya salieron y marca la fila como publicada. Cuando
+# Kafka por fin dice que no, la operación vuelve a «pendiente», pero su fila ya no está pendiente en el outbox: nadie
+# la vuelve a publicar, y la orden se queda sin salir. Con synchronous, la siguiente vuelta empieza cuando esta
+# terminó, con la respuesta de Kafka ya en la mano.
 - route:
     id: sondeo-outbox
     routeConfigurationId: outbox-atorado
@@ -43,6 +50,7 @@
       uri: timer:outbox
       parameters:
         period: 1000
+        synchronous: true
       steps:
         - to:
             uri: >-
@@ -101,6 +109,8 @@
               - to:
                   uri: direct:publicar
               # Salió (o ya había salido: nada que publicar): la fila queda publicada. Si Kafka no lo recibió, no.
+              # «Nada que publicar» solo se cree porque las vueltas van una a la vez (synchronous, arriba): así una
+              # operación en «enviada» no es una que esta misma vuelta tiene todavía en el aire.
               - choice:
                   when:
                     - expression:
