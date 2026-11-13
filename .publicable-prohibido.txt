@@ -1,0 +1,34 @@
+# Patrones que el material del curso no debe contener. Esta lista SI viaja al
+# repositorio publico: son nombres de productos de IA, publicos, y el guion que
+# revisa la plantilla los lee de aqui.
+#
+# Los patrones de infraestructura, rutas y nombres reservados viven en
+# .publicable-interno.txt, que NO se publica: enumerarlos en claro en un
+# repositorio publico delata justo lo que la lista protege.
+
+# --- el curso no habla de asistentes ni de empresas de IA ---
+# (verificar-plantilla.sh lee TAMBIÉN este bloque: va hasta el final del archivo.
+#  Mayúsculas y minúsculas se escriben tal cual: «Cursor» y «Bard» solo con mayúscula
+#  inicial (el sustantivo «cursor» en minúscula es español común). En esta práctica
+#  «Llama» NO se veta: es el verbo al inicio de frase, no el modelo.)
+\bIA\b
+[Ii]nteligencia artificial
+[Cc]odex|[Cc]laude|ChatGPT|OpenAI|Anthropic|Copilot|Gemini|DeepSeek|Mistral|Perplexity
+\bLLMs?\b
+\bGPT-?[0-9o]|\bGPT\b
+[Mm]odelos? de lenguaje|[Gg]randes modelos
+[Aa]prendizaje autom[aá]tico|[Mm]achine learning
+[Aa]sistente de c[oó]digo|[Vv]ibe cod
+\bCursor\b|\bBard\b|[Cc]opiloto|Meta AI|\bGrok\b
+
+# --- certificaciones: solo el uso COMERCIAL (decision de la PO, 20-oct-2026) ---
+# 🔴 El termino TECNICO pasa a proposito: «certificado TLS», «autoridad
+# certificadora», «certificate», `--cert` y x509 son correctos en un curso y vetarlos
+# pondria en rojo material legitimo. Medido ese dia: las 9 apariciones de curso-go y
+# las 2 de typescript son todas tecnicas, y ninguna de estas tres lineas las toca.
+# ⚠️ LIMITE DECLARADO: estos patrones cubren ESPANOL. «certification» (fr) y
+# «certificacao» (pt) no se vetan, porque el glosario de traducciones los usa como
+# termino tecnico; si la PO quiere los cinco idiomas, se amplia con su control positivo.
+[Cc]ertificaci[oó]n(es)?
+[Cc]ertificad[oa]s? (ISO|SOC|PCI|CMMI|ITIL|CKA|CKAD|AWS|Azure|GCP|[0-9]{4,5})
+(estamos|somos|est[aá]|est[aá]n|son|empresa|equipo|personal|ingenieros?|consultores?)[[:space:]]+certificad[oa]s?

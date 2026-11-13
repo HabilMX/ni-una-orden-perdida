@@ -12,3 +12,5 @@ lecciones/*/buzon/
 target/
 # Las cifras que escribe la medición de la lección 32: son de cada máquina, no van al repo
 lecciones/32-*/*/cifras.md
+# La lista interna de la compuerta de publicación: vive solo en el clon de trabajo
+.publicable-interno.txt
