@@ -43,3 +43,8 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 32 | [Un evento por momento en un tópico, con la orden como llave, y un grupo por integración](32-un-topico-un-grupo-por-integracion.md) | 28 en adelante |
 | 33 | [El offset se confirma a mano, después de dejar el desenlace, y lo que falla se vuelve a leer](33-el-offset-se-confirma-despues-del-desenlace.md) | 29 en adelante |
 | 34 | [Lo que hay que publicar se guarda en la misma transacción (outbox), y un sondeo lo publica](34-el-outbox-publica-lo-guardado.md) | 30 |
+| 35 | [Kubernetes de práctica con kind, con metrics-server y versiones fijas, y un clúster que se borra al terminar](35-kubernetes-de-practica-con-kind.md) | 31 (apéndice) |
+| 36 | [A Kubernetes va int-rest, exportado con camel export a Camel Quarkus, sin cambiarle la ruta y sin application.properties](36-int-rest-exportado-con-camel-export.md) | 31 y 32 (apéndice) |
+| 37 | [El HPA escala por CPU, medida como porcentaje de lo que cada copia reserva, y baja rápido en la práctica](37-el-hpa-escala-por-cpu-reservada.md) | 31 (apéndice) |
+| 38 | [El nativo se compila con Mandrel dentro de un contenedor, con el mismo compilador de Java que la JVM](38-el-nativo-se-compila-en-un-contenedor.md) | 32 (apéndice) |
+| 39 | [JVM contra nativo se mide en tu máquina, con un método fijo y sin umbrales; la capacidad se mide igual](39-se-mide-en-tu-maquina-sin-umbrales.md) | 32 (apéndice) |
