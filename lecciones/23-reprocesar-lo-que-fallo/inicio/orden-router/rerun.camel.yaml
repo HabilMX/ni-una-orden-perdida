@@ -1,0 +1,80 @@
+# Reprocesar a mano (lección 23): POST /rerun con {orden, momento, canal, pedido_por, motivo}.
+#
+# Lo pide una PERSONA, después de ver qué se quedó atorado (un canal que estuvo caído, un «no se sabe» que se agotó)
+# y de arreglar la causa. Quien lea el rastro mañana tiene que saber que ese intento no lo hizo el reparto solo,
+# quién lo pidió y por qué.
+#
+# Esta versión es la más fácil, y no alcanza: marca la operación como pendiente y la echa otra vez al reparto.
+# Sale, pero como un intento «auto» sin nombre ni motivo; reabre lo que ya había salido bien (y lo manda otra vez);
+# y no le dice a quien lo pidió cómo le fue. Tus pendientes:
+#
+#   TODO 1. Sin pedido_por o sin motivo, contesta 400 y no hagas nada.
+#   TODO 2. Lee la operación de la base (la consulta de repartir, en reparto.camel.yaml, filtrada también por canal
+#           y con p.estado). Si no existe, 404. Si está aceptada, confirmada o estacionada, 409: solo se reprocesa
+#           lo que falló (pendiente, no_se_sabe, conciliacion_pendiente, rechazada).
+#   TODO 3. Un intento MANUAL, uno solo y aquí mismo: la variable tipo en «manual» (pedido_por y motivo ya están
+#           en variables, y el INSERT de intentar las usa), luego direct:preparar con la fila y direct:intentar.
+#           Si intentar lanza IOException (no se supo), la operación vuelve a conciliacion_pendiente.
+#           Si quedó aceptada, llama a direct:barrido, como el reparto.
+#   TODO 4. Contesta 200 con el desenlace, el código y la versión del mapeo que quedaron en las variables.
+
+- route:
+    id: rerun
+    from:
+      uri: platform-http:/rerun
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${body[orden]}"
+        - setVariable:
+            name: momento
+            expression:
+              simple:
+                expression: "${body[momento]}"
+        - setVariable:
+            name: canal
+            expression:
+              simple:
+                expression: "${body[canal]}"
+        - setVariable:
+            name: pedido_por
+            expression:
+              simple:
+                expression: "${body[pedido_por]}"
+        - setVariable:
+            name: motivo
+            expression:
+              simple:
+                expression: "${body[motivo]}"
+        # TODO 1 y TODO 2 van aquí
+        - to:
+            uri: >-
+              sql:UPDATE operacion SET estado = 'pendiente'
+              WHERE orden = :#${variable.orden} AND momento = :#${variable.momento} AND canal = :#${variable.canal}
+            parameters:
+              dataSource: "#estado"
+        # TODO 3: esto lo reemplaza el intento manual
+        - to:
+            uri: seda:repartir
+            pattern: InOnly
+        - log:
+            message: "Rerun de la orden ${variable.orden} momento ${variable.momento} canal ${variable.canal}: la devolví al reparto"
+        # TODO 4
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              constant:
+                expression: "202"
+                resultType: java.lang.Integer
+        - setBody:
+            expression:
+              constant:
+                expression: '{"resultado":"devuelta al reparto"}'

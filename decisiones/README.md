@@ -35,3 +35,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 24 | [Tres desenlaces, decididos por la evidencia: aceptado, rechazado o no se sabe](24-tres-desenlaces.md) | 20 en adelante |
 | 25 | [El 997 se correlaciona por el grupo y el documento, y solo él confirma](25-el-997-se-correlaciona-por-grupo-y-documento.md) | 21 en adelante |
 | 26 | [Un cortacircuito por canal, en el router](26-un-cortacircuito-por-canal.md) | 22 en adelante |
+| 27 | [El reproceso a mano es un intento más, con nombre y motivo](27-el-rerun-es-un-intento-manual.md) | 23 en adelante |
