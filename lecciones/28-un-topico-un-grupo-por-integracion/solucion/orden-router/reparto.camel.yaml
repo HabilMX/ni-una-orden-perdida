@@ -1,0 +1,297 @@
+# El reparto: lo que ya se guardó sale a sus canales. Desde la 28, por Kafka.
+#
+# Hasta la 27, el router llamaba por HTTP a cada canal (int-rest, int-bd, int-edi) y esperaba su respuesta. Si un canal
+# estaba detenido, el router reintentaba, abría su cortacircuito y, al final, lo dejaba en conciliacion_pendiente:
+# alguien tenía que reenviarlo a mano. Desde aquí, el router deja UN EVENTO por momento en el tópico «ordenes» y se
+# va. Cada canal lo lee con SU PROPIO GRUPO de consumidores (ver kafka.camel.yaml en int-rest, int-bd e int-edi):
+#
+#   router ──→ [ tópico ordenes ] ──→ grupo int-rest → int-rest → API
+#                  llave: la orden    ──→ grupo int-bd   → int-bd   → ERP     (3 copias, una partición cada una)
+#                                     ──→ grupo int-edi  → int-edi  → SFTP del socio
+#
+# Cada grupo lleva su propia cuenta de hasta dónde leyó (su offset). Si int-edi está detenido, su cuenta no avanza,
+# y los otros dos grupos siguen al día. Cuando int-edi vuelve, sigue desde donde se quedó: nadie le reenvía nada.
+#
+# El desenlace regresa por otro tópico, «desenlaces», que solo lee el router (desenlaces.camel.yaml): el router sigue
+# siendo la ÚNICA pieza que escribe en la base de estado.
+#
+# Para cada momento:
+#   1. se lee de la BASE lo que hay que mandar (no de la memoria): lo guardado es lo que sale;
+#   2. se escribe un INTENTO por canal ANTES de publicar, con la huella (sha256) y el tamaño de lo que va a salir, y la
+#      operación pasa a «enviada» (lección 20: si el router se cae justo después de publicar, la base dice que lo
+#      intentó y que espera respuesta);
+#   3. se publica el evento: la orden como LLAVE (todos los eventos de una orden caen en la misma partición, en orden),
+#      el sobre CloudEvents en los encabezados, y para cada canal que le toca, su operación y su intento.
+
+# Lo que el router guardó y se encoló (contestar-y-repartir, el barrido): se publica el momento completo
+- route:
+    id: repartir
+    from:
+      uri: seda:repartir
+      parameters:
+        concurrentConsumers: 10
+      steps:
+        - log:
+            message: "Reparto el momento ${variable.momento} de la orden ${variable.orden} correlacion=${variable.correlacion}"
+        - to:
+            uri: direct:publicar
+
+# Publicar un momento de una orden. Variables que usa:
+#   orden, momento                  qué se publica
+#   solo (opcional)                 una sola operación, por su id: la usan los reintentos y el reproceso a mano.
+#                                   Sin ella, salen todas las operaciones «pendiente» del momento.
+#   tipo, pedido_por, motivo        quién lo pidió (lección 23); el reparto no las pone y el intento queda «auto»
+# Deja: publicado (true o false) y ultimo (el id del último intento que escribió).
+- route:
+    id: publicar
+    routeConfigurationId: sin-manejo
+    from:
+      uri: direct:publicar
+      steps:
+        - setVariable:
+            name: publicado
+            expression:
+              constant:
+                expression: "false"
+        # 1. Lo que hay que mandar, según el momento: la orden, su embarque o su entrega, y de dónde vino (ce-source)
+        - to:
+            uri: >-
+              sql:SELECT CASE CAST(:#${variable.momento} AS text)
+                             WHEN 'creada' THEN (o.datos - 'embarque' - 'entrega')::text
+                             WHEN 'embarcada' THEN (o.datos -> 'embarque')::text
+                             ELSE (o.datos -> 'entrega')::text END AS datos,
+              CASE CAST(:#${variable.momento} AS text)
+                             WHEN 'creada' THEN '/tiendas/' || (o.datos ->> 'tienda')
+                             WHEN 'embarcada' THEN '/bodegas/' || (o.datos -> 'embarque' ->> 'bodega')
+                             ELSE '/paqueterias/' || (o.datos -> 'entrega' ->> 'paqueteria') END AS fuente
+              FROM orden o WHERE o.orden = :#${variable.orden}
+            variableReceive: lectura
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - setVariable:
+            name: fuente
+            expression:
+              simple:
+                expression: "${variable.lectura[fuente]}"
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.lectura[datos]}"
+        # Lo que va a salir, completo, en payload (lección 26), con los datos personales tapados (lección 27).
+        # El cuerpo sigue siendo lo que sale; lo tapado va a la variable rastro.
+        - to:
+            uri: jsonata:mappings/rastro/mascara/v1/mapeo.jsonata
+            variableReceive: rastro
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - to:
+            uri: >-
+              sql:INSERT INTO payload (sha256, cuerpo, tamano)
+              VALUES (encode(sha256(convert_to(:#${body}, 'UTF8')), 'hex'), :#${variable.rastro},
+                      octet_length(convert_to(:#${variable.rastro}, 'UTF8')))
+              ON CONFLICT (sha256) DO NOTHING
+            variableReceive: guardado
+            parameters:
+              dataSource: "#estado"
+        # 2. En UNA sentencia: las operaciones que salen pasan a «enviada», y cada una recibe su intento ANTES de
+        #    publicar. Devuelve una sola fila con lo que el evento necesita: para cada canal, su operación y su intento
+        #    (vacío si no le toca), el número de control del socio y el hilo.
+        #    Con «solo» se publica esa operación, si no va ya en camino ni salió bien (enviada, aceptada, confirmada)
+        #    ni espera a que la suelten (estacionada).
+        #    Ojo: la consulta va dentro de una dirección (URI), y ahí un «+» se lee como espacio: se escribe %2B.
+        - to:
+            uri: >-
+              sql:WITH objetivo AS (
+                UPDATE operacion SET estado = 'enviada'
+                WHERE orden = :#${variable.orden} AND momento = :#${variable.momento}
+                  AND ((CAST(:#${variable.solo} AS bigint) IS NULL AND estado = 'pendiente')
+                    OR (id = CAST(:#${variable.solo} AS bigint)
+                        AND estado NOT IN ('enviada', 'aceptada', 'confirmada', 'estacionada')))
+                RETURNING id, canal, numero_control, correlacion
+              ), nuevos AS (
+                INSERT INTO intento (operacion, n, tipo, pedido_por, motivo, tamano, sha256)
+                SELECT o.id, (SELECT COALESCE(MAX(i.n), 0) %2B 1 FROM intento i WHERE i.operacion = o.id),
+                       COALESCE(CAST(:#${variable.tipo} AS text), 'auto'),
+                       CAST(:#${variable.pedido_por} AS text), CAST(:#${variable.motivo} AS text),
+                       octet_length(convert_to(:#${body}, 'UTF8')),
+                       encode(sha256(convert_to(:#${body}, 'UTF8')), 'hex')
+                FROM objetivo o
+                RETURNING id, operacion
+              )
+              SELECT string_agg(CAST(n.id AS text), ',') AS intentos, max(n.id) AS ultimo,
+                     string_agg(o.canal, ',' ORDER BY o.id) AS canales,
+                     max(CASE WHEN o.canal = 'rest' THEN o.id END) AS rest_operacion,
+                     max(CASE WHEN o.canal = 'rest' THEN n.id END) AS rest_intento,
+                     max(CASE WHEN o.canal = 'bd' THEN o.id END) AS bd_operacion,
+                     max(CASE WHEN o.canal = 'bd' THEN n.id END) AS bd_intento,
+                     max(CASE WHEN o.canal = 'edi' THEN o.id END) AS edi_operacion,
+                     max(CASE WHEN o.canal = 'edi' THEN n.id END) AS edi_intento,
+                     max(CASE WHEN o.canal = 'edi' THEN o.numero_control END) AS control,
+                     max(o.correlacion) AS correlacion
+              FROM nuevos n JOIN objetivo o ON o.id = n.operacion
+            variableReceive: salida
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.salida[intentos]} == null"
+                steps:
+                  - log:
+                      message: "Orden ${variable.orden} momento ${variable.momento}: no hay nada que publicar (ya va en camino o ya salió)"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: ultimo
+                    expression:
+                      simple:
+                        expression: "${variable.salida[ultimo]}"
+                - setVariable:
+                    name: correlacion
+                    expression:
+                      simple:
+                        expression: "${variable.salida[correlacion]}"
+                # 3. El evento. El sobre CloudEvents va en los encabezados, como en HTTP desde la 08; en Kafka se
+                #    escriben con guion bajo (ce_id, ce_type…): así lo pide el estándar para Kafka.
+                #    Todo valor va como texto (resultType String): Kafka guarda bytes, y un número se guardaría en
+                #    binario.
+                - removeHeaders:
+                    pattern: "*"
+                - setHeader:
+                    name: ce_specversion
+                    expression:
+                      constant:
+                        expression: "1.0"
+                - setHeader:
+                    name: ce_type
+                    expression:
+                      simple:
+                        expression: "mx.tienda.orden.${variable.momento}"
+                - setHeader:
+                    name: ce_source
+                    expression:
+                      simple:
+                        expression: "${variable.fuente}"
+                - setHeader:
+                    name: ce_subject
+                    expression:
+                      simple:
+                        expression: "${variable.orden}"
+                - setHeader:
+                    name: ce_id
+                    expression:
+                      simple:
+                        expression: "orden-${variable.orden}-${variable.momento}"
+                - setHeader:
+                    name: ce_correlationid
+                    expression:
+                      simple:
+                        expression: "${variable.correlacion}"
+                - setHeader:
+                    name: content-type
+                    expression:
+                      constant:
+                        expression: application/json
+                # Para cada canal, su operación y su intento. Un canal al que no le toca este evento no los lleva (un
+                # encabezado vacío no se manda), y su servicio lo deja pasar. Solo el socio lleva número de control.
+                - setHeader:
+                    name: operacion-rest
+                    expression:
+                      simple:
+                        expression: "${variable.salida[rest_operacion]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: intento-rest
+                    expression:
+                      simple:
+                        expression: "${variable.salida[rest_intento]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: operacion-bd
+                    expression:
+                      simple:
+                        expression: "${variable.salida[bd_operacion]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: intento-bd
+                    expression:
+                      simple:
+                        expression: "${variable.salida[bd_intento]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: operacion-edi
+                    expression:
+                      simple:
+                        expression: "${variable.salida[edi_operacion]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: intento-edi
+                    expression:
+                      simple:
+                        expression: "${variable.salida[edi_intento]}"
+                        resultType: java.lang.String
+                - setHeader:
+                    name: ce_numerocontrol
+                    expression:
+                      simple:
+                        expression: "${variable.salida[control]}"
+                        resultType: java.lang.String
+                # La LLAVE del evento es la orden: Kafka manda a la misma partición todo lo que tiene la misma llave,
+                # y dentro de una partición el orden se respeta. Los momentos de la 4001 se leen en el orden en que se
+                # publicaron, y siempre los lee la misma copia de cada canal.
+                - setHeader:
+                    name: CamelKafkaKey
+                    expression:
+                      simple:
+                        expression: "${variable.orden}"
+                - doTry:
+                    steps:
+                      - to:
+                          uri: kafka:ordenes
+                          parameters:
+                            brokers: kafka:9092
+                            # Si Kafka no contesta, no se espera un minuto (lo de omisión): a los 5 s se da por no
+                            # publicado
+                            maxBlockMs: 5000
+                            requestTimeoutMs: 4000
+                            deliveryTimeoutMs: 5000
+                      - setVariable:
+                          name: publicado
+                          expression:
+                            constant:
+                              expression: "true"
+                      - log:
+                          message: "Publiqué en Kafka la orden ${variable.orden} momento ${variable.momento} para ${variable.salida[canales]} correlacion=${variable.correlacion}"
+                    doCatch:
+                      # Kafka no recibió el evento: no salió. Los intentos quedan «no_enviado» y las operaciones
+                      # vuelven a «pendiente»: no le pasó nada en ningún destino.
+                      - exception:
+                          - java.lang.Exception
+                        steps:
+                          - setVariable:
+                              name: motivo_falla
+                              expression:
+                                simple:
+                                  expression: "${exception.class.simpleName}: ${exception.message}"
+                          - to:
+                              uri: >-
+                                sql:UPDATE intento SET desenlace = 'no_enviado', fin = now(),
+                                respuesta = jsonb_build_object('codigo', -1, 'cuerpo', CAST(:#${variable.motivo_falla} AS text))
+                                WHERE CAST(id AS text) = ANY(string_to_array(:#${variable.salida[intentos]}, ','))
+                              parameters:
+                                dataSource: "#estado"
+                          - to:
+                              uri: >-
+                                sql:UPDATE operacion SET estado = 'pendiente'
+                                WHERE id IN (SELECT operacion FROM intento
+                                             WHERE CAST(id AS text) = ANY(string_to_array(:#${variable.salida[intentos]}, ',')))
+                                  AND estado = 'enviada'
+                              parameters:
+                                dataSource: "#estado"
+                          - log:
+                              loggingLevel: WARN
+                              message: "Kafka no recibió la orden ${variable.orden} momento ${variable.momento}: no salió y queda pendiente (${variable.motivo_falla})"

@@ -1,0 +1,214 @@
+# El puente con Kafka (desde la lección 28). int-rest ya no recibe del router por HTTP: lee el tópico «ordenes»,
+# toma lo que le toca a su canal (rest) y se lo entrega a su propia ruta de siempre (/integrar, /embarque o
+# /entrega, en este mismo servicio). Lo que hace el canal con la API de pedidos no cambió: solo cómo le llega.
+#
+#   [tópico ordenes] ──grupo int-rest──→ este puente ──HTTP local──→ /integrar · /embarque · /entrega ──→ la API de pedidos
+#                                              │
+#                                              └──→ [tópico desenlaces] ──→ router (anota cómo le fue)
+#
+# El GRUPO es lo que importa aquí. Kafka le da cada evento a UNA copia de cada grupo:
+#   - un grupo por integración (int-rest, int-bd, int-edi): cada integración recibe TODOS los eventos, y lleva su
+#     propia cuenta de hasta dónde leyó. Si int-rest se detiene, los otros grupos siguen; al volver, int-rest
+#     sigue desde donde se quedó;
+#   - las copias de una misma integración (int-bd corre en 3) comparten el grupo: se reparten las particiones, y
+#     cada evento lo atiende una sola de ellas.
+- route:
+    id: int-rest-kafka
+    from:
+      uri: kafka:ordenes
+      parameters:
+        brokers: kafka:9092
+        # Esta es TU parte de la lección (2 de 2). Tal como viene, las TRES integraciones leen con el mismo
+        # grupo, «integraciones»: Kafka trata a int-rest, int-bd e int-edi como copias de una sola cosa y le da
+        # cada evento a UNA de ellas. El evento de la 4001 lo lee, digamos, int-bd, y la API y el socio nunca se
+        # enteran.
+        # TODO 2: dale a esta integración su PROPIO grupo (int-rest), y lo mismo en los kafka.camel.yaml de los otros
+        #         dos canales. Las copias de int-bd sí comparten el suyo: entre ellas se reparten las particiones.
+        groupId: integraciones
+        # Un grupo nuevo empieza por lo más viejo del tópico, no por lo que llegue de aquí en adelante
+        autoOffsetReset: earliest
+        # Si una copia muere sin despedirse, a los 10 s el grupo la da por muerta y reparte su partición (por
+        # omisión, 45 s)
+        sessionTimeoutMs: 10000
+        # Los encabezados de Kafka son bytes; así llegan como texto
+        headerDeserializer: "#class:org.apache.camel.component.kafka.serde.ToStringKafkaHeaderDeserializer"
+      steps:
+        # El router pone en el evento la operación y el intento de cada canal al que le toca. Si no trae los de
+        # «rest», este evento no es para int-rest: se deja pasar.
+        - filter:
+            expression:
+              simple:
+                expression: "${header.operacion-rest} != null"
+            steps:
+              - to:
+                  uri: direct:int-rest-entregar
+
+- route:
+    id: int-rest-entregar
+    from:
+      uri: direct:int-rest-entregar
+      steps:
+        # Lo que hace falta del evento, ANTES de limpiar encabezados
+        - setVariable:
+            name: operacion
+            expression:
+              simple:
+                expression: "${header.operacion-rest}"
+        - setVariable:
+            name: intento
+            expression:
+              simple:
+                expression: "${header.intento-rest}"
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce_subject}"
+        - setVariable:
+            name: tipo
+            expression:
+              simple:
+                expression: "${header.ce_type}"
+        - setVariable:
+            name: fuente
+            expression:
+              simple:
+                expression: "${header.ce_source}"
+        - setVariable:
+            name: id
+            expression:
+              simple:
+                expression: "${header.ce_id}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce_correlationid}"
+        # En qué paso de este servicio entra el momento: creada → /integrar, embarcada → /embarque, entregada → /entrega
+        - setVariable:
+            name: momento
+            expression:
+              simple:
+                expression: "${variable.tipo.replace('mx.tienda.orden.', '')}"
+        - setVariable:
+            name: paso
+            expression:
+              simple:
+                expression: "${variable.momento == 'creada' ? 'integrar' : ${variable.momento} == 'embarcada' ? 'embarque' : 'entrega'}"
+        - log:
+            message: "Leí de Kafka la orden ${variable.orden} (${variable.tipo}), intento ${variable.intento} correlacion=${variable.correlacion}"
+        # El sobre de siempre, en HTTP: en Kafka se escribe ce_id; en HTTP, ce-id
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: ce-specversion
+            expression:
+              constant:
+                expression: "1.0"
+        - setHeader:
+            name: ce-type
+            expression:
+              simple:
+                expression: "${variable.tipo}"
+        - setHeader:
+            name: ce-source
+            expression:
+              simple:
+                expression: "${variable.fuente}"
+        - setHeader:
+            name: ce-subject
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: ce-id
+            expression:
+              simple:
+                expression: "${variable.id}"
+        - setHeader:
+            name: ce-correlationid
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # La entrega a la ruta de siempre de este servicio. Si no contesta, el código queda en 0: «no se sabe».
+        - setVariable:
+            name: codigo
+            expression:
+              constant:
+                expression: "0"
+        - setVariable:
+            name: version
+            expression:
+              constant:
+                expression: ""
+        - doTry:
+            steps:
+              - toD:
+                  uri: "http://localhost:8080/${variable.paso}"
+                  parameters:
+                    httpMethod: POST
+                    throwExceptionOnFailure: false
+              - setVariable:
+                  name: codigo
+                  expression:
+                    simple:
+                      expression: "${header.CamelHttpResponseCode}"
+              - setVariable:
+                  name: version
+                  expression:
+                    simple:
+                      expression: "${header.X-Version-Mapeo}"
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: "${exception.class.simpleName}: ${exception.message}"
+        # El desenlace, al tópico «desenlaces»: lo lee el router, que es el único que escribe en la base de estado.
+        # Con la orden como llave, igual que el evento.
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: CamelKafkaKey
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: operacion
+            expression:
+              simple:
+                expression: "${variable.operacion}"
+        - setHeader:
+            name: intento
+            expression:
+              simple:
+                expression: "${variable.intento}"
+        - setHeader:
+            name: canal
+            expression:
+              constant:
+                expression: rest
+        - setHeader:
+            name: codigo
+            expression:
+              simple:
+                expression: "${variable.codigo}"
+                resultType: java.lang.String
+        - setHeader:
+            name: version
+            expression:
+              simple:
+                expression: "${variable.version}"
+        - to:
+            uri: kafka:desenlaces
+            parameters:
+              brokers: kafka:9092
+        - log:
+            message: "Orden ${variable.orden} (${variable.tipo}): int-rest contestó ${variable.codigo}; se lo dejé al router en desenlaces correlacion=${variable.correlacion}"

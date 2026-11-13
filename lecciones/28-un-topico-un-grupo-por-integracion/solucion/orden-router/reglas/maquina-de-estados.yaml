@@ -1,0 +1,37 @@
+# La máquina de estados de la orden: qué momento necesita a cuál, en cada canal.
+#
+#   creada ──→ embarcada ──→ entregada
+#
+# Se lee así: en el canal «rest», el momento «entregada» necesita que «embarcada» ya esté ACEPTADA en ese mismo
+# canal. Un momento que no aparece aquí no necesita nada antes (la orden creada es el primero).
+# El router la lee cada vez que decide (direct:decidir), así que un cambio aquí vale para lo siguiente que llegue.
+#
+# Es por canal porque cada destino lleva su propio orden: que la API ya tenga el embarque no dice nada del ERP.
+canales:
+  rest:
+    embarcada: creada
+    entregada: embarcada
+  bd:
+    embarcada: creada
+    entregada: embarcada
+  edi:
+    embarcada: creada
+    entregada: embarcada
+momentos: [creada, embarcada, entregada]
+
+# Qué espera cada canal para dar un momento por terminado (lección 25), y cuánto se le espera antes de avisar.
+# Un momento de la orden queda COMPLETO cuando cada canal que le toca llegó a uno de los estados de «llega_a».
+# Un canal que pasa su plazo sin llegar se avisa (tabla alerta, y el log) y el momento SIGUE ABIERTO: si lo que
+# faltaba llega tarde, se completa entonces.
+#   - La API y el ERP contestan al momento: con su «aceptada» basta.
+#   - El socio acepta el archivo al depositarlo, pero lo que cuenta es su 997 (lección 21): «confirmada».
+completa:
+  rest:
+    llega_a: [aceptada]
+    plazo_s: 10
+  bd:
+    llega_a: [aceptada]
+    plazo_s: 10
+  edi:
+    llega_a: [confirmada]
+    plazo_s: 20

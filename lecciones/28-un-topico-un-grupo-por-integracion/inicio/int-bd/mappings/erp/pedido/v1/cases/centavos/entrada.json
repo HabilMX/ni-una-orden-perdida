@@ -1,0 +1,11 @@
+{
+  "orden": "1003",
+  "tienda": "T-022",
+  "cliente": { "nombre": "Cliente de ejemplo", "correo": "cliente3@example.com" },
+  "creada": "2026-11-12T12:40:00-06:00",
+  "renglones": [
+    { "renglon": 1, "sku": "SKU-0100", "descripcion": "Clip", "cantidad": 3, "precio": 0.10 },
+    { "renglon": 2, "sku": "SKU-0101", "descripcion": "Liga", "cantidad": 7, "precio": 0.70 },
+    { "renglon": 3, "sku": "SKU-0102", "descripcion": "Libreta", "cantidad": 1, "precio": 19.99 }
+  ]
+}

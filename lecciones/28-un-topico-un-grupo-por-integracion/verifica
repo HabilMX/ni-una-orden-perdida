@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Comprueba la lección 28: el router publica cada momento en Kafka y cada integración lo lee con su propio grupo.
+#   1. La 4001 llega a sus tres canales por Kafka (con todo arriba).
+#   2. Se detiene int-edi y llegan la 4002 y la 4003. La API y el ERP las reciben igual; el socio no, y Kafka le
+#      guarda a int-edi lo que le toca (su grupo va atrasado: se mide en el broker, con sus offsets).
+#   3. int-edi vuelve y se pone al día SOLO: sus dos 850 aparecen en el SFTP, una vez cada uno, y el router no
+#      reenvió nada (un solo intento por operación). Al final, los tres grupos están al día.
+#   4. Cada evento del tópico «ordenes» lleva la orden como llave.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba, y Kafka.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" --profile kafka "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+KAFKA() { INFRA exec -T kafka "$@" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+DATOS="$RAIZ/datos"
+# Cuántos eventos del tópico «ordenes» le faltan por leer a un grupo: lo dice el broker, con los offsets del grupo
+ATRASO() { KAFKA /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group "$1" \
+  | awk '$2=="ordenes" && $6 ~ /^[0-9]+$/ {s+=$6; n++} END {print (n ? s : -1)}'; }
+# Cuántas operaciones de un canal, de unas órdenes, ya llegaron a su destino
+LLEGARON() { EST "SELECT COUNT(*) FROM operacion WHERE canal='$1' AND momento='creada' AND orden IN ($2) AND estado IN ('aceptada','confirmada')"; }
+esperar() { for i in $(seq 1 "$4"); do [ "$(LLEGARON "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+
+# Todo empieza limpio: los destinos, la base de estado y Kafka (se recrea vacío: sin tópicos ni grupos)
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+INFRA up -d --wait --force-recreate kafka >/dev/null 2>&1 \
+  || { no "Kafka no levantó. Pruébalo a mano: docker compose -f infra/compose.yaml --profile kafka up -d --wait"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname IN ('completitud','alerta','payload','numero_control_seq')")" = "4" ] \
+  || { no "A la base de estado le faltan tablas de lecciones anteriores. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+trap '[ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+EST "DROP VIEW IF EXISTS recorrido" >/dev/null; EST "TRUNCATE acuse, conflicto, intento, payload, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="barrido-http|barrido|desenlaces|sondeo-acuses|correlacionar-acuse|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|decidir|webhook-paqueteria|vigilar|juntar|vencidos|reintentar|repartir|publicar|crear-recorrido|recorrido-http|recibir-momento|contestar-reconocido|reconocer|rerun|int-rest|int-rest-embarque|int-rest-entrega|int-rest-kafka|int-rest-entregar|int-bd|int-bd-embarque|int-bd-entrega|int-bd-kafka|int-bd-entregar|int-edi|int-edi-embarque|int-edi-entrega|int-edi-kafka|int-edi-entregar|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 54 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 54 ] && si "Arrancaron el router (que publica en Kafka), los tres canales con su puente y el sondeo" \
+  || { no "No arrancaron todas las rutas ($(LISTOS) de 54). Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# 1. La 4001, con todo arriba
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
+for i in $(seq 1 60); do
+  [ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden='4001' AND estado IN ('aceptada','confirmada')")" = "3" ] && break; sleep 1
+done
+if [ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden='4001' AND estado IN ('aceptada','confirmada')")" = "3" ]; then
+  si "La 4001 llegó por Kafka a sus tres canales: la API, el ERP y el socio"
+else
+  no "La 4001 no llegó a sus tres canales; así quedó cada uno: $(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001'"). Si un canal se quedó «enviada», ningún consumidor de SU grupo leyó el evento: ¿cada integración lee con su propio grupo?"
+fi
+
+# 2. int-edi detenido: los otros dos siguen
+SERV stop int-edi >/dev/null 2>&1
+for o in 4002 4003; do
+  curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-$o.json"
+done
+esperar rest "'4002','4003'" 2 40; esperar bd "'4002','4003'" 2 20
+REST=$(LLEGARON rest "'4002','4003'"); BD=$(LLEGARON bd "'4002','4003'")
+EN_API=0; for o in 4002 4003; do curl -s -o /dev/null -w '%{http_code}' "localhost:8081/pedidos/$o" | hay -x 200 && EN_API=$((EN_API+1)); done
+EN_ERP=$(SQL "SELECT COUNT(*) FROM pedido_cabecera WHERE pedido IN ('4002','4003') AND estatus='REGISTRADO'")
+[ "$REST" = "2" ] && [ "$BD" = "2" ] && [ "$EN_API" = "2" ] && [ "${EN_ERP:-0}" = "2" ] \
+  && si "Con int-edi detenido, la API y el ERP recibieron la 4002 y la 4003 (API $EN_API de 2, ERP $EN_ERP de 2)" \
+  || no "Con int-edi detenido, la API y el ERP debían seguir: API $EN_API de 2, ERP ${EN_ERP:-0} de 2 (en la base: rest $REST, bd $BD)"
+N850=$(SOCIO 'ls /home/socio/entrada/' | grep -cE '^850-400[23]\.edi$')
+ATRAS=$(ATRASO int-edi)
+[ "$N850" = "0" ] && [ "$ATRAS" -ge 2 ] \
+  && si "El socio todavía no tiene sus 850, y Kafka se los guarda: el grupo int-edi va $ATRAS eventos atrás" \
+  || no "Con int-edi detenido esperaba 0 archivos 850 en el socio y su grupo atrasado (≥ 2): hay $N850 archivos y el grupo int-edi va $ATRAS atrás (-1: el grupo no existe)"
+
+# 3. int-edi vuelve, y se pone al día sin que nadie le reenvíe
+SERV start int-edi >/dev/null 2>&1
+esperar edi "'4002','4003'" 2 90
+EDI=$(LLEGARON edi "'4002','4003'")
+N850=$(SOCIO 'ls /home/socio/entrada/' | grep -cE '^850-400[23]\.edi$')
+INTENTOS=$(EST "SELECT COUNT(*) FROM intento i JOIN operacion p ON p.id = i.operacion WHERE p.canal='edi' AND p.orden IN ('4002','4003')")
+[ "$EDI" = "2" ] && [ "$N850" = "2" ] && [ "$INTENTOS" = "2" ] \
+  && si "int-edi volvió y se puso al día solo: 2 archivos 850 en el socio, y el router no reenvió nada (2 intentos para 2 operaciones)" \
+  || no "Al volver int-edi esperaba 2 operaciones aceptadas, 2 archivos 850 y 2 intentos: hay $EDI aceptadas, $N850 archivos y $INTENTOS intentos"
+for i in $(seq 1 30); do
+  A_REST=$(ATRASO int-rest); A_BD=$(ATRASO int-bd); A_EDI=$(ATRASO int-edi)
+  [ "$A_REST" = "0" ] && [ "$A_BD" = "0" ] && [ "$A_EDI" = "0" ] && break; sleep 1
+done
+[ "$A_REST" = "0" ] && [ "$A_BD" = "0" ] && [ "$A_EDI" = "0" ] \
+  && si "Los tres grupos (int-rest, int-bd, int-edi) quedaron al día: 0 eventos por leer" \
+  || no "Los grupos no quedaron al día: int-rest $A_REST, int-bd $A_BD, int-edi $A_EDI eventos por leer (-1: el grupo no existe)"
+
+# 4. La llave de cada evento es su orden. Se lee el tópico entero, desde el principio, con un lector aparte.
+EVENTOS=$(KAFKA /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ordenes \
+  --from-beginning --timeout-ms 8000 --formatter-property print.key=true --formatter-property print.headers=true \
+  --formatter-property key.separator='|' --formatter-property headers.separator=';')
+TOTAL=$(printf '%s\n' "$EVENTOS" | grep -c 'ce_subject:')
+BIEN=$(printf '%s\n' "$EVENTOS" | awk -F'|' '{ k=$2; if (match($1, /ce_subject:[^;]*/)) { s=substr($1, RSTART+11, RLENGTH-11); if (s==k) n++ } } END {print n+0}')
+[ "$TOTAL" -ge 3 ] && [ "$BIEN" = "$TOTAL" ] \
+  && si "Los $TOTAL eventos del tópico ordenes llevan la orden como llave" \
+  || no "De $TOTAL eventos del tópico ordenes, $BIEN llevan la orden como llave (encabezado CamelKafkaKey)"
+apagar
+exit $ok

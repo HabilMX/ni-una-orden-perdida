@@ -1,0 +1,35 @@
+/* La orden de la tienda, convertida en los datos de un X12 850 (orden de compra) para el socio.
+   El MAPEO CALCULA todo: rellenos de ancho fijo, fechas en el formato del X12, precios con dos decimales,
+   la cuenta de segmentos y el texto limpio. La PLANTILLA solo acomoda (ver templates/edi/850/v1).
+   Separadores de la práctica: * entre elementos, ~ al final del segmento, > dentro de un elemento.
+   Por eso ninguno de esos tres caracteres puede ir dentro de un dato: se cambian por un espacio. */
+(
+  $limpiar := function($t) { $replace($t, /[*~>]/, " ") };
+  $emisor := "TIENDANORTE";
+  $receptor := "SOCIO01";
+  $control := $pad(orden, -9, "0");          /* 1001 → 000001001: el ISA pide 9 dígitos */
+  $aaaammdd := $replace($substring(creada, 0, 10), "-", "");
+  $hhmm := $replace($substring(creada, 11, 5), ":", "");
+  {
+    "isa": {
+      "emisor": $pad($emisor, 15),            /* ancho fijo: 15 caracteres, rellenos con espacios */
+      "receptor": $pad($receptor, 15),
+      "fecha": $substring($aaaammdd, 2),      /* AAMMDD */
+      "hora": $hhmm,
+      "control": $control
+    },
+    "gs": { "emisor": $emisor, "receptor": $receptor, "fecha": $aaaammdd, "hora": $hhmm, "control": orden },
+    "st": { "control": "0001" },
+    "beg": { "orden": orden, "fecha": $aaaammdd },
+    "tienda": { "nombre": $limpiar("Tienda " & tienda), "clave": tienda },
+    "lineas": [renglones.{
+      "n": renglon,
+      "cantidad": cantidad,
+      "precio": $formatNumber(precio, "0.00"),
+      "sku": $limpiar(sku),
+      "descripcion": $limpiar(descripcion)
+    }],
+    "ctt": $count(renglones),
+    "se": { "segmentos": 3 + 2 * $count(renglones) + 2 }   /* ST, BEG, N1 + (PO1, PID) por renglón + CTT, SE */
+  }
+)
