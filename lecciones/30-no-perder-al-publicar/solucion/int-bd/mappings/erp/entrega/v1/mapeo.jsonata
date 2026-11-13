@@ -1,0 +1,7 @@
+/* El aviso de entrega, convertido en los datos que pide el procedimiento registrar_entrega del ERP.
+   La fecha va sin zona horaria porque la columna del ERP es DATETIME. */
+{
+  "pedido": orden,
+  "guia": guia,
+  "fecha": $replace($substring(entregada, 0, 19), "T", " ")
+}

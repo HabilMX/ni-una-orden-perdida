@@ -42,3 +42,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 31 | [El rastro se guarda con los datos personales tapados; al destino sale completo](31-el-rastro-se-guarda-tapado.md) | 27 en adelante |
 | 32 | [Un evento por momento en un tópico, con la orden como llave, y un grupo por integración](32-un-topico-un-grupo-por-integracion.md) | 28 en adelante |
 | 33 | [El offset se confirma a mano, después de dejar el desenlace, y lo que falla se vuelve a leer](33-el-offset-se-confirma-despues-del-desenlace.md) | 29 en adelante |
+| 34 | [Lo que hay que publicar se guarda en la misma transacción (outbox), y un sondeo lo publica](34-el-outbox-publica-lo-guardado.md) | 30 |

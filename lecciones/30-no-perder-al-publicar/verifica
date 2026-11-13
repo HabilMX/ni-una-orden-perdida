@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Comprueba la lección 30: lo que el router guardó sale a Kafka aunque Kafka estuviera caído al guardarlo (outbox).
+#   1. La 4001 llega a sus tres canales (con todo arriba).
+#   2. Se cae Kafka y llegan la 4002 y la 4003. El router las guarda y contesta 202, y en la MISMA transacción deja en
+#      el outbox lo que hay que publicar: 3 filas por orden, pendientes. A los destinos no llega nada (control).
+#   3. Kafka vuelve. Lo guardado sale solo: la API, el ERP y el socio reciben las dos, cada una una sola vez, y el
+#      outbox queda sin pendientes.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba, y Kafka.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" --profile kafka "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; INFRA up -d --wait kafka >/dev/null 2>&1; }
+DATOS="$RAIZ/datos"
+EN_API() { n=0; for o in "$@"; do [ "$(curl -s -o /dev/null -w '%{http_code}' "localhost:8081/pedidos/$o")" = "200" ] && n=$((n+1)); done; echo $n; }
+LLEGARON() { EST "SELECT COUNT(*) FROM operacion WHERE momento='creada' AND orden IN ($1) AND estado IN ('aceptada','confirmada')"; }
+
+# Todo empieza limpio: los destinos, la base de estado y Kafka (se recrea vacío: sin tópicos ni grupos)
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+INFRA up -d --wait --force-recreate kafka >/dev/null 2>&1 \
+  || { no "Kafka no levantó. Pruébalo a mano: docker compose -f infra/compose.yaml --profile kafka up -d --wait"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname IN ('completitud','alerta','payload','numero_control_seq','outbox')")" = "5" ] \
+  || { no "A la base de estado le falta la tabla outbox (lección 30) o alguna anterior. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+trap '[ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+EST "DROP VIEW IF EXISTS recorrido" >/dev/null; EST "TRUNCATE acuse, conflicto, intento, payload, outbox, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+SERV down >/dev/null 2>&1
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="barrido-http|barrido|desenlaces|anotar-desenlace|sondeo-acuses|correlacionar-acuse|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|decidir|webhook-paqueteria|vigilar|juntar|vencidos|reintentar|repartir|sondeo-outbox|publicar|crear-recorrido|recorrido-http|recibir-momento|contestar-reconocido|reconocer|rerun|int-rest|int-rest-embarque|int-rest-entrega|int-rest-kafka|int-rest-entregar|int-bd|int-bd-embarque|int-bd-entrega|int-bd-kafka|int-bd-entregar|int-edi|int-edi-embarque|int-edi-entrega|int-edi-kafka|int-edi-entregar|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 55 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 55 ] && si "Arrancaron el router, los tres canales con su puente y el sondeo" \
+  || { no "No arrancaron todas las rutas ($(LISTOS) de 55). Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# 1. La 4001, con todo arriba
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
+for i in $(seq 1 60); do [ "$(LLEGARON "'4001'")" = "3" ] && break; sleep 1; done
+[ "$(LLEGARON "'4001'")" = "3" ] && si "La 4001 llegó a sus tres canales" \
+  || { no "La 4001 no llegó a sus tres canales: $(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001'")"; apagar; exit 1; }
+
+# 2. Se cae Kafka, y llegan dos órdenes
+INFRA stop kafka >/dev/null 2>&1
+T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+C2=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4002.json")
+C3=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4003.json")
+[ "$C2" = "202" ] && [ "$C3" = "202" ] && [ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden IN ('4002','4003')")" = "6" ] \
+  && si "Con Kafka caído, el router guardó la 4002 y la 4003 y contestó 202 a las dos" \
+  || no "Con Kafka caído, el router debía guardar y contestar 202: contestó $C2 y $C3, y guardó $(EST "SELECT COUNT(*) FROM operacion WHERE orden IN ('4002','4003')") de 6 operaciones"
+sleep 3
+PEND=$(EST "SELECT COUNT(*) FROM outbox x JOIN operacion p ON p.id = x.operacion WHERE p.orden IN ('4002','4003') AND x.publicado IS NULL")
+[ "$PEND" = "6" ] \
+  && si "En el outbox esperan 6 filas sin publicar, una por operación de la 4002 y la 4003" \
+  || no "En el outbox esperaba 6 filas sin publicar de la 4002 y la 4003 y hay ${PEND:-0}: ¿la orden deja su fila en el outbox en la misma transacción en que se guarda?"
+sleep 8                            # Kafka sigue caído: el sondeo lo intenta y no puede
+A=$(EN_API 4002 4003)
+[ "$A" = "0" ] && si "Control: mientras Kafka está caído, la API no tiene ninguna de las dos" \
+  || no "Control: con Kafka caído la API ya tiene $A de 2: esta prueba no está viendo lo que cree"
+
+# 3. Vuelve Kafka: lo guardado sale solo
+INFRA up -d --wait kafka >/dev/null 2>&1 || { no "Kafka no volvió a levantar"; apagar; exit 1; }
+for i in $(seq 1 120); do [ "$(LLEGARON "'4002','4003'")" = "6" ] && break; sleep 1; done
+A=$(EN_API 4002 4003)
+E=$(SQL "SELECT COUNT(*) FROM pedido_cabecera WHERE pedido IN ('4002','4003') AND estatus='REGISTRADO'")
+N850=$(SOCIO 'ls /home/socio/entrada/' | grep -cE '^850-400[23]\.edi$')
+[ "$(LLEGARON "'4002','4003'")" = "6" ] && [ "$A" = "2" ] && [ "${E:-0}" = "2" ] && [ "$N850" = "2" ] \
+  && si "Kafka volvió y lo guardado salió solo: la API, el ERP y el socio tienen la 4002 y la 4003" \
+  || no "Kafka volvió y lo guardado no salió: la API tiene $A de 2, el ERP ${E:-0} de 2 y el socio $N850 de 2 archivos 850 (en la base, $(LLEGARON "'4002','4003'") de 6 operaciones llegaron; $(EST "SELECT string_agg(orden || ' ' || canal || '=' || estado, ', ' ORDER BY orden, canal) FROM operacion WHERE orden IN ('4002','4003') AND estado NOT IN ('aceptada','confirmada')"))"
+LOG_API=$(INFRA logs --since "$T0" api-pedidos 2>/dev/null)
+C=0; for o in 4002 4003; do C=$((C + $(printf '%s\n' "$LOG_API" | grep -c "201 llave=$o "))); done
+[ "$C" = "2" ] && si "En la API se creó cada una UNA vez (2 creaciones para 2 órdenes)" \
+  || no "En la API hubo $C creaciones para 2 órdenes"
+PEND=$(EST "SELECT COUNT(*) FROM outbox WHERE publicado IS NULL")
+[ "$PEND" = "0" ] && [ "$(EST "SELECT COUNT(*) FROM outbox")" -ge 9 ] \
+  && si "El outbox quedó sin pendientes: todo lo que se guardó, salió" \
+  || no "El outbox tiene ${PEND:-?} filas sin publicar (y $(EST "SELECT COUNT(*) FROM outbox") en total, esperaba al menos 9)"
+apagar
+exit $ok

@@ -1,0 +1,57 @@
+# Seguir una orden (lección 26): qué le pasó, canal por canal, intento por intento, con lo que salió en cada uno.
+#
+#   GET /ordenes/4006/recorrido  →  [{"momento":"creada","canal":"rest","n":1,"desenlace":"no_se_sabe",…},
+#                                    {"momento":"creada","canal":"rest","n":2,"tipo":"manual",…}, …]
+#
+# El recorrido es una VISTA de la base de estado (recorrido.sql, junto a este archivo): la arma el router al arrancar,
+# con lo que ya guarda desde la 15 (operacion, intento), la 21 (acuse), la 25 (completitud, alerta) y la 26 (payload).
+# Se busca por la llave de negocio, el número de orden: es lo que trae quien pregunta («¿qué pasó con la 4006?»).
+# No se lee del log: el log recorta los cuerpos grandes y se va con el contenedor; la base no.
+
+# Al arrancar: se declara la vista con lo que diga recorrido.sql (si cambias el archivo, reinicia el router)
+- route:
+    id: crear-recorrido
+    from:
+      uri: timer:crear-recorrido
+      parameters:
+        repeatCount: 1
+      steps:
+        - to:
+            uri: language:constant:resource:file:recorrido.sql
+            parameters:
+              contentCache: false
+        - to:
+            uri: sql:SELECT 1
+            parameters:
+              dataSource: "#estado"
+              useMessageBodyForSql: true
+        - log:
+            message: "Declaré la vista recorrido (recorrido.sql)"
+
+- route:
+    id: recorrido-http
+    from:
+      uri: platform-http:/ordenes/{orden}/recorrido
+      parameters:
+        httpMethodRestrict: GET
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.orden}"
+        # El JSON lo arma la base (json_agg), en el orden en que pasaron las cosas: momento, canal, intento
+        - to:
+            uri: >-
+              sql:SELECT COALESCE(CAST(json_agg(r ORDER BY CASE r.momento WHEN 'creada' THEN 1 WHEN 'embarcada' THEN 2 ELSE 3 END, r.canal, r.n) AS text), '[]')
+              FROM recorrido r WHERE r.orden = :#${variable.orden}
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json

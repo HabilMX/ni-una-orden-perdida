@@ -1,0 +1,181 @@
+# El router: el estado vive fuera del proceso (lección 15). Desde la 16 recibe también a la paquetería
+# (paqueteria.camel.yaml), y desde la 17 estaciona lo que llega antes de tiempo y lo suelta con el barrido
+# (barrido.camel.yaml). Desde la 18 reconoce un aviso repetido y uno en conflicto (reconocer.camel.yaml), y desde
+# la 21 lee los acuses 997 del socio (acuses.camel.yaml). Desde la 23 una persona puede reprocesar a mano lo que
+# falló, con POST /rerun (rerun.camel.yaml). Desde la 28 los canales ya no reciben por HTTP: el router publica cada
+# momento en Kafka (reparto.camel.yaml) y lee lo que contestaron (desenlaces.camel.yaml).
+#
+#   tienda → POST /ordenes   ─┐                                          ┌→ int-rest → API de pedidos
+#   bodega → POST /embarques ─┤→ [router] → GUARDA → 202                 │
+#   paquetería → webhook     ─┘                                          │
+#                         outbox ─→ sondeo → [tópico ordenes] ─┼→ int-bd   → ERP
+#                                                                        └→ int-edi  → SFTP del socio (franquicias)
+#                     [router] ← [tópico desenlaces] ← lo que contestó cada canal
+#
+# Hasta la 14, el router contestaba cuando los tres canales terminaban, y lo que sabía de cada orden vivía en su
+# memoria: si se caía a la mitad, se perdía. Desde aquí, al llegar un momento de la orden el router:
+#   1. lo GUARDA en la base de estado (PostgreSQL): la orden y una operación por canal, en «pendiente», y desde la 30
+#      lo que hay que publicar (outbox), todo en la misma transacción;
+#   2. contesta 202 «recibida» en cuanto guardó. Quien mandó ya puede irse: lo suyo no se pierde;
+#   3. publica DESPUÉS: el sondeo del outbox lo deja en Kafka cuando Kafka lo recibe. Ver reparto.camel.yaml.
+# Lo que se guarda y cómo está en estado.camel.yaml. El router es el ÚNICO que escribe en esa base.
+
+# La orden nueva: la manda la tienda
+- route:
+    id: orden-router
+    from:
+      uri: platform-http:/ordenes
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # Lo que llegó, como texto: así se guarda tal cual en la base (y no como un flujo que solo se lee una vez)
+        - convertBodyTo:
+            type: String
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: tienda
+            expression:
+              jsonpath:
+                expression: "$.tienda"
+        - setVariable:
+            name: momento
+            expression:
+              constant:
+                expression: creada
+        - to:
+            uri: direct:hilo
+        # Qué canales le tocan (la regla «quién es socio», en un solo lugar) y guardarla
+        - to:
+            uri: direct:canales
+        - to:
+            uri: direct:guardar-orden
+        - log:
+            message: "Orden ${variable.orden} correlacion=${variable.correlacion}: guardada con sus canales ${variable.canales}; le contesto a la tienda y reparto después"
+        - to:
+            uri: direct:contestar-y-repartir
+
+# La orden embarcada: la manda el sondeo de la bodega
+- route:
+    id: embarque-router
+    from:
+      uri: platform-http:/embarques
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # Lo que llegó, como texto: así se guarda tal cual en la base (y no como un flujo que solo se lee una vez)
+        - convertBodyTo:
+            type: String
+        - setVariable:
+            name: orden
+            expression:
+              jsonpath:
+                expression: "$.orden"
+        - setVariable:
+            name: momento
+            expression:
+              constant:
+                expression: embarcada
+        - to:
+            uri: direct:hilo
+        # La tienda de la orden ya está guardada: se lee de la base, no del archivo de la bodega
+        - to:
+            uri: direct:cargar-orden
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.tienda} == null"
+                steps:
+                  - to:
+                      uri: direct:no-existe
+            otherwise:
+              steps:
+                - to:
+                    uri: direct:canales
+                # ¿Es nuevo, un repetido o un conflicto? Lo decide reconocer.camel.yaml (lección 18)
+                - to:
+                    uri: direct:recibir-momento
+
+# El hilo de correlación: el que mandaron en X-Correlation-Id o, si no vino, uno nuevo
+- route:
+    id: hilo
+    from:
+      uri: direct:hilo
+      steps:
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${header.X-Correlation-Id} != null"
+                steps:
+                  - setVariable:
+                      name: correlacion
+                      expression:
+                        simple:
+                          expression: "${header.X-Correlation-Id}"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: correlacion
+                    expression:
+                      simple:
+                        expression: "${uuid(random)}"
+
+# Ya guardado: a quien mandó se le contesta 202 «recibida». Desde la 30 no se encola nada aquí: lo que hay que
+# publicar quedó en el outbox, en la misma transacción que la orden, y lo publica su sondeo (reparto.camel.yaml).
+- route:
+    id: contestar-y-repartir
+    from:
+      uri: direct:contestar-y-repartir
+      steps:
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"orden":"${variable.orden}","momento":"${variable.momento}","resultado":"recibida","canales":"${variable.canales}"}'
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              constant:
+                expression: 202
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+
+# Un momento de una orden que el router no conoce: no se guarda ni se reparte, y se dice
+- route:
+    id: no-existe
+    from:
+      uri: direct:no-existe
+      steps:
+        - log:
+            loggingLevel: WARN
+            message: "Llegó el momento ${variable.momento} de la orden ${variable.orden}, que no conozco: no lo guardo ni lo reparto"
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"orden":"${variable.orden}","momento":"${variable.momento}","resultado":"no existe la orden"}'
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              constant:
+                expression: 404
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json

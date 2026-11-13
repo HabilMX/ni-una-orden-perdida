@@ -1,0 +1,223 @@
+# Los desenlaces (desde la 28): lo que cada canal contestó regresa por el tópico «desenlaces», y solo el router lo lee.
+#
+#   int-rest ─┐
+#   int-bd   ─┼→ [ tópico desenlaces ] ──→ grupo orden-router → router → base de estado
+#   int-edi  ─┘     llave: la orden
+#
+# Así el router sigue siendo la ÚNICA pieza que escribe en la base de estado: los canales no la tocan, solo cuentan
+# cómo les fue. Cada desenlace trae su operación, su intento, el código que contestó el canal, la versión del mapeo y
+# el cuerpo de la respuesta. El desenlace se decide aquí, por la EVIDENCIA, igual que desde la 20:
+#   2xx                         → aceptada
+#   4xx                         → rechazada: el destino dijo que no; repetir da lo mismo, no se reintenta
+#   5xx, 504, sin respuesta (0) → no_se_sabe: se vuelve a publicar con espera creciente (reintentos.camel.yaml)
+#
+# Desde la 29, el router confirma A MANO hasta dónde leyó (su offset), DESPUÉS de anotar el desenlace en la base: si
+# algo falla o se cae a la mitad, el desenlace se vuelve a leer en vez de perderse. Es lo mismo que hacen los puentes de los canales
+# (kafka.camel.yaml de int-rest, int-bd e int-edi). Leerlo dos veces no hace daño: la operación cambia solo si sigue
+# «enviada».
+- route:
+    id: desenlaces
+    from:
+      uri: kafka:desenlaces
+      parameters:
+        brokers: kafka:9092
+        groupId: orden-router
+        # Un grupo nuevo empieza por lo más viejo del tópico, no por lo que llegue de aquí en adelante
+        autoOffsetReset: earliest
+        # Si una copia muere sin despedirse, a los 10 s el grupo la da por muerta (por omisión, 45 s)
+        sessionTimeoutMs: 10000
+        # Los encabezados de Kafka son bytes; así llegan como texto
+        headerDeserializer: "#class:org.apache.camel.component.kafka.serde.ToStringKafkaHeaderDeserializer"
+        # Kafka no confirma solo: se confirma cada desenlace cuando ya quedó en la base
+        autoCommitEnable: false
+        allowManualCommit: true
+        # Si anotar un desenlace falla (la base no contesta), no se sigue con el siguiente: se vuelve a leer
+        breakOnFirstError: true
+      steps:
+        - setVariable:
+            name: confirmar
+            expression:
+              simple:
+                expression: "${header.CamelKafkaManualCommit}"
+        - to:
+            uri: direct:anotar-desenlace
+        - script:
+            expression:
+              simple:
+                expression: "${variable.confirmar.commit()}"
+
+# Anotar un desenlace en la base de estado, y lo que sigue de él (soltar lo estacionado, reintentar o rendirse)
+- route:
+    id: anotar-desenlace
+    from:
+      uri: direct:anotar-desenlace
+      steps:
+        - setVariable:
+            name: operacion
+            expression:
+              simple:
+                expression: "${header.operacion}"
+        - setVariable:
+            name: intento
+            expression:
+              simple:
+                expression: "${header.intento}"
+        - setVariable:
+            name: codigo
+            expression:
+              simple:
+                expression: "${header.codigo}"
+                resultType: java.lang.Integer
+        - setVariable:
+            name: version
+            expression:
+              simple:
+                expression: "${header.version}"
+        - setVariable:
+            name: respuesta
+            expression:
+              simple:
+                expression: "${bodyAs(String)}"
+        # De qué orden, momento y canal es, y qué número de intento fue: de la BASE, no de lo que dice el mensaje.
+        # La espera del siguiente reintento sale de aquí mismo: 1 s, 2 s, 4 s… (con 15 % al azar), como en la 19.
+        - to:
+            uri: >-
+              sql:SELECT p.orden, p.momento, p.canal, p.correlacion, i.n, i.tipo,
+              CAST(1000 * power(2, i.n - 1) * (0.85 %2B random() * 0.3) AS int) AS espera
+              FROM intento i JOIN operacion p ON p.id = i.operacion WHERE i.id = CAST(:#${variable.intento} AS bigint)
+            variableReceive: fila
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.fila} == null"
+                steps:
+                  - log:
+                      loggingLevel: WARN
+                      message: "Llegó un desenlace del intento ${variable.intento}, que no conozco: lo dejo pasar"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: orden
+                    expression:
+                      simple:
+                        expression: "${variable.fila[orden]}"
+                - setVariable:
+                    name: momento
+                    expression:
+                      simple:
+                        expression: "${variable.fila[momento]}"
+                - setVariable:
+                    name: canal
+                    expression:
+                      simple:
+                        expression: "${variable.fila[canal]}"
+                - setVariable:
+                    name: correlacion
+                    expression:
+                      simple:
+                        expression: "${variable.fila[correlacion]}"
+                - choice:
+                    when:
+                      - expression:
+                          simple:
+                            expression: "${variable.codigo} range '200..299'"
+                        steps:
+                          - setVariable:
+                              name: desenlace
+                              expression:
+                                constant:
+                                  expression: aceptada
+                      - expression:
+                          simple:
+                            expression: "${variable.codigo} range '400..499'"
+                        steps:
+                          - setVariable:
+                              name: desenlace
+                              expression:
+                                constant:
+                                  expression: rechazada
+                    otherwise:
+                      steps:
+                        - setVariable:
+                            name: desenlace
+                            expression:
+                              constant:
+                                expression: no_se_sabe
+                - to:
+                    uri: >-
+                      sql:UPDATE intento SET desenlace = :#${variable.desenlace}, version_mapeo = :#${variable.version},
+                      respuesta = jsonb_build_object('codigo', CAST(:#${variable.codigo} AS int), 'cuerpo', CAST(:#${variable.respuesta} AS text)),
+                      fin = now() WHERE id = CAST(:#${variable.intento} AS bigint)
+                    parameters:
+                      dataSource: "#estado"
+                # La operación cambia solo si sigue «enviada»: un desenlace repetido (un canal que leyó dos veces el mismo
+                # evento) o uno viejo no pisa lo que ya se sabe, por ejemplo un 997 que ya la confirmó.
+                - to:
+                    uri: "sql:UPDATE operacion SET estado = :#${variable.desenlace} WHERE id = CAST(:#${variable.operacion} AS bigint) AND estado = 'enviada'"
+                    parameters:
+                      dataSource: "#estado"
+                - setVariable:
+                    name: cambio
+                    expression:
+                      simple:
+                        expression: "${header.CamelSqlUpdateCount}"
+                - log:
+                    message: "Orden ${variable.orden} momento ${variable.momento} canal ${variable.canal}: el canal contestó ${variable.codigo}, queda ${variable.desenlace} correlacion=${variable.correlacion}"
+                - filter:
+                    expression:
+                      simple:
+                        expression: "${variable.cambio} == 1"
+                    steps:
+                      - choice:
+                          when:
+                            # Un canal aceptó un momento: puede que algo estacionado lo estuviera esperando (lección 17)
+                            - expression:
+                                simple:
+                                  expression: "${variable.desenlace} == 'aceptada'"
+                              steps:
+                                - to:
+                                    uri: direct:barrido
+                            - expression:
+                                simple:
+                                  expression: "${variable.desenlace} == 'no_se_sabe'"
+                              steps:
+                                - choice:
+                                    when:
+                                      # Un intento a mano no se repite solo (lección 23): queda a la vista
+                                      - expression:
+                                          simple:
+                                            expression: "${variable.fila[tipo]} == 'manual'"
+                                        steps:
+                                          - to:
+                                              uri: "sql:UPDATE operacion SET estado = 'conciliacion_pendiente' WHERE id = CAST(:#${variable.operacion} AS bigint)"
+                                              parameters:
+                                                dataSource: "#estado"
+                                      # Seis intentos sin saber: se agotó (lección 20). Alguien tiene que ir a ver al destino.
+                                      - expression:
+                                          simple:
+                                            expression: "${variable.fila[n]} >= 6"
+                                        steps:
+                                          - to:
+                                              uri: "sql:UPDATE operacion SET estado = 'conciliacion_pendiente' WHERE id = CAST(:#${variable.operacion} AS bigint)"
+                                              parameters:
+                                                dataSource: "#estado"
+                                          - log:
+                                              loggingLevel: WARN
+                                              message: "Agoté los reintentos: orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} queda en conciliacion_pendiente (no se sabe si llegó)"
+                                    otherwise:
+                                      steps:
+                                        - setVariable:
+                                            name: espera
+                                            expression:
+                                              simple:
+                                                expression: "${variable.fila[espera]}"
+                                        - log:
+                                            loggingLevel: WARN
+                                            message: "No se sabe si llegó la orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} (intento ${variable.fila[n]}): la vuelvo a publicar en ${variable.espera} ms"
+                                        - to:
+                                            uri: seda:reintentar
+                                            pattern: InOnly
