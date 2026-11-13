@@ -3,7 +3,8 @@
 #
 # Qué hace, en orden:
 #   1. Levanta el ambiente de la 00 (infra/compose.yaml) y corre su verifica.
-#   2. Recorre las lecciones en orden y corre `./verifica solucion` en cada una.
+#   2. Recorre las lecciones en orden y corre `./verifica solucion` en cada una. Salta las del apéndice
+#      (las que traen un archivo .apendice): piden kind y una compilación nativa, y las corre apendice.yml a mano.
 #   3. Control positivo: la primera lección con `inicio/` debe salir en ROJO. Si saliera verde,
 #      el verifica no está midiendo nada y la corrida falla.
 #   4. Cuenta los ✅ y ❌ de la salida. El total se lee de ahí, no del código de salida.
@@ -43,6 +44,7 @@ jobs:
           for d in lecciones/[0-9][0-9]-*/; do
             n=$(basename "$d")
             [ "$n" = "00-ambiente" ] && continue
+            [ -f "$d/.apendice" ] && { echo "⏭  $n: es del apéndice, la corre el workflow apendice"; continue; }
             [ -x "$d/verifica" ] && [ -d "$d/solucion" ] || { echo "⏭  $n: sin verifica o sin solucion, se salta"; continue; }
             echo "::group::$n"
             ( cd "$d" && ./verifica solucion ) 2>&1 | tee -a salida.txt
