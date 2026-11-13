@@ -171,8 +171,8 @@ quedar en los dos, se guarda en uno solo (la base, con la orden) y el otro se al
 **Lo guardado es lo que sale.** El sondeo publica lo que el outbox dice, leyendo la base. Si se reinicia el router a
 la mitad, la fila sigue ahí.
 
-**Publicar de más se tolera; publicar de menos no.** Si el sondeo publica y se cae antes de marcar `publicado`, la
-fila sale otra vez. Por eso quien lee tiene que reconocer repetidos (la 18 y la 29). Perder un evento, en cambio, no
+**Publicar de más se tolera; publicar de menos no.** Si el router se cae a la mitad del envío, o después de
+publicar y antes de marcar `publicado`, la fila sale otra vez. Por eso quien lee tiene que reconocer repetidos (la 18 y la 29). Perder un evento, en cambio, no
 lo nota nadie hasta que un cliente reclama.
 
 **Un solo camino.** Mantener el envío directo «por si acaso» junto al outbox duplica todo y no arregla nada: el
