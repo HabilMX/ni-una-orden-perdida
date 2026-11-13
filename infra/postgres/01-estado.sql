@@ -14,7 +14,8 @@ CREATE TABLE operacion (
   canal        text NOT NULL,              -- rest | bd | edi
   -- estacionada: llegó antes de lo que necesita (una entrega sin su embarque) y espera a que la suelten (lección 17)
   -- confirmada: el socio mandó su 997 de aceptación (lección 21); con un 997 de rechazo, la operación pasa a rechazada
-  estado       text NOT NULL,              -- pendiente | estacionada | aceptada | confirmada | rechazada | no_se_sabe | conciliacion_pendiente
+  -- enviada: desde la 28, el router ya la dejó en Kafka y espera el desenlace que le devuelva el canal
+  estado       text NOT NULL,              -- pendiente | estacionada | enviada | aceptada | confirmada | rechazada | no_se_sabe | conciliacion_pendiente
   numero_control text,                     -- lo asigna el router con numero_control_seq (lección 15)
   correlacion  text,                       -- el hilo con el que llegó este momento (lección 09); viaja al reenviarlo
   huella       text,                       -- sha256 de lo que llegó en este momento (lección 18): reconoce un repetido
@@ -77,6 +78,8 @@ CREATE TABLE intento (
   tamano       int,
   sha256       text,
   desenlace    text,                        -- NULL mientras va en camino: se escribe ANTES de enviar
+                                            -- no_enviado: no salió (cortacircuito abierto en la 22; Kafka no lo
+                                            -- recibió desde la 28)
   respuesta    jsonb,
   inicio       timestamptz NOT NULL DEFAULT now(),
   fin          timestamptz,
@@ -108,4 +111,18 @@ CREATE TABLE acuse (
   errores        jsonb,
   operacion      bigint REFERENCES operacion(id),
   recibido       timestamptz NOT NULL DEFAULT now()
+);
+
+-- Lo que el router tiene que publicar en Kafka (lección 30, el outbox). La fila se escribe en la MISMA transacción
+-- que la operación: si la operación quedó guardada, su fila también. Un sondeo del router la publica y le pone
+-- publicado; si Kafka está caído, la fila espera y sale cuando vuelva. Un reproceso a mano deja aquí quién y por qué.
+-- Al truncar operacion (como hacen los verifica, con CASCADE) se va con ella.
+CREATE TABLE outbox (
+  id           bigserial PRIMARY KEY,
+  operacion    bigint NOT NULL REFERENCES operacion(id),
+  tipo         text NOT NULL DEFAULT 'auto', -- auto | manual (rerun)
+  pedido_por   text,
+  motivo       text,
+  creado       timestamptz NOT NULL DEFAULT now(),
+  publicado    timestamptz                  -- NULL: todavía no sale
 );

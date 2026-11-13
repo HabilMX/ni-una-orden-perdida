@@ -77,5 +77,42 @@ services:
       socio-sftp:
         condition: service_healthy
 
+  # Kafka (lecciones 28 a 30): el tópico donde el router deja cada momento de la orden y de donde lo leen los canales.
+  # Solo arranca con el perfil «kafka»; las lecciones 00 a 27 no lo usan, y sin el perfil no se levanta:
+  #   docker compose -f infra/compose.yaml --profile kafka up -d --wait
+  # Es la imagen oficial del proyecto Apache Kafka (licencia Apache 2.0), en modo KRaft: un solo nodo que hace de
+  # broker y de controlador, sin ZooKeeper. Los servicios de las lecciones lo alcanzan por su nombre: kafka:9092.
+  # No guarda en un volumen: al recrearlo (como hacen los verifica) empieza vacío, sin tópicos ni grupos.
+  kafka:
+    image: apache/kafka:4.4.0
+    profiles: [kafka]
+    environment:
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw   # un identificador fijo (UUID en base64): el de la documentación de la imagen
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      # Un solo nodo: los tópicos internos (offsets de los grupos, transacciones) van con una sola copia
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      # Un grupo que se forma no espera 3 s a ver si llega alguien más: en la práctica arrancan y paran seguido
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Los tópicos se crean solos al primer uso, con 3 particiones: una por cada copia de int-bd
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      # Medio giga de memoria alcanza para la práctica (por omisión pide uno entero)
+      KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 30s
+      retries: 30
+
 volumes:
   socio-home:
