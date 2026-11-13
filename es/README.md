@@ -1,4 +1,23 @@
-# Ni una orden perdida — lecciones
+# Ni una orden perdida
+
+**Por Dorian Chávez, fundador de Hábil y arquitecto de integración.**
+
+**Para quién es:** quien ya usa la terminal y git, lee JSON y sabe SQL básico, y quiere aprender integración de
+sistemas. No hace falta saber Java ni Camel: las rutas son YAML y se aprenden aquí.
+
+**Qué vas a terminar sabiendo:** lograr, con tus manos, que no se pierda ninguna orden, que todo deje rastro, que
+un reintento no duplique y que un destino caído no tumbe a los demás.
+
+**Lo que necesitas antes de empezar:** terminal y git, leer JSON y SQL básico, y Docker con Compose. De Docker basta
+con `docker compose up` y `down`; lo demás viene escrito. Funciona en Linux, macOS y Windows con WSL.
+
+## El proyecto
+
+Una tienda inventada vende, y cada orden tiene que llegar a tres sistemas que no se parecen entre sí: una API REST, un
+ERP en MariaDB y un socio comercial que recibe documentos EDI X12 por SFTP. Todo corre en tu máquina con Docker. Es una
+práctica abierta y gratuita de integración de sistemas con [Apache Camel](https://camel.apache.org/).
+
+## Las lecciones
 
 Son 31 lecciones, de la 00 a la 30, todas en Docker Compose, más un apéndice opcional de solo lectura. Se hacen en
 orden: cada una parte de lo que dejó la anterior. Empieza por la [00](00-ambiente.md), que levanta el ambiente.
