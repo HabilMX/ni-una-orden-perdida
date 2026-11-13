@@ -18,12 +18,47 @@ CREATE TABLE pedido_detalle (
   FOREIGN KEY (pedido) REFERENCES pedido_cabecera(pedido)
 );
 
+-- Lo que el ERP ve llegar a la vez (lección 24). Mientras registra un pedido, su conexión está en en_curso; al
+-- entrar, anota cuántas había en ese momento en muestra_concurrencia. El máximo de esa columna es lo más que el ERP
+-- vio a la vez. Las dos tablas NO son transaccionales: lo que escriben se ve al momento desde otras conexiones y se
+-- queda aunque el pedido se deshaga.
+-- espera_ms (en ajuste) imita a un ERP que tarda en registrar; por omisión, 0. La 24 la sube para que se vea la fila.
+CREATE TABLE ajuste (
+  nombre       VARCHAR(30) PRIMARY KEY,
+  valor        INT NOT NULL
+);
+INSERT INTO ajuste (nombre, valor) VALUES ('espera_ms', 0);
+
+CREATE TABLE en_curso (
+  conexion     BIGINT PRIMARY KEY
+) ENGINE=MEMORY;
+
+CREATE TABLE muestra_concurrencia (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  pedido       VARCHAR(20) NOT NULL,
+  en_curso     INT NOT NULL,
+  momento      DATETIME(3) NOT NULL DEFAULT NOW(3)
+) ENGINE=Aria;
+
 -- Cierra el registro: comprueba que el total cuadre con el detalle y lo marca REGISTRADO.
 DELIMITER //
 CREATE PROCEDURE registrar_pedido(IN p_pedido VARCHAR(20))
 BEGIN
   DECLARE v_total DECIMAL(12,2);
   DECLARE v_suma  DECIMAL(12,2);
+  DECLARE v_espera INT;
+  -- Pase lo que pase (también si no cuadra), la conexión sale de en_curso y el error sigue su camino
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    DELETE FROM en_curso WHERE conexion = CONNECTION_ID();
+    RESIGNAL;
+  END;
+  INSERT INTO en_curso (conexion) VALUES (CONNECTION_ID());
+  INSERT INTO muestra_concurrencia (pedido, en_curso) SELECT p_pedido, COUNT(*) FROM en_curso;
+  SELECT valor INTO v_espera FROM ajuste WHERE nombre = 'espera_ms';
+  IF v_espera > 0 THEN
+    DO SLEEP(v_espera / 1000);
+  END IF;
   SELECT total INTO v_total FROM pedido_cabecera WHERE pedido = p_pedido;
   IF v_total IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El pedido no existe';
@@ -33,6 +68,7 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El total no cuadra con el detalle';
   END IF;
   UPDATE pedido_cabecera SET estatus = 'REGISTRADO' WHERE pedido = p_pedido;
+  DELETE FROM en_curso WHERE conexion = CONNECTION_ID();
 END //
 DELIMITER ;
 
