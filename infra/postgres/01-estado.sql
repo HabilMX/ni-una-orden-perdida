@@ -13,7 +13,8 @@ CREATE TABLE operacion (
   momento      text NOT NULL,
   canal        text NOT NULL,              -- rest | bd | edi
   -- estacionada: llegó antes de lo que necesita (una entrega sin su embarque) y espera a que la suelten (lección 17)
-  estado       text NOT NULL,              -- pendiente | estacionada | aceptada | rechazada | no_se_sabe | conciliacion_pendiente
+  -- confirmada: el socio mandó su 997 de aceptación (lección 21); con un 997 de rechazo, la operación pasa a rechazada
+  estado       text NOT NULL,              -- pendiente | estacionada | aceptada | confirmada | rechazada | no_se_sabe | conciliacion_pendiente
   numero_control text,                     -- lo asigna el router con numero_control_seq (lección 15)
   correlacion  text,                       -- el hilo con el que llegó este momento (lección 09); viaja al reenviarlo
   huella       text,                       -- sha256 de lo que llegó en este momento (lección 18): reconoce un repetido
@@ -54,4 +55,21 @@ CREATE TABLE intento (
   inicio       timestamptz NOT NULL DEFAULT now(),
   fin          timestamptz,
   UNIQUE (operacion, n)
+);
+
+-- Cada acuse 997 que mandó el socio (lección 21), tal como se leyó, y a qué operación correspondió. El 997 cita
+-- lo que acusa por el grupo (AK1: GS01 y GS06) y el documento (AK2: ST01 y ST02). Si no corresponde a ninguna
+-- operación esperándolo, operacion queda vacía: el acuse no se pierde, y se ve.
+CREATE TABLE acuse (
+  id             bigserial PRIMARY KEY,
+  archivo        text NOT NULL,
+  control_socio  text,                     -- ISA13 del 997: el número del socio, no el nuestro
+  grupo_tipo     text NOT NULL,            -- AK1-01: PO, SH, QM
+  grupo_control  text NOT NULL,            -- AK1-02: el GS06 que mandamos (operacion.numero_control)
+  documento_tipo text NOT NULL,            -- AK2-01: 850, 856, 214
+  documento_control text NOT NULL,         -- AK2-02: el ST02 que mandamos
+  codigo         text NOT NULL,            -- AK5-01: A aceptado, R rechazado
+  errores        jsonb,
+  operacion      bigint REFERENCES operacion(id),
+  recibido       timestamptz NOT NULL DEFAULT now()
 );

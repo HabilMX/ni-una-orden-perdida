@@ -54,7 +54,28 @@ services:
     image: atmoz/sftp:alpine
     command: "socio:${SFTP_CLAVE:-practica}:1001::entrada,salida"
     ports: ["2222:22"]
+    # Desde la lección 21, la carpeta del socio la comparte socio-bot, que deja ahí sus acuses
+    volumes:
+      - socio-home:/home/socio
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 22"]
       interval: 3s
       retries: 20
+
+  # El sistema del socio (lección 21): lee lo que le dejamos en entrada/ y, al cabo de unos segundos, deja en
+  # salida/ su acuse funcional, un 997. Rechaza un documento que pida un producto que no conoce (RECHAZA_SKU).
+  socio-bot:
+    image: alpine:3.22
+    command: ["sh", "/bot/bot.sh"]
+    environment:
+      ACUSE_SEGUNDOS: "8"
+      RECHAZA_SKU: SKU-9999
+    volumes:
+      - ./socio-bot:/bot:ro
+      - socio-home:/home/socio
+    depends_on:
+      socio-sftp:
+        condition: service_healthy
+
+volumes:
+  socio-home:
