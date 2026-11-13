@@ -1,0 +1,33 @@
+# La entrega: la paquetería avisa por webhook que entregó la orden. Es un Event Message: nadie se lo pidió, solo
+# cuenta que algo ya pasó («entregué el paquete con la guía tal»). El router no le contesta qué hacer: le dice
+# que lo recibió (202), y lo demás pasa después, como con la orden y el embarque.
+#
+#   paquetería → POST /webhooks/paqueteria → [router] → GUARDA (momento «entregada») → 202
+#                                                 └─ seda:repartir → API (entregado) · ERP (registrar_entrega) · 214
+#
+# Los canales de entrega ya están hechos (entrega.camel.yaml en int-rest, int-bd e int-edi), y el reparto ya sabe
+# mandar el momento «entregada». Falta la puerta: hoy el webhook contesta 501 («no lo sé hacer») y no guarda nada.
+# El embarque-router de orden-router.camel.yaml hace casi lo mismo para el embarque: léelo antes de empezar.
+- route:
+    id: webhook-paqueteria
+    from:
+      uri: platform-http:/webhooks/paqueteria
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # TODO 1: el cuerpo, como texto (convertBodyTo String): así se guarda tal cual.
+        # TODO 2: la orden sale del aviso ($.orden, con jsonpath) y el momento es 'entregada'. Guárdalos en las
+        #         variables orden y momento, y toma el hilo con direct:hilo.
+        # TODO 3: carga la orden (direct:cargar-orden). Si la variable tienda queda vacía, la orden no existe:
+        #         direct:no-existe contesta 404. Si existe: direct:canales, direct:guardar-momento y, al final,
+        #         direct:contestar-y-repartir (que contesta 202 y deja el reparto en la cola).
+        # Borra estos dos pasos cuando escribas los tuyos:
+        - setBody:
+            expression:
+              constant:
+                expression: '{"resultado":"todavía no sé recibir entregas"}'
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              constant:
+                expression: 501

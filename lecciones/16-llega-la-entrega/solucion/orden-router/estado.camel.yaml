@@ -1,0 +1,118 @@
+# El estado de la integración, en la base PostgreSQL «estado» (ver infra/postgres/01-estado.sql):
+#
+#   orden      una fila por orden: en qué momento va y lo que se sabe de ella (datos)
+#   operacion  una fila por orden, momento y canal: qué hay que hacer y cómo quedó (estado)
+#   intento    una fila por cada vez que se intentó una operación (ver reparto.camel.yaml)
+#
+# Guardar la orden y sus operaciones va en UNA transacción: o queda todo, o nada. Si la base no contesta,
+# el router no contesta 202, y quien mandó sabe que tiene que volver a intentar.
+
+- beans:
+    - name: estado
+      type: org.postgresql.ds.PGSimpleDataSource
+      properties:
+        url: "jdbc:postgresql://estado:5432/estado"
+        user: router
+        password: "{{env:ESTADO_CLAVE:practica}}"
+    - name: transacciones
+      type: org.springframework.jdbc.datasource.DataSourceTransactionManager
+      properties:
+        dataSource: "#estado"
+    - name: todoONada
+      type: org.apache.camel.spring.spi.SpringTransactionPolicy
+      properties:
+        transactionManager: "#transacciones"
+        propagationBehaviorName: PROPAGATION_REQUIRED
+
+# Qué canales le tocan a una orden. La regla «quién es socio», en un solo lugar (lección 11):
+# las franquicias T-501 y T-502 reciben además el EDI.
+- route:
+    id: canales
+    from:
+      uri: direct:canales
+      steps:
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.tienda} in 'T-501,T-502'"
+                steps:
+                  - setVariable:
+                      name: canales
+                      expression:
+                        constant:
+                          expression: "rest,bd,edi"
+            otherwise:
+              steps:
+                - setVariable:
+                    name: canales
+                    expression:
+                      constant:
+                        expression: "rest,bd"
+
+# Lee de la base la tienda de una orden ya guardada. Si no existe, la variable tienda queda vacía.
+# variableReceive: la respuesta de la base va a la variable, y el cuerpo (lo que llegó) no se toca.
+- route:
+    id: cargar-orden
+    from:
+      uri: direct:cargar-orden
+      steps:
+        - to:
+            uri: "sql:SELECT datos->>'tienda' FROM orden WHERE orden = :#${variable.orden}"
+            variableReceive: tienda
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+
+# La orden nueva: la fila de la orden y una operación por canal, en «pendiente», TODO EN UNA TRANSACCIÓN.
+# El cuerpo es la orden como la mandó la tienda: se guarda tal cual, como jsonb, en orden.datos.
+- route:
+    id: guardar-orden
+    from:
+      uri: direct:guardar-orden
+      steps:
+        - transacted:
+            ref: todoONada
+        - to:
+            uri: "sql:INSERT INTO orden (orden, momento, datos) VALUES (:#${variable.orden}, 'creada', CAST(:#${body} AS jsonb))"
+            parameters:
+              dataSource: "#estado"
+        # Una operación por canal. El canal del socio lleva su número de control, que da la secuencia de la base
+        - split:
+            expression:
+              simple:
+                expression: "${variable.canales.split(',')}"
+            steps:
+              - to:
+                  uri: "sql:INSERT INTO operacion (orden, momento, canal, estado, numero_control, correlacion) VALUES (:#${variable.orden}, 'creada', :#${body}, 'pendiente', CASE WHEN :#${body} = 'edi' THEN CAST(nextval('numero_control_seq') AS text) END, :#${variable.correlacion})"
+                  parameters:
+                    dataSource: "#estado"
+
+# Un momento nuevo de una orden que ya existe (el embarque; en la 16, la entrega). Igual que guardar-orden:
+# en una transacción, la orden se actualiza (en qué momento va, y lo que llegó se agrega a sus datos con el
+# nombre de su momento) y se crea una operación por canal, en «pendiente».
+- route:
+    id: guardar-momento
+    from:
+      uri: direct:guardar-momento
+      steps:
+        - setVariable:
+            name: clave
+            expression:
+              simple:
+                expression: "${variable.momento == 'embarcada' ? 'embarque' : 'entrega'}"
+        - transacted:
+            ref: todoONada
+        - to:
+            uri: "sql:UPDATE orden SET momento = :#${variable.momento}, datos = datos || jsonb_build_object(CAST(:#${variable.clave} AS text), CAST(:#${body} AS jsonb)) WHERE orden = :#${variable.orden}"
+            parameters:
+              dataSource: "#estado"
+        - split:
+            expression:
+              simple:
+                expression: "${variable.canales.split(',')}"
+            steps:
+              - to:
+                  uri: "sql:INSERT INTO operacion (orden, momento, canal, estado, numero_control, correlacion) VALUES (:#${variable.orden}, :#${variable.momento}, :#${body}, 'pendiente', CASE WHEN :#${body} = 'edi' THEN CAST(nextval('numero_control_seq') AS text) END, :#${variable.correlacion})"
+                  parameters:
+                    dataSource: "#estado"

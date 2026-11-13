@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Comprueba la lección 16: la paquetería avisa por webhook que entregó la 4001 (aquí la paquetería es este script,
+# con curl). El router lo guarda como el momento «entregada», contesta 202, y la entrega llega a los tres destinos:
+# API y ERP en ENTREGADO con la misma guía, y el 214 en el SFTP del socio. Un aviso de una orden que no existe se
+# rechaza sin guardar nada.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (no están en pendiente)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado <> 'pendiente'"; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+EST "TRUNCATE intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts"' EXIT
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 22 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 22 ] && si "Arrancaron el router (con el webhook de la paquetería), los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# Antes de la entrega: la 4001 se crea y se embarca, como en la 15
+c=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json")
+esperar_ops 4001 creada 3
+python3 -c "import json,sys; e=json.load(open(sys.argv[1])); json.dump({'lote':'9001','bodega':'B-NORTE','embarques':[e]}, open('buzon/lote-bodega-9001.json','w'))" "$DATOS/embarques/embarque-4001.json"
+esperar_ops 4001 embarcada 3
+[ "$c" = "202" ] && [ "$(CAMPO 4001 estatus)" = "EMBARCADO" ] && [ "$(SQL "SELECT estatus FROM pedido_cabecera WHERE pedido='4001'")" = "EMBARCADO" ] \
+  && si "Antes de la entrega: la 4001 está EMBARCADO en la API y en el ERP" || { no "La 4001 no llegó a EMBARCADO; sin eso no hay entrega que probar"; apagar; exit 1; }
+
+# La paquetería avisa
+R=$(curl -s -w "\n%{http_code}" --max-time 10 -XPOST localhost:8080/webhooks/paqueteria -H 'Content-Type: application/json' -d @"$DATOS/webhooks/entrega-4001.json")
+[ "$(echo "$R" | tail -1)" = "202" ] && si "La paquetería avisó la entrega de la 4001 y el router contestó 202 «recibida»" \
+  || no "Esperaba 202 del webhook y el router contestó: $(echo "$R" | tr '\n' ' ')"
+esperar_ops 4001 entregada 3
+OPS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001' AND momento='entregada'")
+[ "$OPS" = "bd=aceptada edi=aceptada rest=aceptada" ] && [ "$(EST "SELECT momento FROM orden WHERE orden='4001'")" = "entregada" ] \
+  && si "Estado: tres operaciones de la 4001 con momento=entregada, aceptadas, y la orden va en «entregada»" \
+  || no "Estado: las operaciones de la entrega quedaron «${OPS:-sin operaciones}»"
+[ "$(CAMPO 4001 estatus)" = "ENTREGADO" ] && [ "$(CAMPO 4001 guia)" = "PAQX770004001" ] \
+  && si "API: la 4001 está ENTREGADO, con la guía con la que salió" || no "API: la 4001 está «$(CAMPO 4001 estatus)»"
+FILA=$(SQL "SELECT c.estatus, e.guia FROM pedido_cabecera c JOIN entrega e USING (pedido) WHERE pedido='4001'")
+[ "$FILA" = "$(printf 'ENTREGADO\tPAQX770004001')" ] && si "ERP: la 4001 está ENTREGADO y su fila de entrega tiene la guía" \
+  || no "ERP: esperaba «ENTREGADO PAQX770004001» y tiene «${FILA:-nada}»"
+mkdir -p "$DONDE/salida"; rm -f "$DONDE/salida/214-4001.edi"
+SOCIO "cat /home/socio/entrada/214-4001.edi" > "$DONDE/salida/214-4001.edi"
+C214=$(EST "SELECT numero_control FROM operacion WHERE orden='4001' AND momento='entregada' AND canal='edi'")
+if [ -s "$DONDE/salida/214-4001.edi" ]; then
+  "$RAIZ/herramientas/leer-x12" "$DONDE/salida/214-4001.edi" >/dev/null 2>&1 \
+    && si "Socio: el 214 de la 4001 está en su SFTP y el lector X12 no le encontró fallas" \
+    || no "Socio: el 214 de la 4001 no pasa el lector: corre herramientas/leer-x12 $DONDE/salida/214-4001.edi"
+  grep -q "^B10\*PAQX770004001\*4001\*PAQX~" "$DONDE/salida/214-4001.edi" && grep -q "^ISA\*.*\*${C214:-sin-numero}\*0\*P\*>~" "$DONDE/salida/214-4001.edi" \
+    && si "Socio: el 214 lleva la guía en el B10 y el número de control de la base ($C214)" || no "Socio: el 214 no lleva la guía o el número de control de la base"
+else
+  no "Socio: no está el 214 de la 4001 (hay: $(SOCIO 'ls /home/socio/entrada' | tr '\n' ' '))"
+fi
+
+# Un aviso de una orden que el router no conoce: se dice, y no se guarda nada
+c=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -XPOST localhost:8080/webhooks/paqueteria -H 'Content-Type: application/json' \
+      -d '{"evento":"entregado","paqueteria":"PAQX","guia":"PAQX770009999","orden":"9999","entregada":"2026-11-14T18:00:00-06:00"}')
+[ "$c" = "404" ] && [ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden='9999'")" = "0" ] \
+  && si "Un aviso de la orden 9999, que no existe: el router contestó 404 y no guardó nada" || no "Un aviso de una orden que no existe contestó «$c» o dejó operaciones"
+apagar
+exit $ok

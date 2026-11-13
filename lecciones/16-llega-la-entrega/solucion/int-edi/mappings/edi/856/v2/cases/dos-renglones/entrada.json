@@ -1,0 +1,24 @@
+{
+  "control": "100000124",
+  "datos": {
+    "embarque": "EMB-4001",
+    "orden": "4001",
+    "tienda": "T-501",
+    "bodega": "B-NORTE",
+    "paqueteria": "PAQX",
+    "guia": "PAQX770004001",
+    "embarcada": "2026-11-13T09:30:00-06:00",
+    "renglones": [
+      {
+        "renglon": 1,
+        "sku": "SKU-0001",
+        "cantidad": 2
+      },
+      {
+        "renglon": 2,
+        "sku": "SKU-0042",
+        "cantidad": 1
+      }
+    ]
+  }
+}

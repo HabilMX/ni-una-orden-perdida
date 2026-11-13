@@ -1,0 +1,11 @@
+{
+  "control": "100000125",
+  "datos": {
+    "evento": "entregado",
+    "paqueteria": "PAQX",
+    "guia": "PAQX770004001",
+    "orden": "4001",
+    "entregada": "2026-11-14T17:05:00-06:00",
+    "recibio": "Recepción de la tienda"
+  }
+}
