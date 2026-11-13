@@ -11,7 +11,7 @@ cuál conviene leer cuando el concepto aparece. Cada una cierra con un **Compru�
 | 04 | [HTTP y sus códigos](04-http-y-sus-codigos.md) | lección 02 |
 | 05 | [Qué es Camel y qué es una ruta](05-camel-y-la-ruta.md) | lección 01 |
 | 06 | [Java, la JVM y Quarkus](06-java-jvm-y-quarkus.md) | lección 01 |
-| 07 | [Qué es «nativo» y por qué arranca tan rápido](07-nativo.md) | lección 33 |
+| 07 | [Qué es «nativo» y por qué arranca tan rápido](07-nativo.md) | lección 32 |
 | 08 | [Kubernetes en una página](08-kubernetes.md) | lección 12 |
 | 09 | [El negocio de retail: ERP, SP, SFTP, EDI X12, webhook y guía](09-el-negocio-de-retail.md) | lección 00 |
 

@@ -41,11 +41,11 @@ Solo el router escribe en esa base. Los canales no guardan estado.
 | Contestar 202 y guardar después | El 202 promete algo que todavía no es cierto: si el router se cae antes de guardar, la orden se pierde y quien la mandó cree que llegó |
 | Una cola en memoria sin base | Al reiniciar el router se pierde lo encolado |
 | Que cada canal guarde lo suyo | Ya no hay un solo lugar que diga cómo va la orden; y cuatro escritores sobre lo mismo se pisan |
-| Un broker de mensajes desde ya | Es la Parte VI (lecciones 29 a 31). Aquí se ve primero la idea con una base que el alumno ya sabe consultar |
+| Un broker de mensajes desde ya | Es la Parte VI (lecciones 28 a 30). Aquí se ve primero la idea con una base que el alumno ya sabe consultar |
 
 ## Qué nos haría reabrirla
 
-- Que el volumen haga de la base un cuello de botella: ahí entra el broker (lección 29) con el outbox (lección 31).
+- Que el volumen haga de la base un cuello de botella: ahí entra el broker (lección 28) con el outbox (lección 30).
 - Que quien manda necesite saber en el momento si el destino aceptó: entonces no basta un 202 y hace falta otra forma
   de contestar (por ejemplo, avisarle después por su propio webhook).
 

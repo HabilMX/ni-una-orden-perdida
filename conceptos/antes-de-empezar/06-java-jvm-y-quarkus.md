@@ -1,7 +1,7 @@
 # Java, la JVM y Quarkus
 
 **Para qué te sirve aquí:** Camel está hecho en Java, y tus rutas corren dentro de una JVM aunque tú solo escribas
-YAML. Cuando una integración pasa a un proyecto real, puede correr sobre Quarkus, como en la lección 32.
+YAML. Cuando una integración pasa a un proyecto real, puede correr sobre Quarkus, como en la lección 31.
 
 ## Lo que ves en tu terminal
 
@@ -38,7 +38,7 @@ Quarkus además puede compilar el servicio a **modo nativo**, sin JVM. Eso tiene
 ## Lo que necesitas saber para la práctica
 
 - En las lecciones corres tus rutas con `camel run`, que usa la JVM de la imagen. Es la forma rápida de aprender.
-- En la lección 32 llevas la misma carpeta a un proyecto de Camel Quarkus con `camel export`.
+- En la lección 31 llevas la misma carpeta a un proyecto de Camel Quarkus con `camel export`.
 - No escribes Java en ninguna lección. Si un error dice `Exception` o trae muchas líneas `at org.apache…`, es Java
   contándote dónde falló: la primera línea con `Caused by` suele decir la causa.
 

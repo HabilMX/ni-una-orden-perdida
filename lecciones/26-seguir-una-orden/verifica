@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Comprueba la lección 26: el recorrido de una orden se lee con una consulta, por su número, con cada canal, cada
+# intento (también los que fallaron y los manuales) y lo que salió en cada uno, completo.
+#   1. Con la API caída llegan la 4006 (el socio la rechaza) y la 4007 (grande: 150 renglones).
+#   2. Vuelve la API y se reprocesa el canal rest de las dos (lección 23).
+#   3. GET /ordenes/4006/recorrido y la vista recorrido cuentan lo que pasó; la 4007 trae su cuerpo entero.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (ni pendientes ni estacionadas)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado NOT IN ('pendiente','estacionada')"; }
+ESTACIONADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado = 'estacionada'"; }
+esperar_est() { for i in $(seq 1 20); do [ "$(ESTACIONADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname IN ('completitud','alerta','payload')")" = "3" ] \
+  || { no "A la base de estado le faltan las tablas completitud, alerta o payload (lecciones 25 y 27). Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+trap '[ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"; INFRA start api-pedidos >/dev/null 2>&1' EXIT
+EST "DROP VIEW IF EXISTS recorrido" >/dev/null; EST "TRUNCATE acuse, conflicto, intento, payload, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+# El router también entra al SFTP del socio desde la 21: a leer los acuses
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+[ "$(INFRA ps --format '{{.Service}} {{.State}}' | awk '$1=="socio-bot"{print $2}')" = "running" ] \
+  || { no "No está arriba socio-bot, el sistema del socio que manda los 997: docker compose -f infra/compose.yaml up -d --wait"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="crear-recorrido|recorrido-http|vigilar|juntar|vencidos|rerun|preparar|llamar-canal|sin-respuesta|sondeo-acuses|correlacionar-acuse|intentar|reconocer|recibir-momento|contestar-reconocido|barrido-http|barrido|decidir|webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 46 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 46 ] && si "Arrancaron el router (con su GET /ordenes/{orden}/recorrido), los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+ORDEN() { curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-$1.json"; }
+RERUN() { curl -s -o /dev/null -w "%{http_code}" --max-time 30 -XPOST localhost:8080/rerun -H 'Content-Type: application/json' \
+  -d "{\"orden\":\"$1\",\"momento\":\"creada\",\"canal\":\"$2\",\"pedido_por\":\"mesa-de-control\",\"motivo\":\"volvió la API\"}"; }
+ESTADO() { EST "SELECT estado FROM operacion WHERE orden='$1' AND momento='creada' AND canal='$2'"; }
+esperar() { for i in $(seq 1 $1); do eval "$2" && return 0; sleep 1; done; return 1; }
+R() { EST "$1"; }
+for i in $(seq 1 15); do [ "$(EST "SELECT COUNT(*) FROM pg_views WHERE viewname='recorrido'")" = "1" ] && break; sleep 1; done
+[ "$(EST "SELECT COUNT(*) FROM pg_views WHERE viewname='recorrido'")" = "1" ] && si "El router declaró la vista recorrido al arrancar" \
+  || { no "No existe la vista recorrido: ¿recorrido.sql tiene un error? Esto dijo el router:"; SERV logs orden-router 2>/dev/null | grep -E "ERROR|Exception" | head -5; apagar; exit 1; }
+
+# 1. Se cae la API y llegan la 4006 y la 4007
+INFRA stop api-pedidos >/dev/null 2>&1
+ORDEN 4006; ORDEN 4007
+RINDIO() { EST "SELECT COUNT(*) FROM operacion p WHERE p.orden IN ('4006','4007') AND p.momento='creada' AND p.canal='rest' AND (p.estado='conciliacion_pendiente' OR (p.estado='pendiente' AND (SELECT i.desenlace FROM intento i WHERE i.operacion=p.id ORDER BY i.n DESC LIMIT 1)='no_enviado'))"; }
+esperar 60 '[ "$(RINDIO)" = "2" ]'
+T1=$(date +%s)
+[ "$(RINDIO)" = "2" ] || no "Con la API caída, el canal rest de la 4006 y la 4007 no se rindió ($(RINDIO) de 2)"
+
+# 2. Vuelve la API; pasada la espera del cortacircuito, se reprocesa el canal rest de las dos
+INFRA start api-pedidos >/dev/null 2>&1; INFRA up -d --wait api-pedidos >/dev/null 2>&1
+while [ $(( $(date +%s) - T1 )) -lt 12 ]; do sleep 1; done
+RERUN 4006 rest >/dev/null; RERUN 4007 rest >/dev/null
+esperar 25 '[ "$(ESTADO 4006 edi)" = "rechazada" ] && [ "$(ESTADO 4007 edi)" = "confirmada" ] && [ "$(EST "SELECT COUNT(*) FROM completitud WHERE orden='"'"'4007'"'"'")" = "1" ]'
+
+# 3. El recorrido
+CODIGO=$(curl -s -o "$DONDE/.recorrido-4006.json" -w "%{http_code}" --max-time 10 localhost:8080/ordenes/4006/recorrido)
+FILAS_HTTP=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$DONDE/.recorrido-4006.json" 2>/dev/null)
+rm -f "$DONDE/.recorrido-4006.json"
+FILAS=$(R "SELECT COUNT(*) FROM recorrido WHERE orden='4006'")
+INTENTOS=$(R "SELECT COUNT(*) FROM intento i JOIN operacion p ON p.id=i.operacion WHERE p.orden='4006'")
+[ "$CODIGO" = "200" ] && [ "$FILAS_HTTP" = "$FILAS" ] && [ "$FILAS" = "$INTENTOS" ] \
+  && si "GET /ordenes/4006/recorrido: $FILAS filas, una por cada intento de la 4006" \
+  || no "GET /ordenes/4006/recorrido contestó $CODIGO con ${FILAS_HTTP:-0} filas; la vista tiene $FILAS y la 4006 tiene $INTENTOS intentos"
+H=$(R "SELECT string_agg(desenlace || '/' || tipo, ' ' ORDER BY n) FROM recorrido WHERE orden='4006' AND canal='rest'")
+U=$(R "SELECT pedido_por || ' ' || desenlace || ' ' || codigo FROM recorrido WHERE orden='4006' AND canal='rest' ORDER BY n DESC LIMIT 1")
+case "$H" in "no_se_sabe/auto "*" aceptada/manual") OKH=1;; *) OKH=0;; esac
+[ "$OKH" = "1" ] && [ "$U" = "mesa-de-control aceptada 201" ] \
+  && si "El canal rest de la 4006 cuenta su historia: $H" \
+  || no "El canal rest de la 4006 en el recorrido: «${H:-nada}» (esperaba de no_se_sabe/auto a aceptada/manual, por mesa-de-control con 201; último: «${U:-nada}»)"
+E6=$(R "SELECT DISTINCT estado_canal || ' ' || COALESCE(acuses, '-') FROM recorrido WHERE orden='4006' AND canal='edi'")
+[ "$E6" = "rechazada R" ] && si "El canal del socio de la 4006: rechazada, con su 997 de rechazo (R) en el recorrido" \
+  || no "El canal del socio de la 4006 en el recorrido: «${E6:-nada}» (esperaba «rechazada R»)"
+SIN=$(R "SELECT COUNT(*) FROM recorrido WHERE orden IN ('4006','4007') AND n IS NOT NULL AND cuerpo IS NULL")
+[ "$SIN" = "0" ] && si "Cada intento del recorrido trae lo que salió en él (cuerpo)" || no "$SIN intentos del recorrido sin su cuerpo"
+G=$(R "SELECT tamano || ' ' || (octet_length(convert_to(cuerpo, 'UTF8')) = tamano) || ' ' || (encode(sha256(convert_to(cuerpo, 'UTF8')), 'hex') = sha256) || ' ' || jsonb_array_length(CAST(cuerpo AS jsonb) -> 'renglones') FROM recorrido WHERE orden='4007' AND canal='bd' ORDER BY n LIMIT 1")
+set -- $G
+[ "${1:-0}" -gt 10000 ] && [ "${2:-}" = "true" ] && [ "${3:-}" = "true" ] && [ "${4:-}" = "150" ] \
+  && si "La 4007 (grande): su cuerpo está entero en el recorrido, $1 bytes con su huella y sus 150 renglones" \
+  || no "La 4007 en el recorrido: «${G:-nada}» (tamaño, largo igual, huella igual, renglones): esperaba más de 10000 bytes, true, true, 150"
+C=$(R "SELECT (SELECT COUNT(DISTINCT completa) FROM recorrido WHERE orden='4007') || ' ' || (SELECT COUNT(completa) FROM recorrido WHERE orden='4006')")
+[ "$C" = "1 0" ] && si "El recorrido dice que la 4007 quedó COMPLETA y la 4006 no" || no "Completa en el recorrido: «$C» (esperaba la 4007 sí y la 4006 no)"
+apagar
+exit $ok

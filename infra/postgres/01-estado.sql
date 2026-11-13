@@ -83,7 +83,7 @@ CREATE TABLE intento (
   UNIQUE (operacion, n)
 );
 
--- Lo que salió en cada intento, completo (lección 27). El intento guarda su huella (sha256) y su tamaño; el cuerpo
+-- Lo que salió en cada intento, completo (lección 26). El intento guarda su huella (sha256) y su tamaño; el cuerpo
 -- vive aquí, una vez por huella: si dos intentos mandan lo mismo, comparten la fila. Es text, sin límite de largo:
 -- no se recorta, por grande que sea.
 CREATE TABLE payload (

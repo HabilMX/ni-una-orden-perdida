@@ -1,10 +1,10 @@
 # El rastro se guarda con los datos personales tapados; al destino sale completo
 
-> **Dónde aparece:** lección 28.
+> **Dónde aparece:** lección 27.
 
 ## El problema
 
-Desde la 27, el rastro guarda entero lo que salió en cada intento, y lo enseña el recorrido. Una orden trae el
+Desde la 26, el rastro guarda entero lo que salió en cada intento, y lo enseña el recorrido. Una orden trae el
 nombre, el correo, el teléfono y la dirección de quien compró. El rastro lo consulta quien diagnostica, que no
 necesita saber quién es la clienta, y se guarda más tiempo y en más lugares que la orden misma. Lo que se mira no
 debería mostrar a la persona.
@@ -44,7 +44,7 @@ los tres. Si un canal llegara a recibir algo distinto del router, tendría su pr
 
 | Alternativa | Por qué no |
 |---|---|
-| No guardar el cuerpo en el rastro | El rastro deja de servir para diagnosticar (lección 27) |
+| No guardar el cuerpo en el rastro | El rastro deja de servir para diagnosticar (lección 26) |
 | Tapar al leer el recorrido | Lo guardado sigue completo en la base y en sus respaldos |
 | Tapar todo el bloque `cliente` | Se pierde lo que explica un rechazo: el dominio del correo, el código postal |
 | Cifrar el cuerpo del rastro | Quien diagnostica tendría que descifrarlo, y vería todo; tapar deja ver solo lo útil |

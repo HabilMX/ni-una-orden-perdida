@@ -1,7 +1,7 @@
 # Kubernetes en una página
 
 **Para qué te sirve aquí:** la práctica corre en tu laptop con Docker Compose, pero en una empresa las integraciones
-suelen correr en Kubernetes. Lo que aprendes con Compose se traduce casi pieza por pieza, y en la lección 32 das ese paso.
+suelen correr en Kubernetes. Lo que aprendes con Compose se traduce casi pieza por pieza, y en la lección 31 das ese paso.
 
 ## Lo que ya conoces de la práctica
 
@@ -35,8 +35,8 @@ conexión que nunca se cierra nunca se reparte (ficha [15](../../decisiones/15-r
 
 ## Lo que necesitas saber para la práctica
 
-- No necesitas Kubernetes para ninguna lección de la 00 a la 31.
-- En la 32 llevas una integración a un proyecto de Camel Quarkus con su Deployment.
+- No necesitas Kubernetes para ninguna lección de la 00 a la 30.
+- En la 31 llevas una integración a un proyecto de Camel Quarkus con su Deployment.
 - Las copias no deben guardar estado propio en su disco: si una muere, otra toma su lugar. Por eso el estado de las
   órdenes vive en una base de datos (lección 15).
 

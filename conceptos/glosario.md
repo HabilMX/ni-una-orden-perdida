@@ -39,10 +39,10 @@ por primera vez.
 | **Montar** | Hacer que un contenedor vea como suya una carpeta de tu máquina (08) |
 | **Multicast** | El patrón que manda el mismo mensaje a varios destinos a la vez (10) |
 | **Mustache** | El lenguaje de plantillas con que se arma el EDI; solo acomoda datos, no calcula (06) |
-| **Nativo** | Un ejecutable hecho directo para el sistema operativo, sin JVM (33) |
+| **Nativo** | Un ejecutable hecho directo para el sistema operativo, sin JVM (32) |
 | **problem+json** | El formato estándar para explicar un error de HTTP en el cuerpo (RFC 9457) (02) |
 | **Puerto** | El número con que una máquina distingue a cada servicio que escucha en la red: 13306 es el ERP (00) |
-| **Quarkus** | Un marco de Java para servicios que arrancan rápido; Camel puede correr sobre él (32) |
+| **Quarkus** | Un marco de Java para servicios que arrancan rápido; Camel puede correr sobre él (31) |
 | **Réplica** | Una copia más del mismo servicio (12) |
 | **Router** | El servicio que recibe la orden de la tienda y la reparte a los int-… (08) |
 | **Ruta** | En Camel, el camino de un mensaje: de dónde llega, qué le pasa y a dónde va (01) |

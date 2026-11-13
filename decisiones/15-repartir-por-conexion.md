@@ -47,7 +47,7 @@ podría quedarse sin ninguna por azar del DNS, aunque la integración esté bien
 
 ## Qué nos haría reabrirla
 
-- Que los servicios se hablen por mensajes en un broker (lección 29): ahí el reparto lo hace el grupo de consumidores, no
+- Que los servicios se hablen por mensajes en un broker (lección 28): ahí el reparto lo hace el grupo de consumidores, no
   la conexión.
 - Que la práctica pase a una malla de servicios, que reparte por petición y no por conexión.
 

@@ -1,6 +1,6 @@
 # El recorrido es una vista por número de orden, y los cuerpos van enteros aparte
 
-> **Dónde aparece:** lección 27.
+> **Dónde aparece:** lección 26.
 
 ## El problema
 
@@ -49,7 +49,7 @@ va con el contenedor. Y del intento solo guardábamos la huella y el tamaño de 
   diría dónde, con la misma huella para comprobarlos.
 - Que haya que guardar también lo que contestó cada destino, completo: iría a la misma tabla, por su huella.
 - Que el recorrido lo consulte gente fuera del equipo: los datos personales del cuerpo tendrían que enmascararse
-  antes de guardarse (lección 28).
+  antes de guardarse (lección 27).
 
 ## Fuentes
 

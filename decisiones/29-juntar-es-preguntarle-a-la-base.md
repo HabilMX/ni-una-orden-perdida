@@ -1,6 +1,6 @@
 # Juntar es preguntarle a la base, y un vencido avisa sin cerrar
 
-> **Dónde aparece:** lección 25 (y el reinicio que el plan tenía para la 26).
+> **Dónde aparece:** lección 25, que también comprueba que un reinicio del router no pierde lo que se espera.
 
 ## El problema
 
@@ -19,8 +19,8 @@ llega, alguien tiene que enterarse.
   en el log. **El momento no se cierra**: si lo que faltaba llega tarde, se completa entonces.
 - Lo hace un reloj del router (`timer`, cada 2 s), con dos consultas a la base de estado. No hay un agregador en
   memoria ni un repositorio de agregación aparte.
-- La lección 26 del plan (el agregador que sobrevive al reinicio, con `JdbcAggregationRepository`) se funde en esta:
-  el `verifica` de la 25 reinicia el router a la mitad y la orden se completa igual.
+- Sobrevivir al reinicio no es una lección aparte: con lo que se junta en la base, no hay nada en memoria que perder.
+  El `verifica` de la 25 reinicia el router a la mitad y la orden se completa igual.
 
 ## Por qué
 

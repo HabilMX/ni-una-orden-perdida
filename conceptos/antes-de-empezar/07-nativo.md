@@ -1,9 +1,9 @@
 # Qué es «nativo» y por qué arranca tan rápido
 
 **Para qué te sirve aquí:** cuando una integración tiene que arrancar al momento porque la carga sube, compilarla a modo
-nativo es una de las opciones. En la lección 33 lo mides tú mismo contra la JVM.
+nativo es una de las opciones. En la lección 32 lo mides tú mismo contra la JVM.
 
-## Lo que ves (en la lección 33)
+## Lo que ves (en la lección 32)
 
 Vas a correr el mismo servicio de dos formas, una en la JVM y otra en nativo, y vas a comparar dos cosas en su bitácora:
 cuánto tardó en decir `started` y cuánta memoria ocupa ya corriendo. No te damos aquí las cifras: las vas a medir.
@@ -37,7 +37,7 @@ cuando unas pocas copias atienden mucho tráfico por largo tiempo. Cuál convien
 
 ## Lo que necesitas saber para la práctica
 
-- Las lecciones 00 a 31 corren en la JVM, con `camel run`. El nativo aparece solo en la 33.
+- Las lecciones 00 a 30 corren en la JVM, con `camel run`. El nativo aparece solo en la 32.
 - «Nativo» aquí no tiene que ver con «aplicación nativa» de un celular: es un ejecutable sin JVM.
 
 ## Compruébalo

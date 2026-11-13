@@ -52,7 +52,7 @@ poca memoria.
 ## Y las cifras
 
 Aquí no hay cifras de arranque ni de memoria. Las cifras publicadas vienen de ejemplos, máquinas y versiones que no son
-las tuyas. En la lección 33 mides tú mismo el mismo servicio en JVM y en nativo, y ahí comparas tu medición con lo que
+las tuyas. En la lección 32 mides tú mismo el mismo servicio en JVM y en nativo, y ahí comparas tu medición con lo que
 publica Quarkus.
 
 ## Fuentes

@@ -35,7 +35,7 @@ golpea mientras arranca. Y si cada pieza (router, int-rest) reintenta por su cue
 | Reintentar en cada canal y también en el router | Cinco reintentos en dos piezas son hasta 36 llamadas por un solo envío |
 | Espera fija | O espera de más cuando el destino ya volvió, o lo golpea mientras arranca |
 | Reintento asíncrono (`asyncDelayedRedelivery`) | Libera la cola mientras espera: lo que venía detrás puede llegar antes y se pierde el orden |
-| Mandar el fallo a otra cola y reintentar después | También rompe el orden; tiene sentido cuando el orden no importa (lección 29 en adelante) |
+| Mandar el fallo a otra cola y reintentar después | También rompe el orden; tiene sentido cuando el orden no importa (lección 28 en adelante) |
 
 ## Qué nos haría reabrirla
 

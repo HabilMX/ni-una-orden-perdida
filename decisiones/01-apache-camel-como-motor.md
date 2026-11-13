@@ -19,7 +19,7 @@ corre sobre Camel Quarkus.
 - **Escala en Kubernetes.** Cada integración es un servicio aparte, y lo que escala es ese servicio.
 - **Puede arrancar rápido.** Camel Quarkus compila a modo nativo, que promete arrancar mucho más rápido y con menos
   memoria que la JVM. La JVM es la máquina que corre Java; en modo nativo el programa se compila directo para el
-  sistema operativo, sin JVM. Eso importa cuando un clúster sube y baja réplicas (copias del mismo servicio) solo. No te lo pedimos de fe: en la lección 33
+  sistema operativo, sin JVM. Eso importa cuando un clúster sube y baja réplicas (copias del mismo servicio) solo. No te lo pedimos de fe: en la lección 32
   mides los dos modos con el mismo servicio.
 - **Los patrones tienen nombre.** Router, Multicast, Content-Based Router… son los del libro de Hohpe y Woolf. Lo que
   aprendes aquí lo reconoces en cualquier otra herramienta.
@@ -33,7 +33,7 @@ corre sobre Camel Quarkus.
 
 ## Qué nos haría reabrirla
 
-- Que el arranque y la memoria en nativo dejen de ser mejores que en la JVM para este tipo de servicio (lo mide la 33).
+- Que el arranque y la memoria en nativo dejen de ser mejores que en la JVM para este tipo de servicio (lo mide la 32).
 - Que un conector que la práctica necesite deje de tener soporte en modo nativo.
 
 ## Fuentes
