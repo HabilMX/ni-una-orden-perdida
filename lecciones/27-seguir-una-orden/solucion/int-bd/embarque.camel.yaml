@@ -1,0 +1,46 @@
+# int-bd, segundo momento: el embarque. Le pide al ERP que registre que el pedido salió de la bodega.
+# El procedimiento registrar_embarque hace todo: guarda la fila en «embarque» y deja el pedido EMBARCADO,
+# y se niega (SIGNAL 45000) si el pedido no existe o no está REGISTRADO. Por eso aquí basta una llamada.
+# Usa la misma conexión «erp» que declara int-bd.camel.yaml, en esta misma carpeta.
+- route:
+    id: int-bd-embarque
+    from:
+      uri: platform-http:/embarque
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - to:
+            uri: jsonata:mappings/erp/embarque/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: pedido
+            expression:
+              simple:
+                expression: "${body[pedido]}"
+        - log:
+            message: "Registrando en el ERP el embarque del pedido ${variable.pedido} (guía ${body[guia]}) correlacion=${variable.correlacion}"
+        - to:
+            uri: sql:CALL registrar_embarque(:#pedido, :#guia, :#paqueteria, :#fecha)
+            parameters:
+              dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"erp","pedido":"${variable.pedido}","resultado":"EMBARCADO"}'
+        # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: erp/embarque/v1
+        - log:
+            message: "El ERP registró el embarque del pedido ${variable.pedido} correlacion=${variable.correlacion}"

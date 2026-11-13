@@ -1,0 +1,42 @@
+{
+  "maquina": {
+    "canales": {
+      "rest": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      },
+      "bd": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      },
+      "edi": {
+        "embarcada": "creada",
+        "entregada": "embarcada"
+      }
+    },
+    "momentos": [
+      "creada",
+      "embarcada",
+      "entregada"
+    ]
+  },
+  "momento": "entregada",
+  "canal": "rest",
+  "operaciones": [
+    {
+      "momento": "creada",
+      "canal": "rest",
+      "estado": "aceptada"
+    },
+    {
+      "momento": "embarcada",
+      "canal": "rest",
+      "estado": "aceptada"
+    },
+    {
+      "momento": "entregada",
+      "canal": "rest",
+      "estado": "estacionada"
+    }
+  ]
+}

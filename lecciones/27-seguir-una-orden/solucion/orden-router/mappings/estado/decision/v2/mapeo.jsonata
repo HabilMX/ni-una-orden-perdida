@@ -1,0 +1,31 @@
+/* Versión 2 (lección 21): lo que se necesita antes cuenta como listo si está ACEPTADO o CONFIRMADO. Desde la 21,
+   el canal del socio pasa de «aceptada» (depositado) a «confirmada» (con su 997), y lo que esperaba al 850 no
+   debe quedarse estacionado por eso. Lo demás es igual que la v1.
+
+   La decisión de la máquina de estados: con lo que llegó y lo que ya está guardado de la orden, ¿se procesa,
+   se estaciona o no es válido? Calcula; no escribe nada. Quien decide qué hacer con la respuesta es el router.
+
+   Llega:  {"maquina": <reglas/maquina-de-estados.yaml>, "momento": "entregada", "canal": "rest",
+            "operaciones": [{"momento": "creada", "canal": "rest", "estado": "aceptada"}, …]}
+   Sale:   {"decision": "procesa" | "estaciona" | "invalido", "espera": <el momento que falta, o null>,
+            "motivo": <en palabras>}
+
+   - invalido:  el momento no está en la máquina, o la orden no tiene ninguna operación guardada.
+   - procesa:   el momento no necesita nada antes, o lo que necesita ya está ACEPTADO o CONFIRMADO en este canal.
+   - estaciona: lo que necesita todavía no llega a este canal, o llegó pero aún no está aceptado. */
+(
+  $necesita := $lookup($lookup(maquina.canales, canal), momento);
+  $canal := canal;
+  $previa := operaciones[momento = $necesita and canal = $canal];
+  $not(momento in maquina.momentos) ? {"decision": "invalido", "espera": null,
+                                       "motivo": "La máquina de estados no conoce el momento " & momento}
+  : $count(operaciones) = 0 ? {"decision": "invalido", "espera": null,
+                               "motivo": "La orden no tiene nada guardado"}
+  : $not($exists($necesita)) ? {"decision": "procesa", "espera": null,
+                                "motivo": "El momento " & momento & " no necesita nada antes"}
+  : $previa.estado in ["aceptada", "confirmada"] ? {"decision": "procesa", "espera": null,
+                                    "motivo": $necesita & " ya está " & $previa.estado & " en el canal " & canal}
+  : {"decision": "estaciona", "espera": $necesita,
+     "motivo": $exists($previa) ? $necesita & " está «" & $previa.estado & "» en el canal " & canal
+                                : $necesita & " todavía no llega al canal " & canal}
+)

@@ -1,0 +1,59 @@
+# int-edi, segundo momento: el embarque. Le avisa al socio que su orden salió, con un X12 856 (aviso de embarque),
+# y lo deja en su SFTP con los mismos cuatro cuidados del 850 (lección 07): nombre temporal, nombre final
+# determinístico (856-<orden>.edi), sin pisar uno que ya está y solo con la llave anotada en known_hosts.
+# El mapeo calcula, la plantilla solo acomoda: igual que con el 850.
+- route:
+    id: int-edi-embarque
+    from:
+      uri: platform-http:/embarque
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce-subject}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        # Desde la lección 15 el número de control lo asigna el router y llega en el sobre (ce-numerocontrol).
+        # El mapeo recibe los dos juntos: {"control": …, "datos": <lo que llegó>}
+        - setBody:
+            expression:
+              simple:
+                expression: '{"control":"${header.ce-numerocontrol}","datos":${body}}'
+        - to:
+            uri: jsonata:mappings/edi/856/v2/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - to:
+            uri: mustache:templates/edi/856/v1/856.mustache
+        - removeHeaders:
+            pattern: "*"
+        - to:
+            uri: sftp://socio@socio-sftp:22/entrada
+            parameters:
+              password: "{{env:SFTP_CLAVE:practica}}"
+              knownHostsFile: known_hosts
+              strictHostKeyChecking: "yes"
+              fileName: "856-${variable.orden}.edi"
+              tempFileName: "${file:onlyname.noext}.tmp"
+              fileExist: Fail
+        # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: edi/856/v2
+        - log:
+            message: "Dejé el 856 de la orden ${variable.orden} en el SFTP del socio correlacion=${variable.correlacion}"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"socio","archivo":"856-${variable.orden}.edi","resultado":"DEPOSITADO"}'
