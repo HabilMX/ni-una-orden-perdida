@@ -1,0 +1,8 @@
+# Piezas extra que Camel descarga para el router desde la lección 15.
+# El controlador (driver) de PostgreSQL: sin él, Camel no sabe hablar con la base de estado.
+org.postgresql:postgresql:42.7.7
+# Las transacciones: guardar la orden y sus operaciones, todo o nada (como int-bd con el ERP en la 05).
+org.apache.camel:camel-spring:4.22.1
+org.springframework:spring-jdbc:7.0.9
+# Además, para leer la máquina de estados (reglas/maquina-de-estados.yaml) como datos, desde la lección 17.
+org.apache.camel:camel-snakeyaml:4.22.1

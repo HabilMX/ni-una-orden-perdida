@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Comprueba la lección 21: el 850 de la 4001 queda depositado («aceptada») y el socio todavía no lo acusa. Cuando
+# su sistema (socio-bot) deja el 997 en salida/, el router lo lee, lo correlaciona por los números del grupo y del
+# documento (GS06 y ST02, no el ISA) y solo entonces el canal pasa a «confirmada». La 4006 pide un producto que el
+# socio no conoce: su 997 la rechaza. Un 997 que no corresponde a nada se anota y se avisa, sin tocar operaciones.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (ni pendientes ni estacionadas)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado NOT IN ('pendiente','estacionada')"; }
+ESTACIONADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado = 'estacionada'"; }
+esperar_est() { for i in $(seq 1 20); do [ "$(ESTACIONADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+EST "TRUNCATE acuse, conflicto, intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+# El router también entra al SFTP del socio desde la 21: a leer los acuses
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+[ "$(INFRA ps --format '{{.Service}} {{.State}}' | awk '$1=="socio-bot"{print $2}')" = "running" ] \
+  || { no "No está arriba socio-bot, el sistema del socio que manda los 997: docker compose -f infra/compose.yaml up -d --wait"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="sondeo-acuses|correlacionar-acuse|intentar|reconocer|recibir-momento|contestar-reconocido|barrido-http|barrido|decidir|webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 31 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 31 ] && si "Arrancaron el router (con el sondeo de los acuses), los tres canales y el sondeo de la bodega" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+EDI() { EST "SELECT estado FROM operacion WHERE orden='$1' AND momento='creada' AND canal='edi'"; }
+esperar_edi() { for i in $(seq 1 $3); do [ "$(EDI "$1")" = "$2" ] && return 0; sleep 1; done; return 1; }
+
+# 1. La 4001: depositada primero, confirmada después
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
+esperar_edi 4001 aceptada 20
+ANTES=$(EDI 4001); ACUSES=$(EST "SELECT COUNT(*) FROM acuse")
+[ "$ANTES" = "aceptada" ] && [ "$ACUSES" = "0" ] \
+  && si "El 850 de la 4001 quedó depositado («aceptada») y todavía no hay acuse: enviado no es confirmado" \
+  || no "Esperaba el canal del socio en «aceptada» y sin acuses; está «$ANTES» con $ACUSES acuses"
+esperar_edi 4001 confirmada 40
+CTL=$(EST "SELECT numero_control FROM operacion WHERE orden='4001' AND momento='creada' AND canal='edi'")
+F=$(EST "SELECT a.codigo, a.grupo_tipo, a.documento_tipo, a.documento_control, (a.control_socio <> a.grupo_control) FROM acuse a JOIN operacion p ON p.id = a.operacion WHERE p.orden='4001' AND a.grupo_control = '$CTL'")
+[ "$(EDI 4001)" = "confirmada" ] && [ "$F" = "$(printf 'A\tPO\t850\t0001\tt')" ] \
+  && si "Llegó el 997 de aceptación: el canal pasó a «confirmada», correlacionado por el GS06 ($CTL) y el ST02, no por el ISA del socio" \
+  || no "Esperaba la 4001 confirmada por un 997 A que cite el grupo $CTL; está «$(EDI 4001)» y el acuse es «${F:-nada}»"
+R997=$(SOCIO "ls /home/socio/salida/.leidos" | grep "^997-$CTL.edi$")
+mkdir -p "$DONDE/salida"
+if [ -n "$R997" ]; then
+  SOCIO "cat /home/socio/salida/.leidos/$R997" > "$DONDE/salida/$R997"
+  "$RAIZ/herramientas/leer-x12" "$DONDE/salida/$R997" >/dev/null 2>&1 && hay "^AK1\*PO\*$CTL~" "$DONDE/salida/$R997" \
+    && si "El 997 que leyó el router pasa el lector X12, y su AK1 cita el grupo $CTL" \
+    || no "El 997 $R997 no pasa el lector X12 o su AK1 no cita $CTL"
+else
+  no "El router no tomó el 997 de la 4001 (en salida/.leidos hay: $(SOCIO 'ls /home/socio/salida/.leidos' | tr '\n' ' '))"
+fi
+OTROS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001' AND momento='creada' AND canal <> 'edi'")
+[ "$OTROS" = "bd=aceptada rest=aceptada" ] && si "La API y el ERP no esperan un acuse: se quedan en «aceptada» ($OTROS)" \
+  || no "La API y el ERP quedaron «${OTROS:-nada}»"
+
+# 2. La 4006 pide un producto que el socio no conoce: su 997 la rechaza
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4006.json"
+esperar_edi 4006 rechazada 40
+F=$(EST "SELECT a.codigo, a.errores->0->>'segmento', a.errores->0->>'valor' FROM acuse a JOIN operacion p ON p.id = a.operacion WHERE p.orden='4006'")
+[ "$(EDI 4006)" = "rechazada" ] && [ "$F" = "$(printf 'R\tPO1\tSKU-9999')" ] \
+  && si "La 4006: el 997 de rechazo dejó el canal en «rechazada», con el error que señaló el socio (PO1, SKU-9999)" \
+  || no "La 4006: esperaba rechazada por un 997 R que señale el PO1 con SKU-9999; está «$(EDI 4006)» y el acuse es «${F:-nada}»"
+
+# 3. Un 997 que no corresponde a nada: se anota, se avisa y no toca ninguna operación
+SOCIO "printf 'ISA*00*          *00*          *ZZ*SOCIO01        *ZZ*TIENDANORTE    *261113*0900*U*00401*799999999*0*P*>~\nGS*FA*SOCIO01*TIENDANORTE*20261113*0900*799999999*X*004010~\nST*997*0001~\nAK1*PO*199999999~\nAK2*850*0001~\nAK5*A~\nAK9*A*1*1*1~\nSE*6*0001~\nGE*1*799999999~\nIEA*1*799999999~\n' > /home/socio/salida/997-199999999.edi && chown 1001 /home/socio/salida/997-199999999.edi"
+for i in $(seq 1 20); do [ "$(EST "SELECT COUNT(*) FROM acuse WHERE grupo_control='199999999'")" = "1" ] && break; sleep 1; done
+F=$(EST "SELECT COUNT(*), COUNT(operacion) FROM acuse WHERE grupo_control='199999999'")
+CAMBIO=$(EST "SELECT COUNT(*) FROM operacion WHERE estado = 'confirmada'")
+[ "$F" = "$(printf '1\t0')" ] && [ "$CAMBIO" = "1" ] && SERV logs orden-router 2>/dev/null | hay "WARN.*997-199999999.edi no corresponde" \
+  && si "Un 997 que cita un grupo que no mandamos quedó anotado sin operación, con su WARN, y no confirmó nada más" \
+  || no "El 997 sin dueño: esperaba 1 acuse sin operación, 1 sola confirmada y un WARN; hay «$F» y $CAMBIO confirmadas"
+apagar
+exit $ok

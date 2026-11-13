@@ -1,0 +1,72 @@
+# Enviado no es confirmado (lección 21). Que el 850 quedó en el SFTP del socio («aceptada») dice que lo
+# DEPOSITAMOS, no que el socio lo recibió y lo entiende. Eso lo dice su acuse funcional, el 997, que llega después
+# y por otro camino: el socio lo deja en salida/, en su SFTP.
+#
+#   850 → entrada/ … (segundos, u horas en la vida real) … salida/997-<GS06>.edi → router → confirmada | rechazada
+#
+# El 997 no trae el número de orden. Se correlaciona con su operación por los números de control que mandamos:
+#   AK1-02 = el GS06 del grupo   → operacion.numero_control (el que asigna el router desde la 15)
+#   AK2-01 / AK2-02 = el ST01 y el ST02 del documento → qué documento (850, 856, 214) y cuál dentro del grupo
+# El ISA13 del 997 es del socio: no sirve para correlacionar.
+#
+# El router tiene una sola copia, así que este sondeo corre una vez (como el de la bodega, lección 13).
+
+# El sondeo de los acuses: cada 997 se lee, se traduce con su mapeo y se correlaciona
+- route:
+    id: sondeo-acuses
+    from:
+      uri: sftp://socio@socio-sftp:22/salida
+      parameters:
+        password: "{{env:SFTP_CLAVE:practica}}"
+        knownHostsFile: known_hosts
+        strictHostKeyChecking: "yes"
+        include: "997-.*\\.edi"
+        move: .leidos
+        delay: 2000
+      steps:
+        - convertBodyTo:
+            type: String
+        - setVariable:
+            name: archivo
+            expression:
+              simple:
+                expression: "${header.CamelFileName}"
+        # El texto del 997 como cadena JSON, para que el mapeo lo lea
+        - marshal:
+            json: {}
+        - to:
+            uri: jsonata:mappings/edi/997/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        # Lo que dijo el mapeo, como texto: de ahí salen sus errores para la tabla acuse
+        - setVariable:
+            name: leido
+            expression:
+              simple:
+                expression: "${body}"
+        - unmarshal:
+            json: {}
+        - log:
+            message: "Llegó el 997 ${variable.archivo}: acusa el ${body[documento][tipo]} del grupo ${body[grupo][control]} con ${body[acuse]}"
+        - to:
+            uri: direct:correlacionar-acuse
+
+# Correlacionar: TU parte de la lección. Tal como viene, el router lee el 997 y no hace nada con él: el canal del
+# socio se queda en «aceptada» (depositado), aunque el socio ya haya acusado.
+- route:
+    id: correlacionar-acuse
+    from:
+      uri: direct:correlacionar-acuse
+      steps:
+        # TODO 1: anota el acuse en la tabla acuse (archivo, control_socio, grupo_tipo, grupo_control,
+        #         documento_tipo, documento_control, codigo, errores): se anota aunque no corresponda a nada.
+        # TODO 2: busca la operación del socio que esperaba este acuse: canal 'edi', estado 'aceptada', con
+        #         numero_control = AK1-02 (el GS06 del grupo, ${body[grupo][control]}), el momento que corresponde al
+        #         documento (850 → creada, 856 → embarcada, 214 → entregada) y el ST02 que mandamos ('0001').
+        #         ¿Por qué no sirve el ISA13 del 997? Compara ${body[socio][control]} con el número que mandaste.
+        # TODO 3: pásala a 'confirmada' si AK5 es A, o a 'rechazada' si es R, y deja en la fila del acuse su operación.
+        #         Pista: un UPDATE … RETURNING dentro de un WITH, y el INSERT del acuse usando lo que regresó.
+        # TODO 4: si no correspondió a ninguna, avísalo con un WARN que diga «<archivo> no corresponde».
+        - log:
+            message: "Leí el 997 ${variable.archivo}, pero todavía no lo correlaciono (TODO 1 a 4)"

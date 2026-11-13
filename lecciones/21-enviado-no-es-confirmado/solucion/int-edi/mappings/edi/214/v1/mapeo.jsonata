@@ -1,0 +1,29 @@
+/* El aviso de entrega de la paquetería, convertido en los datos de un X12 214 (estatus del transportista).
+   El MAPEO CALCULA, la PLANTILLA solo acomoda (ver templates/edi/214/v1).
+   Llega junto con el número de control que asignó el router: {"control": "100000007", "datos": <el aviso>}.
+   Separadores de la práctica: * entre elementos, ~ al final del segmento, > dentro de un elemento. */
+(
+  $control := $exists(control) and $length(control) = 9 ? control
+    : $error("Falta el número de control del router (9 dígitos), o no mide 9");
+  datos.(
+    $limpiar := function($t) { $replace($t, /[*~>]/, " ") };
+    $emisor := "TIENDANORTE";
+    $receptor := "SOCIO01";
+    $aaaammdd := $replace($substring(entregada, 0, 10), "-", "");
+    $hhmm := $replace($substring(entregada, 11, 5), ":", "");
+    {
+      "isa": {
+        "emisor": $pad($emisor, 15),
+        "receptor": $pad($receptor, 15),
+        "fecha": $substring($aaaammdd, 2),
+        "hora": $hhmm,
+        "control": $control
+      },
+      "gs": { "emisor": $emisor, "receptor": $receptor, "fecha": $aaaammdd, "hora": $hhmm, "control": $control },
+      "st": { "control": "0001" },
+      "b10": { "guia": $limpiar(guia), "orden": orden, "paqueteria": $limpiar(paqueteria) },
+      "estatus": { "fecha": $aaaammdd, "hora": $hhmm },
+      "se": { "segmentos": 6 }            /* ST, B10, L11, LX, AT7, SE */
+    }
+  )
+)

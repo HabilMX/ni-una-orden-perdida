@@ -1,0 +1,65 @@
+# Los servicios de la lección 21: el router (que ahora lee los acuses 997 del socio), los tres canales y el sondeo.
+# Los cinco son la MISMA imagen de Camel; lo único distinto es la carpeta que cada uno monta.
+#
+#   DONDE=mio docker compose -f lecciones/21-enviado-no-es-confirmado/compose.yaml up -d      (tu versión)
+#   DONDE=solucion docker compose -f lecciones/21-enviado-no-es-confirmado/compose.yaml up -d (la nuestra)
+#
+# La bodega deja sus lotes en buzon/, junto a este archivo. El sondeo la ve como /work/buzon.
+# El router guarda en la base «estado» del ambiente (lección 00): la única pieza que escribe ahí.
+# Se unen a la red del ambiente (lección 00) para alcanzar a los destinos por su nombre.
+name: practica-retail-l21
+
+x-camel: &camel
+  image: apache/camel-jbang:4.22.1
+  command: ["run", "."]          # corre todos los *.camel.yaml de su carpeta
+  working_dir: /work
+  networks: [practica]
+
+services:
+  orden-router:
+    <<: *camel
+    # Las mismas piezas de su dependencias.txt: PostgreSQL, las transacciones y el lector de YAML
+    command: ["run", ".", "--dep=org.postgresql:postgresql:42.7.7,org.apache.camel:camel-spring:4.22.1,org.springframework:spring-jdbc:7.0.9,org.apache.camel:camel-snakeyaml:4.22.1"]
+    volumes:
+      - ./${DONDE:-mio}/orden-router:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+    ports: ["8080:8080"]        # la tienda le habla al router; es el único que se ve desde tu máquina
+
+  int-rest:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/int-rest:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+  int-bd:
+    <<: *camel
+    # Las mismas piezas de su dependencias.txt: el controlador de MariaDB y las transacciones
+    command: ["run", ".", "--dep=org.mariadb.jdbc:mariadb-java-client:3.5.11,org.apache.camel:camel-spring:4.22.1,org.springframework:spring-jdbc:7.0.9"]
+    volumes:
+      - ./${DONDE:-mio}/int-bd:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+  int-edi:
+    <<: *camel
+    volumes:
+      - ./${DONDE:-mio}/int-edi:/work
+      - practica-retail-m2:/home/ubuntu/.m2
+
+  # El sondeo de la bodega: UNA sola copia, a propósito. Revisa buzon/ y le pasa cada embarque al router.
+  sondeo-bodega:
+    <<: *camel
+    deploy:
+      replicas: 1
+    volumes:
+      - ./${DONDE:-mio}/sondeo-bodega:/work
+      - ./buzon:/work/buzon
+      - practica-retail-m2:/home/ubuntu/.m2
+
+networks:
+  practica:
+    name: practica-retail_default
+    external: true
+
+volumes:
+  practica-retail-m2:
+    external: true
