@@ -39,7 +39,7 @@ Y tres reglas que ya están en el código:
 | Regla | Qué significa | Dónde vive |
 |---|---|---|
 | **Solo el router reintenta** | Los canales (int-rest, int-bd, int-edi) contestan lo que les pasó y ya | Los canales no tienen reintentos |
-| **Solo se repite lo que quedó «no se sabe»** | Sin respuesta, o un error 5xx. Un 4xx de esta API (su 422) es un «no» del destino y no se repite | `direct:intentar` lanza una `IOException` solo en ese caso |
+| **Solo se repite lo que quedó «no se sabe»** | Sin respuesta, o un error 5xx. Un 4xx de esta API (su 422) es un «no» del destino y no se repite (en la 20 verás que no todos los 4xx son un «no») | `direct:intentar` lanza una `IOException` solo en ese caso |
 | **Cada intento deja su renglón** | Antes de llamar al canal, `intentar` escribe en la tabla `intento`; después anota cómo le fue | `reparto.camel.yaml`, desde la 15 |
 
 ## 2. Predice
@@ -195,7 +195,7 @@ Lo que decidimos en esta lección, con lo que descartamos y qué nos haría camb
 
 ## Repaso
 
-1. ¿Qué respuestas del destino se reintentan y cuáles no? ¿Por qué un 4xx no?
+1. ¿Qué respuestas del destino se reintentan y cuáles no? ¿Por qué el 422 de esta API no?
 2. ¿Para qué sirve que cada pausa sea el doble de la anterior?
 3. ¿Para qué sirve el 15 % de azar? Explícalo con tres copias del router.
 4. ¿Por qué reintentar no duplicó la orden en la API?

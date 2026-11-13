@@ -34,8 +34,9 @@ La primera cifra del código dice de qué familia es:
 | **4xx** | El error es de quien pidió | `400` te faltó algo · `404` no existe · `422` lo entendí, pero no tiene sentido |
 | **5xx** | El error es de quien contesta | El servicio se cayó o no pudo terminar |
 
-La diferencia importa para decidir qué hacer: un **4xx** no se arregla reintentando lo mismo; un **5xx** o una
-respuesta que nunca llegó a veces sí.
+La diferencia importa para decidir qué hacer: un **4xx** no se arregla reintentando lo mismo, salvo tres
+que dicen «ahora no, prueba después» (`408`, `425` y `429`, lección 20); un **5xx** o una respuesta que nunca llegó a
+veces sí.
 
 Un mismo código puede tener varias causas. Por eso la API de la práctica explica cada error en el cuerpo, en el formato
 estándar de problemas de HTTP: su campo `type` dice cuál es.
