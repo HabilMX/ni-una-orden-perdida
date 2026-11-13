@@ -1,0 +1,42 @@
+/* El embarque de la bodega, convertido en los datos de un X12 856 (aviso de embarque) para el socio.
+   El MAPEO CALCULA todo: rellenos, fechas en el formato del X12, la numeración de los niveles (HL),
+   la cuenta de segmentos y el texto limpio. La PLANTILLA solo acomoda (ver templates/edi/856/v1).
+   Separadores de la práctica: * entre elementos, ~ al final del segmento, > dentro de un elemento.
+
+   La estructura es «embarque → orden → artículo» (BSN05 = 0004): un HL del embarque (S), uno de la orden (O)
+   que cuelga del primero, y uno por artículo (I) que cuelga de la orden.
+
+   ⚠️ Número de control: como el 850 de la lección 06, sale del número de orden. Así, el 850 y el 856 de la
+   misma orden llevan el MISMO número, y un socio real rechazaría el segundo como repetido. En la lección 15
+   el router asigna un número nuevo a cada documento. */
+(
+  $limpiar := function($t) { $replace($t, /[*~>]/, " ") };
+  $emisor := "TIENDANORTE";
+  $receptor := "SOCIO01";
+  $control := $pad(orden, -9, "0");
+  $aaaammdd := $replace($substring(embarcada, 0, 10), "-", "");
+  $hhmm := $replace($substring(embarcada, 11, 5), ":", "");
+  {
+    "isa": {
+      "emisor": $pad($emisor, 15),
+      "receptor": $pad($receptor, 15),
+      "fecha": $substring($aaaammdd, 2),
+      "hora": $hhmm,
+      "control": $control
+    },
+    "gs": { "emisor": $emisor, "receptor": $receptor, "fecha": $aaaammdd, "hora": $hhmm, "control": orden },
+    "st": { "control": "0001" },
+    "bsn": { "embarque": $limpiar(embarque), "fecha": $aaaammdd, "hora": $hhmm },
+    "envio": { "paqueteria": $limpiar(paqueteria), "guia": $limpiar(guia), "fecha": $aaaammdd, "hora": $hhmm },
+    "orden": orden,
+    "lineas": [renglones.{
+      "hl": 2 + renglon,                       /* el 1 es el embarque y el 2 la orden */
+      "n": renglon,
+      "sku": $limpiar(sku),
+      "cantidad": cantidad
+    }],
+    "ctt": $count(renglones),
+    /* ST, BSN, HL(S), TD5, REF, DTM, HL(O), PRF + (HL, LIN, SN1) por renglón + CTT, SE */
+    "se": { "segmentos": 8 + 3 * $count(renglones) + 2 }
+  }
+)

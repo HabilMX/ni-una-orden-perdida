@@ -1,0 +1,44 @@
+# int-bd, tercer momento: la entrega. El procedimiento registrar_entrega guarda la fila en «entrega» y deja el
+# pedido ENTREGADO; se niega (SIGNAL 45000) si el pedido no está EMBARCADO o si la guía no es la del embarque.
+# Usa la misma conexión «erp» que declara int-bd.camel.yaml, en esta misma carpeta.
+- route:
+    id: int-bd-entrega
+    from:
+      uri: platform-http:/entrega
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - to:
+            uri: jsonata:mappings/erp/entrega/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: pedido
+            expression:
+              simple:
+                expression: "${body[pedido]}"
+        - log:
+            message: "Registrando en el ERP la entrega del pedido ${variable.pedido} (guía ${body[guia]}) correlacion=${variable.correlacion}"
+        - to:
+            uri: sql:CALL registrar_entrega(:#pedido, :#guia, :#fecha)
+            parameters:
+              dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"erp","pedido":"${variable.pedido}","resultado":"ENTREGADO"}'
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: erp/entrega/v1
+        - log:
+            message: "El ERP registró la entrega del pedido ${variable.pedido} correlacion=${variable.correlacion}"

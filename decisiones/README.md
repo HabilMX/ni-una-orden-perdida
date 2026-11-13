@@ -34,3 +34,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 23 | [Se reintenta en el lugar, solo en el router, con espera creciente](23-reintentar-en-el-lugar.md) | 19 en adelante |
 | 24 | [Tres desenlaces, decididos por la evidencia: aceptado, rechazado o no se sabe](24-tres-desenlaces.md) | 20 en adelante |
 | 25 | [El 997 se correlaciona por el grupo y el documento, y solo él confirma](25-el-997-se-correlaciona-por-grupo-y-documento.md) | 21 en adelante |
+| 26 | [Un cortacircuito por canal, en el router](26-un-cortacircuito-por-canal.md) | 22 en adelante |

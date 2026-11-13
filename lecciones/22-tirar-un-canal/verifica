@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Comprueba la lección 22: se cae el SFTP del socio y llegan cuatro órdenes. El cortacircuito del canal del socio se
+# abre: deja de llamarlo y sus operaciones se quedan pendientes, sin intentos que esperen. La API y el ERP siguen al
+# día con las cuatro. Cuando el SFTP vuelve, pasada la espera del cortacircuito, una orden nueva llega al socio.
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (ni pendientes ni estacionadas)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado NOT IN ('pendiente','estacionada')"; }
+ESTACIONADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado = 'estacionada'"; }
+esperar_est() { for i in $(seq 1 20); do [ "$(ESTACIONADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 1; done; return 1; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+EST "TRUNCATE acuse, conflicto, intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+# El router también entra al SFTP del socio desde la 21: a leer los acuses
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+[ "$(INFRA ps --format '{{.Service}} {{.State}}' | awk '$1=="socio-bot"{print $2}')" = "running" ] \
+  || { no "No está arriba socio-bot, el sistema del socio que manda los 997: docker compose -f infra/compose.yaml up -d --wait"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="llamar-canal|sin-respuesta|sondeo-acuses|correlacionar-acuse|intentar|reconocer|recibir-momento|contestar-reconocido|barrido-http|barrido|decidir|webhook-paqueteria|int-rest-entrega|int-bd-entrega|int-edi-entrega|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 33 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 33 ] && si "Arrancaron el router (con un cortacircuito por canal), los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# Se tira el canal del socio. Pase lo que pase, al salir se vuelve a levantar.
+trap 'INFRA start socio-sftp >/dev/null 2>&1; [ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+INFRA stop socio-sftp >/dev/null 2>&1
+for o in 4001 4002 4003 4004; do
+  curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-$o.json"
+done
+T0=$(date +%s)
+AL_DIA() { EST "SELECT COUNT(*) FROM operacion WHERE momento='creada' AND canal IN ('rest','bd') AND estado = 'aceptada'"; }
+for i in $(seq 1 25); do [ "$(AL_DIA)" = "8" ] && break; sleep 1; done
+SEG=$(( $(date +%s) - T0 ))
+API=0; for o in 4001 4002 4003 4004; do [ "$(CAMPO $o estatus)" = "CREADO" ] && API=$((API+1)); done
+ERP=$(SQL "SELECT COUNT(*) FROM pedido_cabecera WHERE pedido IN ('4001','4002','4003','4004') AND estatus='REGISTRADO'")
+[ "$API" = "4" ] && [ "$ERP" = "4" ] \
+  && si "Con el SFTP caído, la API y el ERP siguieron al día: las 4 órdenes en los dos, en ${SEG} s" \
+  || no "Con el SFTP caído, a los ${SEG} s la API tiene $API de 4 y el ERP $ERP de 4: el canal caído frenó a los otros"
+EDI=$(EST "SELECT string_agg(estado, ' ' ORDER BY orden) FROM operacion WHERE momento='creada' AND canal='edi'")
+CORTADOS=$(EST "SELECT COUNT(*) FROM operacion p WHERE p.momento='creada' AND p.canal='edi' AND (SELECT i.desenlace FROM intento i WHERE i.operacion = p.id ORDER BY i.n DESC LIMIT 1) = 'no_enviado'")
+INTMAX=$(EST "SELECT MAX(c) FROM (SELECT COUNT(i.id) c FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.momento='creada' AND p.canal='edi' AND p.orden <> '4001' GROUP BY p.id) x")
+[ "$EDI" = "pendiente pendiente pendiente pendiente" ] && [ "$CORTADOS" = "4" ] && [ "$INTMAX" = "1" ] \
+  && si "El canal del socio: las 4 quedaron pendientes, su último intento «no_enviado», y de la 4002 en adelante con un solo intento (no esperaron)" \
+  || no "El canal del socio quedó «${EDI:-nada}», con $CORTADOS no enviadas y hasta ${INTMAX:-0} intentos en una de la 4002 a la 4004"
+LOGR=$(SERV logs orden-router 2>/dev/null)
+printf '%s\n' "$LOGR" | hay "WARN.*Cortacircuito de edi ABIERTO" && ! printf '%s\n' "$LOGR" | hay -E "Cortacircuito de (rest|bd) ABIERTO" \
+  && si "Log: se abrió el cortacircuito del socio, y solo ese" || no "Log: esperaba el cortacircuito de edi abierto y los de rest y bd cerrados"
+
+# Vuelve el SFTP: pasada la espera, una orden nueva prueba el canal (medio abierto) y llega
+INFRA start socio-sftp >/dev/null 2>&1; INFRA up -d --wait socio-sftp >/dev/null 2>&1
+sleep 12
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4005.json"
+for i in $(seq 1 20); do case "$(EST "SELECT estado FROM operacion WHERE orden='4005' AND momento='creada' AND canal='edi'")" in aceptada|confirmada) break;; esac; sleep 1; done
+E5=$(EST "SELECT estado FROM operacion WHERE orden='4005' AND momento='creada' AND canal='edi'")
+{ [ "$E5" = "aceptada" ] || [ "$E5" = "confirmada" ]; } && [ -n "$(SOCIO 'ls /home/socio/entrada/850-4005.edi' 2>/dev/null)" ] \
+  && si "Volvió el SFTP: la 4005 pasó por el cortacircuito ya cerrado y su 850 está en el socio" \
+  || no "Volvió el SFTP y la 4005 quedó «${E5:-nada}» en el canal del socio"
+apagar
+exit $ok
