@@ -2,6 +2,9 @@
 # Comprueba la lección 03: el mapeo v2 pasa sus casos dorados y la API acepta el pedido con su total.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -11,7 +14,7 @@ ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
 echo "— Casos dorados del mapeo v2"
 "$RAIZ/herramientas/probar-mapeo" "$DONDE/mappings/api/pedido/v2" && si "El mapeo v2 pasa todos sus casos dorados" || no "El mapeo v2 no pasa sus casos dorados"
 
-grep -q "mappings/api/pedido/v2/mapeo.jsonata" "$DONDE/orden-a-api.camel.yaml" \
+hay "mappings/api/pedido/v2/mapeo.jsonata" "$DONDE/orden-a-api.camel.yaml" \
   && si "La ruta usa la versión 2 del mapeo" || no "La ruta todavía usa otra versión del mapeo (debe apuntar a v2)"
 
 if curl -s -o /dev/null --max-time 2 localhost:8080; then
@@ -24,8 +27,8 @@ echo "— De punta a punta, con la orden de los centavos"
 LOG=$(mktemp); cd "$DONDE"
 "$RAIZ/herramientas/camel" run orden-a-api.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
 PID=$!
-for i in $(seq 1 60); do grep -q "Started orden-a-api" "$LOG" && break; sleep 2; done
-grep -q "Started orden-a-api" "$LOG" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+for i in $(seq 1 60); do hay "Started orden-a-api" "$LOG" && break; sleep 2; done
+hay "Started orden-a-api" "$LOG" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
 c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-1003.json")
 [ "$c" = "201" ] && si "La API aceptó la orden 1003 (201)" || no "La API no aceptó la orden 1003: llegó $c (si es 422, el motivo está en la bitácora de la API: docker compose -f infra/compose.yaml logs api-pedidos)"
 t=$(curl -s localhost:8081/pedidos/1003 | python3 -c "import sys,json; print(json.load(sys.stdin).get('total'))" 2>/dev/null)

@@ -2,6 +2,9 @@
 # Comprueba la lección 04: la orden queda en el ERP con su cabecera, su detalle completo y REGISTRADO.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -20,8 +23,8 @@ SQL "DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude 
 LOG=$(mktemp); cd "$DONDE"
 "$RAIZ/herramientas/camel" run orden-al-erp.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
 PID=$!
-for i in $(seq 1 60); do grep -qE "Started orden-al-erp|Error starting" "$LOG" && break; sleep 2; done
-grep -q "Started orden-al-erp" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+for i in $(seq 1 60); do hay -E "Started orden-al-erp|Error starting" "$LOG" && break; sleep 2; done
+hay "Started orden-al-erp" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
 
 for o in 1001 1003; do
   curl -s -o /dev/null -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$RAIZ/datos/ordenes/orden-$o.json"

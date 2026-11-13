@@ -2,6 +2,9 @@
 # Comprueba la lección 02: la orden entra por HTTP, se traduce y la API la registra una sola vez.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -20,8 +23,8 @@ fi
 LOG=$(mktemp); cd "$DONDE"
 "$RAIZ/herramientas/camel" run orden-a-api.camel.yaml --max-seconds=90 >"$LOG" 2>&1 &
 PID=$!
-for i in $(seq 1 60); do grep -q "Started orden-a-api" "$LOG" && break; sleep 2; done
-grep -q "Started orden-a-api" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
+for i in $(seq 1 60); do hay "Started orden-a-api" "$LOG" && break; sleep 2; done
+hay "Started orden-a-api" "$LOG" && si "La ruta arrancó" || { no "La ruta no arrancó (revisa $LOG)"; kill $PID 2>/dev/null; exit 1; }
 
 ORDEN="$RAIZ/datos/ordenes/orden-1001.json"
 c1=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$ORDEN")
@@ -37,7 +40,7 @@ echo "$p" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['pedid
 # Solo lo que anotó desde que se reinició al inicio de esta comprobación.
 API=$(docker compose -f "$RAIZ/infra/compose.yaml" ps -q api-pedidos)
 DESDE=$(docker inspect -f '{{.State.StartedAt}}' "$API")
-docker logs --since "$DESDE" "$API" 2>&1 | grep -q "201 llave=1001 " \
+docker logs --since "$DESDE" "$API" 2>&1 | hay "201 llave=1001 " \
   && si "La API recibió la llave 1001: el id de la orden viajó hasta el destino" || no "La API no recibió la llave 1001"
 docker stop $(docker ps -q --filter ancestor=apache/camel-jbang:4.22.1) >/dev/null 2>&1; wait $PID 2>/dev/null
 exit $ok

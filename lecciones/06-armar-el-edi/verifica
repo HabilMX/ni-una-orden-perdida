@@ -2,6 +2,9 @@
 # Comprueba la lección 06: el mapeo calcula el 850, la plantilla lo acomoda y el resultado es un X12 bien armado.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). No necesita el ambiente: solo Docker.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -15,12 +18,12 @@ cp "$RAIZ/datos/ordenes/orden-1001.json" "$RAIZ/datos/ordenes/orden-1005-caracte
 LOG=$(mktemp)
 "$RAIZ/herramientas/camel" run orden-a-edi.camel.yaml --max-messages=2 --max-seconds=90 >"$LOG" 2>&1
 # Sin esto, una ruta que ni arrancó se vería igual que una plantilla rota
-grep -q "Started orden-a-edi" "$LOG" || { no "La ruta no arrancó. Esto dijo Camel:"; tail -15 "$LOG"; exit 1; }
+hay "Started orden-a-edi" "$LOG" || { no "La ruta no arrancó. Esto dijo Camel:"; tail -15 "$LOG"; exit 1; }
 
 for o in 1001 1005; do
   f="salida/850-$o.edi"
   [ -f "$f" ] || { no "No se generó $f"; continue; }
-  if grep -q "&amp;" "$f"; then no "El 850 de la $o trae &amp;: usa llaves TRIPLES en la plantilla"; fi
+  if hay "&amp;" "$f"; then no "El 850 de la $o trae &amp;: usa llaves TRIPLES en la plantilla"; fi
   "$RAIZ/herramientas/leer-x12" "$PWD/$f" >/dev/null 2>&1 \
     && si "El 850 de la $o es un X12 bien armado (el lector no encontró fallas)" || no "El 850 de la $o no pasa la revisión del lector: corre herramientas/leer-x12 sobre él"
 done

@@ -2,6 +2,9 @@
 # Comprueba la lección 01: la ruta corrió y la orden pasó de entrada/ a salida/.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio)
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 DONDE="${1:-mio}"
 [ -d "$DONDE" ] || { echo "❌ No existe la carpeta $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
@@ -12,8 +15,8 @@ LOG=$(mktemp)
 docker run --rm -v "$PWD":/work -w /work apache/camel-jbang:4.22.1 \
   run primera-ruta.camel.yaml --max-seconds=20 >"$LOG" 2>&1
 ok=0
-grep -q "Started primera-ruta" "$LOG" && echo "✅ La ruta arrancó" || { echo "❌ La ruta no arrancó (revisa $LOG)"; ok=1; }
-grep -q "orden-1001.json" "$LOG"      && echo "✅ El log anunció la orden" || { echo "❌ El log no anunció la orden"; ok=1; }
+hay "Started primera-ruta" "$LOG" && echo "✅ La ruta arrancó" || { echo "❌ La ruta no arrancó (revisa $LOG)"; ok=1; }
+hay "orden-1001.json" "$LOG"      && echo "✅ El log anunció la orden" || { echo "❌ El log no anunció la orden"; ok=1; }
 [ -f salida/orden-1001.json ]          && echo "✅ La orden llegó a salida/" || { echo "❌ La orden no llegó a salida/"; ok=1; }
 [ -z "$(ls -A entrada 2>/dev/null | grep -v '^\.camel$')" ] && echo "✅ entrada/ quedó vacía" || { echo "❌ La orden sigue en entrada/"; ok=1; }
 # Control positivo: la orden que salió es la misma que entró

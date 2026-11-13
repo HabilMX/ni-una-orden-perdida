@@ -5,6 +5,9 @@
 # rechaza sin guardar nada.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -75,7 +78,7 @@ if [ -s "$DONDE/salida/214-4001.edi" ]; then
   "$RAIZ/herramientas/leer-x12" "$DONDE/salida/214-4001.edi" >/dev/null 2>&1 \
     && si "Socio: el 214 de la 4001 está en su SFTP y el lector X12 no le encontró fallas" \
     || no "Socio: el 214 de la 4001 no pasa el lector: corre herramientas/leer-x12 $DONDE/salida/214-4001.edi"
-  grep -q "^B10\*PAQX770004001\*4001\*PAQX~" "$DONDE/salida/214-4001.edi" && grep -q "^ISA\*.*\*${C214:-sin-numero}\*0\*P\*>~" "$DONDE/salida/214-4001.edi" \
+  hay "^B10\*PAQX770004001\*4001\*PAQX~" "$DONDE/salida/214-4001.edi" && hay "^ISA\*.*\*${C214:-sin-numero}\*0\*P\*>~" "$DONDE/salida/214-4001.edi" \
     && si "Socio: el 214 lleva la guía en el B10 y el número de control de la base ($C214)" || no "Socio: el 214 no lleva la guía o el número de control de la base"
 else
   no "Socio: no está el 214 de la 4001 (hay: $(SOCIO 'ls /home/socio/entrada' | tr '\n' ' '))"

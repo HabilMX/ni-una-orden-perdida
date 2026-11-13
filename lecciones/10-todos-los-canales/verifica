@@ -3,6 +3,9 @@
 # y el hilo de correlación llega a los dos que lo guardan (API y ERP).
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -46,21 +49,21 @@ try:
     print(" ".join(sorted(c["canal"] + "=" + str(c["codigo"]) for c in d["canales"])))
 except Exception:
     print("")' 2>/dev/null)
-if [ "$(echo "$R" | tail -1)" = "200" ] && echo "$CANALES" | grep -qE "^api=20[01] erp=200 socio=200$"; then
+if [ "$(echo "$R" | tail -1)" = "200" ] && echo "$CANALES" | hay -E "^api=20[01] erp=200 socio=200$"; then
   si "La tienda mandó la 1003 y el router contestó lo que dijo cada canal: $CANALES"
 else
   no "El router no contestó que los tres canales la recibieron. Contestó: $(echo "$R" | tr '\n' ' ')"
 fi
 sleep 2   # el último canal puede terminar un instante después de que su log aparece
 
-docker logs --since "$DESDE" "$API" 2>&1 | grep -q "201 llave=1003 pedido=1003 correlacion=$HILO" \
+docker logs --since "$DESDE" "$API" 2>&1 | hay "201 llave=1003 pedido=1003 correlacion=$HILO" \
   && si "API: tiene el pedido 1003, con el hilo $HILO" || no "API: no registró la 1003 con el hilo $HILO"
 FILA=$(SQL "SELECT estatus, correlacion FROM pedido_cabecera WHERE pedido='1003'")
 [ "$FILA" = "$(printf 'REGISTRADO\t%s' "$HILO")" ] && si "ERP: tiene el pedido 1003 REGISTRADO, con el hilo $HILO" \
   || no "ERP: esperaba «REGISTRADO $HILO» y tiene «${FILA:-nada}»"
-SOCIO "cat /home/socio/entrada/850-1003.edi" | grep -q "^BEG\*00\*SA\*1003\*" \
+SOCIO "cat /home/socio/entrada/850-1003.edi" | hay "^BEG\*00\*SA\*1003\*" \
   && si "Socio: tiene el 850 de la 1003 en su SFTP" || no "Socio: no está el 850 de la 1003 (hay: $(SOCIO 'ls /home/socio/entrada' | tr '\n' ' '))"
-SERV logs int-edi 2>/dev/null | grep -q "orden 1003 en el SFTP del socio correlacion=$HILO" \
+SERV logs int-edi 2>/dev/null | hay "orden 1003 en el SFTP del socio correlacion=$HILO" \
   && si "int-edi anotó el hilo (al socio no se le manda: con él, el hilo es el número de control del X12)" \
   || no "int-edi no anotó el hilo $HILO"
 apagar

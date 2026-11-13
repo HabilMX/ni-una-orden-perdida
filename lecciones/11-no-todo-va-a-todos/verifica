@@ -3,6 +3,9 @@
 # pero al SFTP del socio solo llegan las de franquicia (tiendas T-501 y T-502).
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -46,7 +49,7 @@ for i in $(seq 1 90); do [ "$(LISTOS)" -ge 4 ] && break; sleep 2; done
 NOAPLICA=0
 for f in "$LOTE"/*.json; do
   r=$(curl -s --max-time 60 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$f")
-  echo "$r" | grep -q '"canal":"socio","resultado":"no aplica"' && NOAPLICA=$((NOAPLICA+1))
+  echo "$r" | hay '"canal":"socio","resultado":"no aplica"' && NOAPLICA=$((NOAPLICA+1))
 done
 sleep 2
 

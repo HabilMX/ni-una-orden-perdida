@@ -3,6 +3,9 @@
 # y la API la registra. El sobre CloudEvents viaja con ella. Solo el router se ve desde tu máquina.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -24,8 +27,8 @@ SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lecció
 for i in $(seq 1 60); do
   [ "$(SERV logs 2>/dev/null | grep -cE 'Started (orden-router|int-rest) ')" -ge 2 ] && break; sleep 2
 done
-SERV logs orden-router 2>/dev/null | grep -q "Started orden-router " && si "El router arrancó" || no "El router no arrancó"
-SERV logs int-rest 2>/dev/null | grep -q "Started int-rest " && si "int-rest arrancó (la misma imagen, otra carpeta)" || no "int-rest no arrancó"
+SERV logs orden-router 2>/dev/null | hay "Started orden-router " && si "El router arrancó" || no "El router no arrancó"
+SERV logs int-rest 2>/dev/null | hay "Started int-rest " && si "int-rest arrancó (la misma imagen, otra carpeta)" || no "int-rest no arrancó"
 [ $ok -eq 0 ] || { SERV logs 2>/dev/null | tail -20; apagar; exit 1; }
 
 c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' \
@@ -34,11 +37,11 @@ c=$(curl -s -o /dev/null -w "%{http_code}" -XPOST localhost:8080/ordenes -H 'Con
 
 # Lo mira el destino: la API anota con qué llave le llegó el pedido, desde que se reinició arriba.
 API=$(docker compose -f "$RAIZ/infra/compose.yaml" ps -q api-pedidos)
-docker logs --since "$(docker inspect -f '{{.State.StartedAt}}' "$API")" "$API" 2>&1 | grep -q "201 llave=1003 " \
+docker logs --since "$(docker inspect -f '{{.State.StartedAt}}' "$API")" "$API" 2>&1 | hay "201 llave=1003 " \
   && si "La API registró la orden 1003: el recorrido tienda → router → int-rest → API se completó" \
   || no "La API no registró la orden 1003"
 
-SERV logs int-rest 2>/dev/null | grep -q "sobre orden-1003-creada, tipo mx.tienda.orden.creada" \
+SERV logs int-rest 2>/dev/null | hay "sobre orden-1003-creada, tipo mx.tienda.orden.creada" \
   && si "int-rest recibió el sobre CloudEvents de la orden (id orden-1003-creada)" \
   || no "int-rest no recibió el sobre CloudEvents de la orden 1003"
 

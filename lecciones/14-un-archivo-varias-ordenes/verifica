@@ -4,6 +4,9 @@
 # anotado en la bitácora del sondeo y el lote se aparta a .error/ para que alguien lo vea.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")"
 RAIZ="$(cd ../.. && pwd)"
 DONDE="${1:-mio}"
@@ -58,7 +61,7 @@ mkdir -p "$DONDE/salida"; rm -f "$DONDE/salida"/856-*.edi
 BIEN=0
 for o in 4001 4002 4003 4004 4005; do
   SOCIO "cat /home/socio/entrada/856-$o.edi" > "$DONDE/salida/856-$o.edi"
-  [ -s "$DONDE/salida/856-$o.edi" ] && grep -q "^PRF\*$o~" "$DONDE/salida/856-$o.edi" \
+  [ -s "$DONDE/salida/856-$o.edi" ] && hay "^PRF\*$o~" "$DONDE/salida/856-$o.edi" \
     && "$RAIZ/herramientas/leer-x12" "$DONDE/salida/856-$o.edi" >/dev/null 2>&1 && BIEN=$((BIEN+1))
 done
 ARCH=$(SOCIO "ls /home/socio/entrada" | grep -c '^856-')
@@ -76,7 +79,7 @@ N=$(embarcadas 4001 4002 4004 4005)
 # La bitácora se guarda primero: con «| grep -q» directo, grep cierra la tubería antes de tiempo y pipefail lo
 # cuenta como falla aunque la línea sí esté
 BITACORA=$(SERV logs sondeo-bodega 2>/dev/null)
-echo "$BITACORA" | grep -q "no aceptó el embarque de la orden 9999" \
+echo "$BITACORA" | hay "no aceptó el embarque de la orden 9999" \
   && si "Sondeo: anotó en su bitácora que el embarque de la 9999 no pasó" || no "Sondeo: no anotó cuál embarque del lote no pasó"
 [ -f buzon/.error/lote-bodega-0002.json ] && si "Buzón: el lote 0002 se apartó a .error/ para que alguien vea el embarque malo" \
   || no "Buzón: el lote 0002 no está en .error/ (hay: $(ls -A buzon buzon/.* 2>/dev/null | tr '\n' ' '))"

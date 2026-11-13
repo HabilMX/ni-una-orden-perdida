@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Comprueba la lección 00: el ambiente está arriba y cada pieza contesta lo que debe.
 set -uo pipefail
+# hay: como «grep -q», pero lee la entrada completa. Con pipefail, «grep -q» corta la tubería al primer acierto,
+# el comando de antes muere por SIGPIPE y la búsqueda que sí encontró se cuenta como falla.
+hay() { grep "$@" >/dev/null; }
 cd "$(dirname "$0")/../.."
 C="docker compose -f infra/compose.yaml"
 ok=0
@@ -19,7 +22,7 @@ p=$($C exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "s
 
 # Control positivo del ERP: el procedimiento RECHAZA un pedido que no existe (no es permisivo)
 r=$($C exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "call registrar_pedido('NO-EXISTE')" 2>&1)
-echo "$r" | grep -q "El pedido no existe" && si "El ERP rechaza lo que no cuadra" || no "El ERP no rechazó un pedido inexistente (o no contestó)"
+echo "$r" | hay "El pedido no existe" && si "El ERP rechaza lo que no cuadra" || no "El ERP no rechazó un pedido inexistente (o no contestó)"
 
 $C exec -T socio-sftp sh -c 'test -d /home/socio/entrada && test -d /home/socio/salida' && si "El SFTP del socio tiene entrada/ y salida/" || no "El SFTP del socio no tiene sus carpetas"
 # Control positivo de la API: sin llave de idempotencia debe rechazar (400), no aceptar
