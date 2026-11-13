@@ -1,0 +1,139 @@
+# ¿Cuándo dos mensajes son el mismo? (lección 18)
+#
+# La paquetería puede avisar dos veces la misma entrega: no recibió nuestro 202 a tiempo, o su sistema reintenta
+# por su cuenta. La bodega puede dejar dos veces el mismo lote. Antes de guardar un momento, el router lo RECONOCE:
+#
+#   llave  = el ce-id del momento (orden-<orden>-<momento>) + el canal  → la UNIQUE de operacion
+#   huella = sha256 de lo que llegó, ya normalizado (jsonb: sin espacios de más ni orden de campos)
+#
+#   - nuevo:     no hay operaciones con esa llave → se guarda y se reparte, como hasta la 17.
+#   - repetido:  la llave existe y la huella es la misma → 202 «ya la tenía», sin guardar ni repartir nada.
+#   - conflicto: la llave existe y la huella es OTRA → 409; se anota en la tabla conflicto, se avisa en el log
+#                (WARN) y no se pisa lo guardado. Alguien cambió el contenido: lo decide una persona.
+#
+# Si dos avisos iguales llegan al mismo tiempo y los dos se ven «nuevos», la UNIQUE de operacion detiene al
+# segundo: su transacción se deshace, contesta error, y cuando lo reintente ya se reconocerá como repetido.
+
+# Lo recibe la puerta de cada momento (embarque-router, webhook-paqueteria) cuando ya sabe sus canales
+- route:
+    id: recibir-momento
+    from:
+      uri: direct:recibir-momento
+      steps:
+        - to:
+            uri: direct:reconocer
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.visto} == 'repetido'"
+                steps:
+                  - log:
+                      message: "Orden ${variable.orden} momento ${variable.momento} correlacion=${variable.correlacion}: es un repetido (misma huella); ya lo tenía, no reparto nada"
+                  - to:
+                      uri: direct:contestar-reconocido
+              - expression:
+                  simple:
+                    expression: "${variable.visto} == 'conflicto'"
+                steps:
+                  - to:
+                      uri: direct:contestar-reconocido
+            otherwise:
+              steps:
+                - to:
+                    uri: direct:guardar-momento
+                - log:
+                    message: "Momento ${variable.momento} de la orden ${variable.orden} correlacion=${variable.correlacion}: guardado con sus canales ${variable.canales}"
+                - to:
+                    uri: direct:contestar-y-repartir
+
+# Un repetido se contesta 202 (sí lo tenemos); un conflicto, 409 (con esa llave tenemos otra cosa)
+- route:
+    id: contestar-reconocido
+    from:
+      uri: direct:contestar-reconocido
+      steps:
+        - removeHeaders:
+            pattern: "*"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"orden":"${variable.orden}","momento":"${variable.momento}","resultado":"${variable.visto}"}'
+        - setHeader:
+            name: CamelHttpResponseCode
+            expression:
+              simple:
+                expression: "${variable.visto == 'repetido' ? '202' : '409'}"
+                resultType: java.lang.Integer
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        - setHeader:
+            name: X-Correlation-Id
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+
+# Reconocer: deja en ${variable.visto} «nuevo», «repetido» o «conflicto», y en ${variable.huella} la huella
+# de lo que llegó. No cambia el cuerpo.
+- route:
+    id: reconocer
+    from:
+      uri: direct:reconocer
+      steps:
+        # La huella de lo que llegó y la del primero que se guardó con esa llave (NULL si no hay)
+        - to:
+            uri: >-
+              sql:SELECT encode(sha256(convert_to(CAST(CAST(:#${body} AS jsonb) AS text), 'UTF8')), 'hex') AS nueva,
+              (SELECT huella FROM operacion WHERE orden = :#${variable.orden} AND momento = :#${variable.momento}
+               ORDER BY id LIMIT 1) AS guardada
+            variableReceive: huellas
+            parameters:
+              dataSource: "#estado"
+              outputType: SelectOne
+        - setVariable:
+            name: huella
+            expression:
+              simple:
+                expression: "${variable.huellas[nueva]}"
+        - choice:
+            when:
+              - expression:
+                  simple:
+                    expression: "${variable.huellas[guardada]} == null"
+                steps:
+                  - setVariable:
+                      name: visto
+                      expression:
+                        constant:
+                          expression: nuevo
+              - expression:
+                  simple:
+                    expression: "${variable.huellas[guardada]} == ${variable.huella}"
+                steps:
+                  - setVariable:
+                      name: visto
+                      expression:
+                        constant:
+                          expression: repetido
+            otherwise:
+              steps:
+                - setVariable:
+                    name: visto
+                    expression:
+                      constant:
+                        expression: conflicto
+                - to:
+                    uri: >-
+                      sql:INSERT INTO conflicto (llave, orden, momento, huella_guardada, huella_nueva, cuerpo, correlacion)
+                      VALUES ('orden-' || CAST(:#${variable.orden} AS text) || '-' || CAST(:#${variable.momento} AS text), :#${variable.orden},
+                      :#${variable.momento}, :#${variable.huellas[guardada]}, :#${variable.huella},
+                      CAST(:#${body} AS jsonb), :#${variable.correlacion})
+                    variableReceive: anotado
+                    parameters:
+                      dataSource: "#estado"
+                - log:
+                    loggingLevel: WARN
+                    message: "CONFLICTO orden-${variable.orden}-${variable.momento} correlacion=${variable.correlacion}: misma llave, otra huella (guardada ${variable.huellas[guardada]}, llegó ${variable.huella}). No lo reparto ni piso lo guardado; quedó en la tabla conflicto"

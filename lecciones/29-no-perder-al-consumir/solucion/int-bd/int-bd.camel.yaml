@@ -1,0 +1,154 @@
+# int-bd: el servicio que sabe hablar con el ERP. Es la ruta de la 05, ahora detrás del router:
+#   recibe la orden por /integrar → traducir a filas → cabecera + detalle + registrar_pedido, todo o nada.
+# Del sobre toma el hilo (ce-correlationid) y lo guarda en la cabecera del pedido, en la columna correlacion.
+# El controlador de MariaDB y las transacciones vienen en dependencias.txt (y en el compose, con --dep).
+
+- beans:
+    - name: erp
+      type: org.mariadb.jdbc.MariaDbDataSource
+      properties:
+        url: "jdbc:mariadb://erp:3306/erp"
+        user: integracion
+        password: "{{env:ERP_CLAVE:practica}}"
+    - name: transacciones
+      type: org.springframework.jdbc.datasource.DataSourceTransactionManager
+      properties:
+        dataSource: "#erp"
+    - name: todoONada
+      type: org.apache.camel.spring.spi.SpringTransactionPolicy
+      properties:
+        transactionManager: "#transacciones"
+        propagationBehaviorName: PROPAGATION_REQUIRED
+
+- route:
+    id: int-bd
+    from:
+      uri: platform-http:/integrar
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        # No tumbar al ERP (lección 24). El ERP aguanta 6 registros a la vez, y int-bd corre en 3 copias: cada copia
+        # deja pasar a lo más 6 / 3 = 2 pedidos a la vez. El tercero espera aquí su turno (no se rechaza) hasta que
+        # uno de los dos termine y conteste. Con 5 copias, el ERP podría ver 5 × 2 = 10: el tope es POR COPIA.
+        # mode: ConcurrentRequests cuenta los que van EN CURSO. El modo por omisión, TotalRequests, contaría
+        # cuántos entran por segundo, y un ERP que tarda 1.5 s en cada uno se llenaría igual.
+        - throttle:
+            mode: ConcurrentRequests
+            expression:
+              constant:
+                expression: "2"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce-correlationid}"
+        - to:
+            uri: jsonata:mappings/erp/pedido/v1/mapeo.jsonata
+            parameters:
+              inputType: JsonString
+              outputType: JsonString
+        - unmarshal:
+            json: {}
+        - setVariable:
+            name: cabecera
+            expression:
+              simple:
+                expression: "${body[cabecera]}"
+        - setVariable:
+            name: detalle
+            expression:
+              simple:
+                expression: "${body[detalle]}"
+        # Idempotencia del ERP (lección 23): si el pedido ya está REGISTRADO con el mismo total, es un reenvío.
+        # Se contesta 200 «ya registrado» sin escribir nada, igual que la API con su Idempotency-Key. Pasa cuando el
+        # router no supo si el ERP lo recibió (se cortó la respuesta) y lo vuelve a mandar, solo o con un rerun.
+        # Si el pedido existe con OTRO total, no es el mismo: 409, y una persona decide cuál vale.
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
+        - to:
+            uri: "sql:SELECT estatus, total = :#total AS igual FROM pedido_cabecera WHERE pedido = :#pedido"
+            variableReceive: previo
+            parameters:
+              dataSource: "#erp"
+              outputType: SelectOne
+        - filter:
+            expression:
+              simple:
+                expression: "${variable.previo} != null"
+            steps:
+              - setHeader:
+                  name: X-Version-Mapeo
+                  expression:
+                    constant:
+                      expression: erp/pedido/v1
+              - choice:
+                  when:
+                    - expression:
+                        simple:
+                          expression: "${variable.previo[estatus]} == 'REGISTRADO' && ${variable.previo[igual]} == 1"
+                      steps:
+                        - setBody:
+                            expression:
+                              simple:
+                                expression: '{"canal":"erp","pedido":"${variable.cabecera[pedido]}","resultado":"YA_REGISTRADO"}'
+                        - log:
+                            message: "El ERP ya tenía el pedido ${variable.cabecera[pedido]}: es un reenvío, no se duplica correlacion=${variable.correlacion}"
+                  otherwise:
+                    steps:
+                      - setHeader:
+                          name: CamelHttpResponseCode
+                          expression:
+                            constant:
+                              expression: "409"
+                              resultType: java.lang.Integer
+                      - setBody:
+                          expression:
+                            simple:
+                              expression: '{"canal":"erp","pedido":"${variable.cabecera[pedido]}","resultado":"YA_EXISTE_DISTINTO"}'
+                      - log:
+                          loggingLevel: WARN
+                          message: "El ERP ya tiene el pedido ${variable.cabecera[pedido]} con otro contenido: no lo piso correlacion=${variable.correlacion}"
+              - stop: {}
+        - transacted:
+            ref: todoONada
+        - log:
+            message: "Registrando en el ERP el pedido ${variable.cabecera[pedido]} correlacion=${variable.correlacion}"
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
+        - to:
+            uri: "sql:INSERT INTO pedido_cabecera (pedido, tienda, fecha, total, correlacion) VALUES (:#pedido, :#tienda, :#fecha, :#total, :#${variable.correlacion})"
+            parameters:
+              dataSource: "#erp"
+        - split:
+            expression:
+              simple:
+                expression: "${variable.detalle}"
+            steps:
+              - to:
+                  uri: sql:INSERT INTO pedido_detalle (pedido, posicion, sku, cantidad, precio) VALUES (:#pedido, :#posicion, :#sku, :#cantidad, :#precio)
+                  parameters:
+                    dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: "${variable.cabecera}"
+        - to:
+            uri: sql:CALL registrar_pedido(:#pedido)
+            parameters:
+              dataSource: "#erp"
+        - setBody:
+            expression:
+              simple:
+                expression: '{"canal":"erp","pedido":"${variable.cabecera[pedido]}","resultado":"REGISTRADO"}'
+        # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
+        - setHeader:
+            name: X-Version-Mapeo
+            expression:
+              constant:
+                expression: erp/pedido/v1
+        - log:
+            message: "El ERP registró el pedido ${variable.cabecera[pedido]} correlacion=${variable.correlacion}"

@@ -1,0 +1,242 @@
+# El puente con Kafka (desde la lección 28). int-bd ya no recibe del router por HTTP: lee el tópico «ordenes»,
+# toma lo que le toca a su canal (bd) y se lo entrega a su propia ruta de siempre (/integrar, /embarque o
+# /entrega, en este mismo servicio). Lo que hace el canal con el ERP no cambió: solo cómo le llega.
+#
+#   [tópico ordenes] ──grupo int-bd──→ este puente ──HTTP local──→ /integrar · /embarque · /entrega ──→ el ERP
+#                                              │
+#                                              └──→ [tópico desenlaces] ──→ router (anota cómo le fue)
+#
+# El GRUPO es lo que importa aquí. Kafka le da cada evento a UNA copia de cada grupo:
+#   - un grupo por integración (int-rest, int-bd, int-edi): cada integración recibe TODOS los eventos, y lleva su
+#     propia cuenta de hasta dónde leyó. Si int-bd se detiene, los otros grupos siguen; al volver, int-bd
+#     sigue desde donde se quedó;
+#   - las copias de una misma integración (int-bd corre en 3) comparten el grupo: se reparten las particiones, y
+#     cada evento lo atiende una sola de ellas.
+#
+# Desde la 29, int-bd CONFIRMA A MANO hasta dónde leyó (su offset), y solo DESPUÉS de dejar el desenlace en Kafka:
+#
+#   leer el evento → entregarlo al canal → publicar el desenlace → confirmar el offset
+#                                                                   ↑ si algo falla antes de aquí, se vuelve a leer
+#
+# Por omisión, Kafka confirma solo (autoCommitEnable: true) lo que el consumidor ya leyó. Y si un evento falla a la
+# mitad (por ejemplo, Kafka no acepta su desenlace), Camel lo anota en el log y sigue con el siguiente: la cuenta
+# avanza por encima del que falló. El canal ya lo entregó, pero el router no se entera de cómo le fue, y nadie lo
+# vuelve a leer: se perdió.
+# Confirmando a mano y con breakOnFirstError, lo que falló no se confirma: Camel regresa a ese evento y lo vuelve a
+# intentar. Y si al consumidor lo matan a la mitad, al volver lee otra vez lo que no confirmó.
+# Leer dos veces lo mismo no duplica: la API reconoce su llave de idempotencia y el ERP contesta «ya registrado».
+# El costo: un evento que no se puede terminar detiene su partición. Camel lo reintenta, y lo que viene detrás espera
+# a que salga. Por eso el puente deja un desenlace aunque el canal no conteste («no se sabe», código 0): quien
+# reintenta la entrega es el router.
+- route:
+    id: int-bd-kafka
+    from:
+      uri: kafka:ordenes
+      parameters:
+        brokers: kafka:9092
+        groupId: int-bd
+        # Un grupo nuevo empieza por lo más viejo del tópico, no por lo que llegue de aquí en adelante
+        autoOffsetReset: earliest
+        # Si una copia muere sin despedirse, a los 10 s el grupo la da por muerta y reparte su partición (por
+        # omisión, 45 s)
+        sessionTimeoutMs: 10000
+        # Los encabezados de Kafka son bytes; así llegan como texto
+        headerDeserializer: "#class:org.apache.camel.component.kafka.serde.ToStringKafkaHeaderDeserializer"
+        # Kafka ya no confirma solo; el puente confirma cada evento cuando terminó con él
+        autoCommitEnable: false
+        allowManualCommit: true
+        # Si un evento falla, no se sigue con el siguiente: se vuelve a leer el que falló
+        breakOnFirstError: true
+      steps:
+        # Con allowManualCommit, Camel deja en este encabezado con qué confirmar ESTE evento. Se guarda en una
+        # variable porque la entrega limpia los encabezados.
+        - setVariable:
+            name: confirmar
+            expression:
+              simple:
+                expression: "${header.CamelKafkaManualCommit}"
+        # El router pone en el evento la operación y el intento de cada canal al que le toca. Si no trae los de
+        # «bd», este evento no es para int-bd: se deja pasar.
+        - filter:
+            expression:
+              simple:
+                expression: "${header.operacion-bd} != null"
+            steps:
+              - to:
+                  uri: direct:int-bd-entregar
+        # El desenlace ya quedó en Kafka (o el evento no era para int-bd): ahora sí, se confirma el offset.
+        # commit() avisa a Kafka que este evento, y todos los anteriores de su partición, ya se leyeron.
+        - script:
+            expression:
+              simple:
+                expression: "${variable.confirmar.commit()}"
+
+- route:
+    id: int-bd-entregar
+    from:
+      uri: direct:int-bd-entregar
+      steps:
+        # Lo que hace falta del evento, ANTES de limpiar encabezados
+        - setVariable:
+            name: operacion
+            expression:
+              simple:
+                expression: "${header.operacion-bd}"
+        - setVariable:
+            name: intento
+            expression:
+              simple:
+                expression: "${header.intento-bd}"
+        - setVariable:
+            name: orden
+            expression:
+              simple:
+                expression: "${header.ce_subject}"
+        - setVariable:
+            name: tipo
+            expression:
+              simple:
+                expression: "${header.ce_type}"
+        - setVariable:
+            name: fuente
+            expression:
+              simple:
+                expression: "${header.ce_source}"
+        - setVariable:
+            name: id
+            expression:
+              simple:
+                expression: "${header.ce_id}"
+        - setVariable:
+            name: correlacion
+            expression:
+              simple:
+                expression: "${header.ce_correlationid}"
+        # En qué paso de este servicio entra el momento: creada → /integrar, embarcada → /embarque, entregada → /entrega
+        - setVariable:
+            name: momento
+            expression:
+              simple:
+                expression: "${variable.tipo.replace('mx.tienda.orden.', '')}"
+        - setVariable:
+            name: paso
+            expression:
+              simple:
+                expression: "${variable.momento == 'creada' ? 'integrar' : ${variable.momento} == 'embarcada' ? 'embarque' : 'entrega'}"
+        - log:
+            message: "Leí de Kafka la orden ${variable.orden} (${variable.tipo}), intento ${variable.intento} correlacion=${variable.correlacion}"
+        # El sobre de siempre, en HTTP: en Kafka se escribe ce_id; en HTTP, ce-id
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: ce-specversion
+            expression:
+              constant:
+                expression: "1.0"
+        - setHeader:
+            name: ce-type
+            expression:
+              simple:
+                expression: "${variable.tipo}"
+        - setHeader:
+            name: ce-source
+            expression:
+              simple:
+                expression: "${variable.fuente}"
+        - setHeader:
+            name: ce-subject
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: ce-id
+            expression:
+              simple:
+                expression: "${variable.id}"
+        - setHeader:
+            name: ce-correlationid
+            expression:
+              simple:
+                expression: "${variable.correlacion}"
+        - setHeader:
+            name: Content-Type
+            expression:
+              constant:
+                expression: application/json
+        # La entrega a la ruta de siempre de este servicio. Si no contesta, el código queda en 0: «no se sabe».
+        - setVariable:
+            name: codigo
+            expression:
+              constant:
+                expression: "0"
+        - setVariable:
+            name: version
+            expression:
+              constant:
+                expression: ""
+        - doTry:
+            steps:
+              - toD:
+                  uri: "http://localhost:8080/${variable.paso}"
+                  parameters:
+                    httpMethod: POST
+                    throwExceptionOnFailure: false
+              - setVariable:
+                  name: codigo
+                  expression:
+                    simple:
+                      expression: "${header.CamelHttpResponseCode}"
+              - setVariable:
+                  name: version
+                  expression:
+                    simple:
+                      expression: "${header.X-Version-Mapeo}"
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      expression:
+                        simple:
+                          expression: "${exception.class.simpleName}: ${exception.message}"
+        # El desenlace, al tópico «desenlaces»: lo lee el router, que es el único que escribe en la base de estado.
+        # Con la orden como llave, igual que el evento.
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            name: CamelKafkaKey
+            expression:
+              simple:
+                expression: "${variable.orden}"
+        - setHeader:
+            name: operacion
+            expression:
+              simple:
+                expression: "${variable.operacion}"
+        - setHeader:
+            name: intento
+            expression:
+              simple:
+                expression: "${variable.intento}"
+        - setHeader:
+            name: canal
+            expression:
+              constant:
+                expression: bd
+        - setHeader:
+            name: codigo
+            expression:
+              simple:
+                expression: "${variable.codigo}"
+                resultType: java.lang.String
+        - setHeader:
+            name: version
+            expression:
+              simple:
+                expression: "${variable.version}"
+        - to:
+            uri: kafka:desenlaces
+            parameters:
+              brokers: kafka:9092
+        - log:
+            message: "Orden ${variable.orden} (${variable.tipo}): int-bd contestó ${variable.codigo}; se lo dejé al router en desenlaces correlacion=${variable.correlacion}"

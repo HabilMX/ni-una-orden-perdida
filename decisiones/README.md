@@ -41,3 +41,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 30 | [El recorrido es una vista por número de orden, y los cuerpos van enteros aparte](30-el-recorrido-es-una-vista.md) | 26 en adelante |
 | 31 | [El rastro se guarda con los datos personales tapados; al destino sale completo](31-el-rastro-se-guarda-tapado.md) | 27 en adelante |
 | 32 | [Un evento por momento en un tópico, con la orden como llave, y un grupo por integración](32-un-topico-un-grupo-por-integracion.md) | 28 en adelante |
+| 33 | [El offset se confirma a mano, después de dejar el desenlace, y lo que falla se vuelve a leer](33-el-offset-se-confirma-despues-del-desenlace.md) | 29 en adelante |

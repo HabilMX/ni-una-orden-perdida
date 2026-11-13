@@ -1,0 +1,5 @@
+{"pedido":"1003","tienda":"T-022","fecha":"2026-11-12T12:40:00-06:00",
+ "partidas":[{"posicion":1,"sku":"SKU-0100","cantidad":3,"precio":0.1,"importe":0.3},
+             {"posicion":2,"sku":"SKU-0101","cantidad":7,"precio":0.7,"importe":4.9},
+             {"posicion":3,"sku":"SKU-0102","cantidad":1,"precio":19.99,"importe":19.99}],
+ "total":25.19}

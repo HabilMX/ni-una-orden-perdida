@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Comprueba la lección 29: lo que un canal lee de Kafka no se pierde si algo falla, o si lo matan, a la mitad.
+#   1. La 4001 llega a sus tres canales (con todo arriba).
+#   2. Kafka deja de aceptar desenlaces (el verifica le baja al tópico «desenlaces» el tamaño máximo de mensaje) y
+#      llegan tres órdenes. int-rest e int-bd entregan a la API y al ERP, pero no pueden dejar su desenlace: el
+#      router no se entera (control; lo que venía detrás en la misma partición espera al que falló). Kafka vuelve a aceptar, y el router se entera de las seis operaciones: lo que
+#      falló no quedó confirmado, y se volvió a leer. Cada pedido se creó UNA vez en la API.
+#   3. Tres órdenes más, y a la mitad de una entrega a int-rest se le MATA (docker compose kill: sin despedirse). Al
+#      volver, la API tiene las tres, cada una creada UNA sola vez: lo que se leyó dos veces lo reconoce la llave de
+#      idempotencia de la API (se mide en el log de la API, el destino).
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba, y Kafka.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+hay() { grep "$@" >/dev/null; }   # grep sin -q: con pipefail, -q corta la tubería y da falsos rojos
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" --profile kafka "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+KAFKA() { INFRA exec -T kafka "$@" 2>/dev/null; }
+TAMANO() { KAFKA /opt/kafka/bin/kafka-configs.sh --bootstrap-server localhost:9092 --alter --entity-type topics --entity-name desenlaces "$@" >/dev/null; }
+# Al terminar: los servicios abajo, la API normal y el tópico desenlaces como estaba
+apagar() { SERV down >/dev/null 2>&1; curl -s -o /dev/null -XPOST localhost:8081/admin/modo -H 'Content-Type: application/json' -d '{"modo":"normal"}'
+  TAMANO --delete-config max.message.bytes 2>/dev/null; }
+MODO() { curl -s -o /dev/null -XPOST localhost:8081/admin/modo -H 'Content-Type: application/json' -d "$1"; }
+DATOS="$RAIZ/datos"
+# Cuántas de estas órdenes tiene la API (el destino), preguntándole una por una
+EN_API() { n=0; for o in "$@"; do [ "$(curl -s -o /dev/null -w '%{http_code}' "localhost:8081/pedidos/$o")" = "200" ] && n=$((n+1)); done; echo $n; }
+REST_OK() { EST "SELECT COUNT(*) FROM operacion WHERE canal='rest' AND momento='creada' AND orden IN ($1) AND estado = 'aceptada'"; }
+MANDAR() { for o in "$@"; do curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/lote-10/orden-$o.json"; done; }
+
+# Todo empieza limpio: los destinos, la base de estado y Kafka (se recrea vacío: sin tópicos ni grupos)
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+INFRA up -d --wait --force-recreate kafka >/dev/null 2>&1 \
+  || { no "Kafka no levantó. Pruébalo a mano: docker compose -f infra/compose.yaml --profile kafka up -d --wait"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname IN ('completitud','alerta','payload','numero_control_seq')")" = "4" ] \
+  || { no "A la base de estado le faltan tablas de lecciones anteriores. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+trap '[ "$DONDE" = "mio" ] || rm -f "$DONDE/int-edi/known_hosts" "$DONDE/orden-router/known_hosts"' EXIT
+EST "DROP VIEW IF EXISTS recorrido" >/dev/null; EST "TRUNCATE acuse, conflicto, intento, payload, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -rf /home/socio/entrada/* /home/socio/salida/* /home/socio/salida/.leidos" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+(cd "$DONDE/orden-router" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio para el router"; exit 1; }
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="barrido-http|barrido|desenlaces|anotar-desenlace|sondeo-acuses|correlacionar-acuse|orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|decidir|webhook-paqueteria|vigilar|juntar|vencidos|reintentar|repartir|publicar|crear-recorrido|recorrido-http|recibir-momento|contestar-reconocido|reconocer|rerun|int-rest|int-rest-embarque|int-rest-entrega|int-rest-kafka|int-rest-entregar|int-bd|int-bd-embarque|int-bd-entrega|int-bd-kafka|int-bd-entregar|int-edi|int-edi-embarque|int-edi-entrega|int-edi-kafka|int-edi-entregar|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 55 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 55 ] && si "Arrancaron el router, los tres canales con su puente y el sondeo" \
+  || { no "No arrancaron todas las rutas ($(LISTOS) de 55). Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# 1. La 4001, con todo arriba: así los grupos ya existen y tienen su cuenta
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json"
+for i in $(seq 1 60); do
+  [ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden='4001' AND estado IN ('aceptada','confirmada')")" = "3" ] && break; sleep 1
+done
+[ "$(EST "SELECT COUNT(*) FROM operacion WHERE orden='4001' AND estado IN ('aceptada','confirmada')")" = "3" ] \
+  && si "La 4001 llegó a sus tres canales" \
+  || { no "La 4001 no llegó a sus tres canales: $(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001'")"; apagar; exit 1; }
+
+# 2. Algo falla a la mitad: Kafka no acepta los desenlaces
+LOTE_A=(2001 2003 2004); EN_A="'2001','2003','2004'"
+OPS_OK() { EST "SELECT COUNT(*) FROM operacion WHERE canal IN ('rest','bd') AND momento='creada' AND orden IN ($1) AND estado = 'aceptada'"; }
+TAMANO --add-config max.message.bytes=1 || { no "No pude cambiar el tópico desenlaces en Kafka"; apagar; exit 1; }
+T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+MANDAR "${LOTE_A[@]}"
+for i in $(seq 1 60); do [ "$(EN_API "${LOTE_A[@]}")" -ge 1 ] \
+  && [ "$(SQL "SELECT COUNT(*) FROM pedido_cabecera WHERE pedido IN ($EN_A)")" -ge 1 ] && break; sleep 1; done
+sleep 4
+A=$(EN_API "${LOTE_A[@]}"); E=$(SQL "SELECT COUNT(*) FROM pedido_cabecera WHERE pedido IN ($EN_A)"); R=$(OPS_OK "$EN_A")
+# Con la solución, el evento que falló detiene su partición: lo que venía detrás en ella espera (ficha 33)
+[ "$A" -ge 1 ] && [ "${E:-0}" -ge 1 ] && [ "$R" = "0" ] \
+  && si "Control: la API tiene $A y el ERP ${E:-0} de las 3, y el router no se enteró de ninguna (sus desenlaces no se pudieron escribir)" \
+  || no "Control: esperaba al menos 1 en la API y en el ERP y 0 enteradas en el router; hay $A en la API, ${E:-0} en el ERP y $R en el router"
+TAMANO --delete-config max.message.bytes || { no "No pude regresar el tópico desenlaces a como estaba"; apagar; exit 1; }
+for i in $(seq 1 60); do [ "$(OPS_OK "$EN_A")" = "6" ] && break; sleep 1; done
+R=$(OPS_OK "$EN_A")
+[ "$R" = "6" ] \
+  && si "Kafka volvió a aceptar y el router se enteró de las 6 operaciones: lo que falló se volvió a leer" \
+  || no "El router se enteró de $R de 6 operaciones: $((6 - R)) se perdieron. Los canales las entregaron, pero el evento quedó confirmado sin su desenlace: ¿confirmas a mano, después del desenlace, y con breakOnFirstError?"
+LOG_API=$(INFRA logs --since "$T0" api-pedidos 2>/dev/null)
+C=0; for o in "${LOTE_A[@]}"; do C=$((C + $(printf '%s\n' "$LOG_API" | grep -c "201 llave=$o "))); done
+[ "$C" = "3" ] && si "En la API se creó cada una UNA vez (3 creaciones para 3 órdenes)" \
+  || no "En la API hubo $C creaciones para 3 órdenes"
+
+# 3. Matarlo a la mitad de una entrega
+LOTE_B=(2006 2008 2009); EN_B="'2006','2008','2009'"
+SERV stop int-rest >/dev/null 2>&1
+MANDAR "${LOTE_B[@]}"
+MODO '{"modo":"lento","espera_ms":2500}'
+T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+SERV start int-rest >/dev/null 2>&1
+for i in $(seq 1 120); do [ "$(EN_API "${LOTE_B[@]}")" -ge 1 ] && break; sleep 0.5; done
+sleep 1.2                          # ya va a la mitad de la siguiente entrega: la API está esperando 2.5 s
+SERV kill int-rest >/dev/null 2>&1
+MODO '{"modo":"normal"}'
+SERV start int-rest >/dev/null 2>&1
+for i in $(seq 1 90); do [ "$(REST_OK "$EN_B")" = "3" ] && break; sleep 1; done
+FINAL=$(EN_API "${LOTE_B[@]}"); OKS=$(REST_OK "$EN_B")
+LOG_API=$(INFRA logs --since "$T0" api-pedidos 2>/dev/null)
+CREADAS=0; REPETIDOS=0; DOBLES=""
+for o in "${LOTE_B[@]}"; do
+  c=$(printf '%s\n' "$LOG_API" | grep -c "201 llave=$o ")
+  r=$(printf '%s\n' "$LOG_API" | grep -c "200 llave=$o ")
+  CREADAS=$((CREADAS + c)); REPETIDOS=$((REPETIDOS + r)); [ "$c" -gt 1 ] && DOBLES="$DOBLES $o"
+done
+[ "$FINAL" = "3" ] && [ "$OKS" = "3" ] \
+  && si "Tras matar int-rest, la API tiene las 3 y las 3 operaciones quedaron aceptadas" \
+  || no "Tras matar int-rest, la API tiene $FINAL de 3 ($OKS de 3 aceptadas)"
+if [ "$CREADAS" = "3" ] && [ -z "$DOBLES" ]; then
+  if [ "$REPETIDOS" -ge 1 ]; then
+    si "Cada una se creó UNA vez en la API; lecturas repetidas: $REPETIDOS, y la API las reconoció como reenvío (200)"
+  else
+    si "Cada una se creó UNA vez en la API (esta vez el corte no dejó ninguna leída dos veces)"
+  fi
+else
+  no "En la API: $CREADAS creaciones para 3 órdenes (dobles:${DOBLES:- ninguna})"
+fi
+apagar
+exit $ok

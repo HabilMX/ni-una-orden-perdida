@@ -1,0 +1,9 @@
+/* El embarque de la bodega, convertido en el evento «embarcado» que espera la API de pedidos.
+   La API solo necesita saber con qué guía y qué paquetería salió, y cuándo. Los renglones no los pide:
+   ella ya tiene el pedido completo desde que se creó. */
+{
+  "tipo": "embarcado",
+  "guia": guia,
+  "paqueteria": paqueteria,
+  "fecha": embarcada
+}
