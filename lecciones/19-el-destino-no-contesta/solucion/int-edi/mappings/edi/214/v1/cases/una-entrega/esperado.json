@@ -1,0 +1,6 @@
+{"isa":{"emisor":"TIENDANORTE    ","receptor":"SOCIO01        ","fecha":"261114","hora":"1705","control":"100000125"},
+ "gs":{"emisor":"TIENDANORTE","receptor":"SOCIO01","fecha":"20261114","hora":"1705","control":"100000125"},
+ "st":{"control":"0001"},
+ "b10":{"guia":"PAQX770004001","orden":"4001","paqueteria":"PAQX"},
+ "estatus":{"fecha":"20261114","hora":"1705"},
+ "se":{"segmentos":6}}

@@ -1,0 +1,38 @@
+/* Versión 2 del 850: lo mismo que la v1, pero el NÚMERO DE CONTROL ya no sale de la orden. Lo asigna el router
+   (secuencia numero_control_seq de la base de estado), uno nuevo por documento, y llega junto con los datos:
+     {"control": "100000007", "datos": <lo que llegó del router>}
+   El ISA13 y el GS06 llevan ese número. Sin él, el mapeo se niega: un X12 sin número de control no se manda.
+   Lo demás se explica en la v1 (mappings/edi/850/v1/mapeo.jsonata). */
+(
+  $control := $exists(control) and $length(control) = 9 ? control
+    : $error("Falta el número de control del router (9 dígitos), o no mide 9");
+  datos.(
+    $limpiar := function($t) { $replace($t, /[*~>]/, " ") };
+    $emisor := "TIENDANORTE";
+    $receptor := "SOCIO01";
+    $aaaammdd := $replace($substring(creada, 0, 10), "-", "");
+    $hhmm := $replace($substring(creada, 11, 5), ":", "");
+    {
+      "isa": {
+        "emisor": $pad($emisor, 15),            /* ancho fijo: 15 caracteres, rellenos con espacios */
+        "receptor": $pad($receptor, 15),
+        "fecha": $substring($aaaammdd, 2),      /* AAMMDD */
+        "hora": $hhmm,
+        "control": $control
+      },
+      "gs": { "emisor": $emisor, "receptor": $receptor, "fecha": $aaaammdd, "hora": $hhmm, "control": $control },
+      "st": { "control": "0001" },
+      "beg": { "orden": orden, "fecha": $aaaammdd },
+      "tienda": { "nombre": $limpiar("Tienda " & tienda), "clave": tienda },
+      "lineas": [renglones.{
+        "n": renglon,
+        "cantidad": cantidad,
+        "precio": $formatNumber(precio, "0.00"),
+        "sku": $limpiar(sku),
+        "descripcion": $limpiar(descripcion)
+      }],
+      "ctt": $count(renglones),
+      "se": { "segmentos": 3 + 2 * $count(renglones) + 2 }   /* ST, BEG, N1 + (PO1, PID) por renglón + CTT, SE */
+    }
+  )
+)

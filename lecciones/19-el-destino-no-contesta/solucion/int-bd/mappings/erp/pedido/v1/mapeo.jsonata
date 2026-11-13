@@ -1,0 +1,18 @@
+/* La orden de la tienda, convertida en las filas que espera el ERP:
+   una cabecera y un renglón de detalle por partida.
+   La fecha va sin zona horaria porque la columna del ERP es DATETIME (hora local de la tienda). */
+{
+  "cabecera": {
+    "pedido": orden,
+    "tienda": tienda,
+    "fecha": $replace($substring(creada, 0, 19), "T", " "),
+    "total": $round($sum(renglones.(cantidad * precio)), 2)
+  },
+  "detalle": [renglones.{
+    "pedido": %.orden,
+    "posicion": renglon,
+    "sku": sku,
+    "cantidad": cantidad,
+    "precio": precio
+  }]
+}

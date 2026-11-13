@@ -1,0 +1,37 @@
+# Reintentar en el lugar (lección 19). Solo el router reintenta: los canales (int-rest, int-bd, int-edi) contestan
+# lo que les pasó y ya; si cada pieza reintentara por su cuenta, los reintentos se multiplicarían.
+#
+#   intento 1 ✗ ─ 1 s ─ intento 2 ✗ ─ 2 s ─ intento 3 ✗ ─ 4 s ─ intento 4 ✓     (más o menos 15 % al azar)
+#
+# Se repite en el lugar: la cola seda:repartir tiene un solo consumidor y la espera lo detiene, así que lo que viene
+# detrás (el embarque de la misma orden, otra orden) espera su turno. Eso conserva el orden, y cuesta: mientras un
+# destino no contesta, nadie más avanza.
+#
+# Solo se repite lo que quedó «no se sabe» (sin respuesta o 5xx): direct:intentar lanza una IOException en ese caso.
+# Un 4xx es un «no» del destino y no se repite. Agotados los reintentos, la operación se queda en no_se_sabe.
+# Esta es TU parte de la lección.
+- routeConfiguration:
+    id: reintentar-en-el-lugar
+    onException:
+      - onException:
+          exception:
+            - java.io.IOException
+          # TODO 1: agrega una redeliveryPolicy: 5 reintentos, el primero a 1 s (redeliveryDelay: 1000).
+          # TODO 2: que cada espera sea el doble de la anterior (useExponentialBackOff, backOffMultiplier: 2).
+          # TODO 3: con un poco de azar, para que dos routers no reintenten al mismo tiempo
+          #         (useCollisionAvoidance, collisionAvoidanceFactor: 0.15).
+          # TODO 4: que cada reintento se vea en el log como WARN (retryAttemptedLogLevel).
+          # Tal como viene, no hay reintentos: al primer «no se sabe» se rinde.
+          handled:
+            constant:
+              expression: "true"
+          steps:
+            - log:
+                loggingLevel: ERROR
+                message: "Agoté los reintentos: orden ${variable.orden} momento ${variable.momento} canal ${variable.canal} se queda en no_se_sabe"
+
+# La ruta que hace cada intento no maneja sus errores: los deja subir a quien la llamó (enviar)
+- routeConfiguration:
+    id: sin-manejo
+    errorHandler:
+      noErrorHandler: {}

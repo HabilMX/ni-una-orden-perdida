@@ -1,0 +1,9 @@
+{"isa":{"emisor":"TIENDANORTE    ","receptor":"SOCIO01        ","fecha":"261112","hora":"1015","control":"100000123"},
+ "gs":{"emisor":"TIENDANORTE","receptor":"SOCIO01","fecha":"20261112","hora":"1015","control":"100000123"},
+ "st":{"control":"0001"},
+ "beg":{"orden":"1001","fecha":"20261112"},
+ "tienda":{"nombre":"Tienda T-014","clave":"T-014"},
+ "lineas":[{"n":1,"cantidad":2,"precio":"89.50","sku":"SKU-0001","descripcion":"Taza blanca"},
+           {"n":2,"cantidad":1,"precio":"249.00","sku":"SKU-0042","descripcion":"Mantel azul"}],
+ "ctt":2,
+ "se":{"segmentos":9}}
