@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Comprueba la lección 15: el router GUARDA cada momento en la base de estado antes de contestar 202, y lleva ahí
+# la cuenta de cada canal: una operación por canal, con sus intentos (huella sha256 y versión del mapeo).
+# Desde aquí el número de control del X12 lo asigna el router: el 850 y el 856 llevan el de la base.
+# Y con el ERP caído, la tienda recibe su 202 igual, y la operación del ERP queda sin aceptar (no se pierde).
+# Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba.
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ="$(cd ../.. && pwd)"
+DONDE="${1:-mio}"
+[ -d "$DONDE" ] || { echo "❌ No existe $DONDE/. Copia inicio/ a mio/ primero."; exit 1; }
+ok=0; si() { echo "✅ $1"; }; no() { echo "❌ $1"; ok=1; }
+INFRA() { docker compose -f "$RAIZ/infra/compose.yaml" "$@"; }
+SQL() { INFRA exec -T erp mariadb -uintegracion -p"${ERP_CLAVE:-practica}" erp -N -e "$1" 2>/dev/null; }
+EST() { INFRA exec -T estado psql -U router -d estado -tAF $'\t' -c "$1" 2>/dev/null; }
+SOCIO() { INFRA exec -T socio-sftp sh -c "$1" 2>/dev/null; }
+SERV() { DONDE="$DONDE" docker compose -f compose.yaml "$@"; }
+apagar() { SERV down >/dev/null 2>&1; }
+CAMPO() { curl -s "localhost:8081/pedidos/$1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$2'))" 2>/dev/null; }
+DATOS="$RAIZ/datos"
+# Cuántas operaciones de una orden y un momento ya tienen desenlace (no están en pendiente)
+TERMINADAS() { EST "SELECT COUNT(*) FROM operacion WHERE orden='$1' AND momento='$2' AND estado <> 'pendiente'"; }
+esperar_ops() { for i in $(seq 1 40); do [ "$(TERMINADAS "$1" "$2")" -ge "$3" ] && return 0; sleep 2; done; return 1; }
+
+# Todo empieza limpio: los destinos y la base de estado
+INFRA restart api-pedidos >/dev/null 2>&1
+INFRA up -d --wait api-pedidos erp estado >/dev/null 2>&1 || { no "El ambiente no levantó: ¿corriste la 00?"; exit 1; }
+SQL "DELETE FROM entrega; DELETE FROM embarque; DELETE FROM pedido_detalle; DELETE FROM pedido_cabecera;" || { no "No pude hablar con el ERP"; exit 1; }
+[ "$(EST "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='operacion' AND column_name='correlacion'")" = "1" ] \
+  && [ "$(EST "SELECT COUNT(*) FROM pg_class WHERE relname='numero_control_seq'")" = "1" ] \
+  || { no "A la base de estado le falta la secuencia numero_control_seq o la columna correlacion. Recréala: docker compose -f infra/compose.yaml up -d --wait --force-recreate -V estado"; exit 1; }
+EST "TRUNCATE intento, operacion, orden RESTART IDENTITY CASCADE" >/dev/null || { no "No pude limpiar la base de estado"; exit 1; }
+SOCIO "rm -f /home/socio/entrada/*" || { no "No pude hablar con el SFTP del socio"; exit 1; }
+(cd "$DONDE/int-edi" && "$RAIZ/herramientas/confiar-en-socio" >/dev/null) || { no "No pude anotar la llave del socio"; exit 1; }
+[ "$DONDE" = "mio" ] || trap 'rm -f "$DONDE/int-edi/known_hosts"' EXIT
+rm -rf buzon; mkdir -p buzon
+
+apagar
+if curl -s -o /dev/null --max-time 2 localhost:8080; then
+  no "El puerto 8080 está ocupado: apaga lo que dejaste corriendo (Ctrl+C o «docker compose … down») y vuelve a intentar"; exit 1
+fi
+SERV up -d >/dev/null 2>&1 || { no "No pude levantar los servicios de la lección"; apagar; exit 1; }
+RUTAS="orden-router|embarque-router|hilo|contestar-y-repartir|no-existe|canales|cargar-orden|guardar-orden|guardar-momento|repartir|enviar|int-rest|int-bd|int-edi|int-rest-embarque|int-bd-embarque|int-edi-embarque|sondeo-bodega"
+LISTOS() { SERV logs 2>/dev/null | grep -cE "Started ($RUTAS) "; }
+for i in $(seq 1 90); do [ "$(LISTOS)" -ge 18 ] && break; sleep 2; done
+[ "$(LISTOS)" -ge 18 ] && si "Arrancaron el router (con su base de estado), los tres canales y el sondeo" \
+  || { no "No arrancaron todas las rutas. Esto dijeron:"; SERV logs 2>/dev/null | grep -E "ERROR|Exception" | head -10; apagar; exit 1; }
+
+# 1) La tienda manda la 4001 (franquicia: le tocan los tres canales)
+R=$(curl -s -w "\n%{http_code}" --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4001.json")
+[ "$(echo "$R" | tail -1)" = "202" ] && si "La tienda mandó la 4001 y el router contestó 202 «recibida»" || no "Esperaba 202 del router y contestó: $(echo "$R" | tr '\n' ' ')"
+esperar_ops 4001 creada 3
+[ "$(EST "SELECT COUNT(*) FROM orden WHERE orden='4001' AND momento='creada' AND datos->>'tienda'='T-501'")" = "1" ] \
+  && si "Estado: una fila de la orden 4001, con sus datos" || no "Estado: no está la fila de la orden 4001 con sus datos"
+OPS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001' AND momento='creada'")
+[ "$OPS" = "bd=aceptada edi=aceptada rest=aceptada" ] && si "Estado: tres operaciones de la 4001, una por canal, y las tres aceptadas" \
+  || no "Estado: esperaba «bd=aceptada edi=aceptada rest=aceptada» y hay «${OPS:-nada}»"
+INT=$(EST "SELECT COUNT(DISTINCT p.canal) FROM operacion p JOIN intento i ON i.operacion = p.id WHERE p.orden='4001' AND p.momento='creada' AND i.sha256 ~ '^[0-9a-f]{64}$' AND i.version_mapeo IS NOT NULL AND i.desenlace = p.estado")
+[ "$INT" = "3" ] && si "Estado: cada operación tiene su intento, con huella sha256, versión del mapeo y desenlace" \
+  || no "Estado: solo $INT de 3 operaciones tienen un intento con huella, versión y desenlace"
+[ "$(CAMPO 4001 estatus)" = "CREADO" ] && [ "$(SQL "SELECT estatus FROM pedido_cabecera WHERE pedido='4001'")" = "REGISTRADO" ] \
+  && si "Destinos: la API tiene la 4001 CREADO y el ERP REGISTRADO" || no "Destinos: la 4001 no llegó a la API o al ERP"
+C850=$(EST "SELECT numero_control FROM operacion WHERE orden='4001' AND momento='creada' AND canal='edi'")
+SOCIO "cat /home/socio/entrada/850-4001.edi" | grep -q "^ISA\*.*\*${C850:-sin-numero}\*0\*P\*>~" \
+  && si "Socio: el 850 de la 4001 lleva en el ISA el número de control de la base ($C850)" \
+  || no "Socio: el ISA del 850 no lleva el número de control de la base («${C850:-no hay}»)"
+
+# 2) La bodega embarca la 4001 (un lote de un solo embarque)
+python3 -c "import json,sys; e=json.load(open(sys.argv[1])); json.dump({'lote':'9001','bodega':'B-NORTE','embarques':[e]}, open('buzon/lote-bodega-9001.json','w'))" "$DATOS/embarques/embarque-4001.json"
+esperar_ops 4001 embarcada 3
+OPS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4001' AND momento='embarcada'")
+[ "$OPS" = "bd=aceptada edi=aceptada rest=aceptada" ] && [ "$(EST "SELECT momento FROM orden WHERE orden='4001'")" = "embarcada" ] \
+  && si "Estado: el embarque de la 4001 tiene sus tres operaciones aceptadas y la orden va en «embarcada»" \
+  || no "Estado: el embarque de la 4001 quedó «${OPS:-sin operaciones}»"
+C856=$(EST "SELECT numero_control FROM operacion WHERE orden='4001' AND momento='embarcada' AND canal='edi'")
+SOCIO "cat /home/socio/entrada/856-4001.edi" | grep -q "^ISA\*.*\*${C856:-sin-numero}\*0\*P\*>~" && [ -n "$C856" ] && [ "$C856" != "$C850" ] \
+  && si "Socio: el 856 lleva su propio número de control ($C856), distinto del 850 ($C850)" \
+  || no "Socio: el 856 no lleva un número de control propio de la base («${C856:-no hay}» contra el 850 «${C850:-no hay}»)"
+[ "$(CAMPO 4001 estatus)" = "EMBARCADO" ] && si "Destinos: la API tiene la 4001 EMBARCADO" || no "Destinos: la API tiene la 4001 en «$(CAMPO 4001 estatus)»"
+
+# 3) El ERP se cae. La tienda manda la 4002: el router la guarda, contesta 202 igual, y el ERP queda pendiente de saber
+INFRA stop erp >/dev/null 2>&1
+R=$(curl -s -w "\n%{http_code}" --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4002.json")
+COD=$(echo "$R" | tail -1)
+esperar_ops 4002 creada 3
+OPS=$(EST "SELECT string_agg(canal || '=' || estado, ' ' ORDER BY canal) FROM operacion WHERE orden='4002' AND momento='creada'")
+INFRA start erp >/dev/null 2>&1; INFRA up -d --wait erp >/dev/null 2>&1
+[ "$COD" = "202" ] && si "Con el ERP caído, la tienda recibió su 202 por la 4002" || no "Con el ERP caído, el router contestó «$COD» en vez de 202"
+case "$OPS" in
+  "bd=no_se_sabe edi=aceptada rest=aceptada"|"bd=rechazada edi=aceptada rest=aceptada")
+    si "Estado: la operación del ERP quedó sin aceptar y está guardada («$OPS»); las otras dos siguieron" ;;
+  *) no "Estado: con el ERP caído esperaba la del ERP sin aceptar y las otras aceptadas; hay «${OPS:-nada}»" ;;
+esac
+apagar
+exit $ok
