@@ -20,7 +20,7 @@ Aquí se anota qué trae cada versión de la práctica y qué se corrigió despu
   la misma en JVM y en nativo, medida por el alumno. Pide un equipo con más memoria y disco; lo dice al principio.
 
 ### Decisiones
-- 39 fichas en [`decisiones/`](decisiones/README.md), cada una con el problema, qué decidimos, por qué, qué
+- 40 fichas en [`decisiones/`](decisiones/README.md), cada una con el problema, qué decidimos, por qué, qué
   descartamos y qué nos haría reabrirla.
 
 ### Cómo se comprueba

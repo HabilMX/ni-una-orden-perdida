@@ -11,7 +11,9 @@ N=$(find "$DIR/cases" -name entrada.json 2>/dev/null | wc -l | tr -d ' ')
 [ "$N" -gt 0 ] || { echo "❌ No hay casos en $DIR/cases: sin casos no hay nada que probar"; exit 1; }
 case "$DIR" in "$RAIZ"/*) REL="${DIR#"$RAIZ"/}";; *) echo "❌ La carpeta debe estar dentro del repo"; exit 1;; esac
 LOG=$(mktemp)
-docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 apache/camel-jbang:4.22.1 \
+# Arranca como root solo para correr como el dueño de tu carpeta (ver herramientas/correr-como-el-dueno)
+docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 \
+  --user root --entrypoint sh apache/camel-jbang:4.22.1 /work/herramientas/correr-como-el-dueno \
   run herramientas/probar-mapeo.camel.yaml --prop=casos="$REL/cases" --prop=mapeo="$REL/mapeo.jsonata" \
   --max-messages="$N" --max-seconds=120 >"$LOG" 2>&1
 OK=$(grep -c "CASO-OK" "$LOG"); FALLA=$(grep -c "CASO-FALLA" "$LOG")

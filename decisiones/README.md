@@ -48,3 +48,4 @@ qué la haría cambiar. Si encuentras un caso que la contradiga, abre un issue.
 | 37 | [El HPA escala por CPU, medida como porcentaje de lo que cada copia reserva, y baja rápido en la práctica](37-el-hpa-escala-por-cpu-reservada.md) | 31 (apéndice) |
 | 38 | [El nativo se compila con Mandrel dentro de un contenedor, con el mismo compilador de Java que la JVM](38-el-nativo-se-compila-en-un-contenedor.md) | 32 (apéndice) |
 | 39 | [JVM contra nativo se mide en tu máquina, con un método fijo y sin umbrales; la capacidad se mide igual](39-se-mide-en-tu-maquina-sin-umbrales.md) | 32 (apéndice) |
+| 40 | [Los contenedores de Camel escriben como el dueño de tu carpeta, sin que tengas que hacer nada](40-camel-escribe-como-el-dueno-de-la-carpeta.md) | 01 a 30 |

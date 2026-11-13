@@ -8,7 +8,9 @@ ARCH="$(cd "$(dirname "${1:?Dime el archivo X12}")" && pwd)/$(basename "$1")"
 [ -f "$ARCH" ] || { echo "❌ No existe $1"; exit 1; }
 case "$ARCH" in "$RAIZ"/*) REL="${ARCH#"$RAIZ"/}";; *) echo "❌ El archivo debe estar dentro del repo"; exit 1;; esac
 LOG=$(mktemp)
-docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 apache/camel-jbang:4.22.1 \
+# Arranca como root solo para correr como el dueño de tu carpeta (ver herramientas/correr-como-el-dueno)
+docker run --rm -v "$RAIZ":/work -w /work -v practica-retail-m2:/home/ubuntu/.m2 \
+  --user root --entrypoint sh apache/camel-jbang:4.22.1 /work/herramientas/correr-como-el-dueno \
   run herramientas/leer-x12.camel.yaml --prop=carpeta="$(dirname "$REL")" --prop=archivo="$(basename "$REL")" \
   --max-messages=1 --max-seconds=60 >"$LOG" 2>&1
 grep -q "X12-TIPO" "$LOG" || { echo "❌ No pude leer el archivo como X12 (revisa $LOG)"; exit 1; }

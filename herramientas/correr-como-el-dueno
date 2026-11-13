@@ -1,0 +1,49 @@
+#!/bin/sh
+# Arranque de los contenedores de Camel: la ruta corre con el MISMO usuario que es dueño de tu carpeta.
+# No lo corres tú: lo usan herramientas/camel, los compose.yaml de las lecciones y algunos verifica.
+#
+# Por qué existe. La imagen oficial de Camel (apache/camel-jbang) trae un usuario fijo, «ubuntu», con el número
+# (uid) 1000. En Linux, los permisos de la carpeta que montas en /work se respetan tal cual:
+#   - si tu usuario tiene otro número (un servidor de pruebas suele usar el 1001; otra laptop, el 1002), «ubuntu»
+#     no puede crear salida/ ni mover lo que lee, y la orden se queda en entrada/;
+#   - si la carpeta no existía cuando levantaste los servicios, Docker la crea a nombre de root, y tampoco ahí
+#     puede escribir.
+# En una Mac, Docker traduce los permisos de la carpeta compartida y esto casi nunca se nota.
+#
+# Qué hace, en orden. Arranca como root SOLO para acomodar esto dentro del contenedor, y luego suelta ese poder:
+#   1. Mira de quién es /work. Si se ve a nombre de root (0), lo más probable es que sea una carpeta compartida
+#      de Mac o de Docker Desktop, que ya traduce permisos: se queda con «ubuntu», como siempre.
+#   2. Si Docker creó a nombre de root alguna carpeta montada dentro de /work (por ejemplo, buzon/), se la pasa al
+#      dueño de /work. Así esa carpeta queda como si la hubieras creado tú.
+#   3. Si el dueño no es el 1000, le cambia el número a «ubuntu» DENTRO del contenedor (tu máquina no se toca).
+#      Así su casa, /home/ubuntu, con lo que Camel ya trae descargado, le sigue sirviendo.
+#   4. Si el caché de descargas (el volumen practica-retail-m2) quedó a nombre de otro número, lo pone a nombre
+#      de este usuario. Pasa, por ejemplo, si en la misma máquina corrió antes otro usuario.
+#   5. Arranca Camel como ese usuario, con lo mismo que le hayas pedido («run ...», «--version», etc.).
+set -eu
+
+DUENO=$(stat -c %u /work)
+GRUPO=$(stat -c %g /work)
+if [ "$DUENO" = "0" ]; then
+  DUENO=1000
+  GRUPO=1000
+else
+  find /work -mindepth 1 -maxdepth 1 -type d -user 0 -exec chown "$DUENO:$GRUPO" {} +
+fi
+
+if [ "$GRUPO" != "$(id -g ubuntu)" ]; then
+  groupmod -o -g "$GRUPO" ubuntu
+fi
+if [ "$DUENO" != "$(id -u ubuntu)" ]; then
+  # -o: el número puede repetirse con otro usuario de la imagen; dentro del contenedor no estorba
+  usermod -o -u "$DUENO" -g "$GRUPO" ubuntu
+fi
+CASA=/home/ubuntu
+for d in "$CASA" "$CASA/.m2"; do
+  if [ -d "$d" ] && [ "$(stat -c %u:%g "$d")" != "$DUENO:$GRUPO" ]; then
+    chown -R "$DUENO:$GRUPO" "$d"
+  fi
+done
+
+export HOME="$CASA"
+exec setpriv --reuid="$DUENO" --regid="$GRUPO" --init-groups camel "$@"

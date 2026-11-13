@@ -17,6 +17,14 @@ x-camel: &camel
   command: ["run", "."]          # corre todos los *.camel.yaml de su carpeta
   working_dir: /work
   networks: [practica]
+  # Arranca como root solo para acomodar permisos, y luego corre Camel con el MISMO usuario que es dueño de la
+  # carpeta. Sin esto, en Linux, Camel no puede escribir en /work ni en buzon/ si tu usuario no tiene el número 1000.
+  # El detalle está en herramientas/correr-como-el-dueno.
+  user: root
+  entrypoint: ["sh", "/practica/arranque"]
+  configs:
+    - source: arranque
+      target: /practica/arranque
 
 services:
   orden-router:
@@ -70,3 +78,7 @@ networks:
 volumes:
   practica-retail-m2:
     external: true
+
+configs:
+  arranque:
+    file: ../../herramientas/correr-como-el-dueno

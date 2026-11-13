@@ -12,7 +12,9 @@ cd "$DONDE"
 rm -rf entrada salida && mkdir -p entrada
 cp ../../../datos/ordenes/orden-1001.json entrada/
 LOG=$(mktemp)
-docker run --rm -v "$PWD":/work -w /work apache/camel-jbang:4.22.1 \
+# Arranca como root solo para correr como el dueño de tu carpeta (ver herramientas/correr-como-el-dueno)
+docker run --rm -v "$PWD":/work -w /work -v "$PWD/../../../herramientas/correr-como-el-dueno":/practica/arranque:ro \
+  --user root --entrypoint sh apache/camel-jbang:4.22.1 /practica/arranque \
   run primera-ruta.camel.yaml --max-seconds=20 >"$LOG" 2>&1
 ok=0
 hay "Started primera-ruta" "$LOG" && echo "✅ La ruta arrancó" || { echo "❌ La ruta no arrancó (revisa $LOG)"; ok=1; }

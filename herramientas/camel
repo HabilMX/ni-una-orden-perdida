@@ -23,9 +23,15 @@ if [ "${1:-}" = "run" ] && [ -f dependencias.txt ]; then
   DEPS=$(grep -vE '^\s*(#|$)' dependencias.txt | paste -sd, -)
   [ -n "$DEPS" ] && EXTRA=(--dep="$DEPS")
 fi
+# El contenedor arranca como root solo para acomodar permisos y luego corre Camel con el MISMO usuario que es
+# dueño de la carpeta en la que estás. Sin esto, en Linux, Camel no puede escribir en tu carpeta si tu usuario no
+# tiene el número 1000. El detalle está en herramientas/correr-como-el-dueno.
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 exec docker run --rm $TTY \
   --network "${CAMEL_RED:-practica-retail_default}" \
   -v "$PWD":/work -w /work \
   -v practica-retail-m2:/home/ubuntu/.m2 \
+  -v "$RAIZ/herramientas/correr-como-el-dueno":/practica/arranque:ro \
+  --user root --entrypoint sh \
   ${PUERTO[@]+"${PUERTO[@]}"} \
-  "$IMAGEN" "$@" ${EXTRA[@]+"${EXTRA[@]}"}
+  "$IMAGEN" /practica/arranque "$@" ${EXTRA[@]+"${EXTRA[@]}"}
