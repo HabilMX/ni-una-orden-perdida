@@ -24,6 +24,9 @@ evento. Para el router, se perdió.
 - Un evento que no es para el canal también se confirma, para que la cuenta del grupo avance.
 - Lo que se lea dos veces lo reconoce el destino: la llave de idempotencia de la API (lección 02), el «ya registrado»
   del ERP (lección 23) y el desenlace que solo cambia una operación que sigue `enviada` (lección 28).
+- El SFTP del socio no sabe reconocer un repetido: no pisa un archivo que ya está (lección 07), y la segunda entrega
+  falla. Lo reconoce int-edi: si el archivo existe, lo lee y lo compara con el 850 que iba a dejar. Idéntico, contesta
+  que ya estaba y la operación queda aceptada; distinto, es un conflicto (lección 18), contesta `409` y no pisa nada.
 
 ## Por qué
 
@@ -63,9 +66,8 @@ resto seguiría.
 
 - Que un canal tarde tanto por evento que confirmar uno por uno pese: se confirmaría cada tantos eventos, con la misma
   regla (solo lo terminado).
-- Que un destino no pueda reconocer un repetido: habría que guardar en el canal qué eventos ya entregó. Pasa con el
-  850 del socio: el SFTP no pisa un archivo que ya está, así que un repetido no se duplica pero queda «no se sabe» y,
-  agotados los reintentos, en conciliación.
+- Que el socio borre o mueva lo que ya leyó: entonces el archivo ya no estaría para compararlo, y el canal tendría que
+  guardar por su cuenta qué 850 ya entregó. En la práctica el socio deja sus archivos en `entrada/`.
 - Que un evento se atore por su contenido: un tópico aparte para lo que no se puede terminar.
 
 ## Fuentes

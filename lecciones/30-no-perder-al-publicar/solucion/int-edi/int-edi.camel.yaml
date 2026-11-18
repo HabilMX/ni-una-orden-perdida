@@ -38,15 +38,81 @@
             uri: mustache:templates/edi/850/v1/850.mustache
         - removeHeaders:
             pattern: "*"
-        - to:
-            uri: sftp://socio@socio-sftp:22/entrada
-            parameters:
-              password: "{{env:SFTP_CLAVE:practica}}"
-              knownHostsFile: known_hosts
-              strictHostKeyChecking: "yes"
-              fileName: "850-${variable.orden}.edi"
-              tempFileName: "${file:onlyname.noext}.tmp"
-              fileExist: Fail
+        # Desde la 29, int-edi puede leer dos veces el mismo evento (ficha 33), y entonces entrega dos veces el
+        # mismo 850. El SFTP no lo pisa (fileExist: Fail, lección 07) y la escritura falla. Pero el nombre sale de
+        # la orden y el contenido también, número de control incluido: un 850 repetido es IDÉNTICO al que ya está.
+        # Así que, si el archivo ya existe, se lee y se compara con el que se iba a dejar:
+        #   - idéntico → es el mismo 850: «ya estaba», y la operación queda aceptada (como el «ya registrado» del ERP);
+        #   - distinto → misma llave, otro contenido: es un CONFLICTO (lección 18). Se contesta 409 y alguien decide.
+        # En ningún caso se pisa el archivo del socio.
+        - setVariable:
+            name: edi
+            expression:
+              simple:
+                expression: "${body}"
+        - setVariable:
+            name: resultado
+            expression:
+              constant:
+                expression: DEPOSITADO
+        - doTry:
+            steps:
+              - to:
+                  uri: sftp://socio@socio-sftp:22/entrada
+                  parameters:
+                    password: "{{env:SFTP_CLAVE:practica}}"
+                    knownHostsFile: known_hosts
+                    strictHostKeyChecking: "yes"
+                    fileName: "850-${variable.orden}.edi"
+                    tempFileName: "${file:onlyname.noext}.tmp"
+                    fileExist: Fail
+            doCatch:
+              - exception:
+                  - org.apache.camel.component.file.GenericFileOperationFailedException
+                onWhen:
+                  simple:
+                    expression: "${exception.message} contains 'File already exist'"
+                steps:
+                  # Se lee el que ya está, sin moverlo ni borrarlo (noop), aunque ya se haya leído antes (idempotent=false)
+                  - pollEnrich:
+                      expression:
+                        simple:
+                          expression: >-
+                            sftp://socio@socio-sftp:22/entrada?password={{env:SFTP_CLAVE:practica}}&knownHostsFile=known_hosts&strictHostKeyChecking=yes&fileName=850-${variable.orden}.edi&noop=true&idempotent=false
+                      timeout: 10000
+                  - convertBodyTo:
+                      type: java.lang.String
+                  - choice:
+                      when:
+                        - simple:
+                            expression: "${body} == ${variable.edi}"
+                          steps:
+                            - setVariable:
+                                name: resultado
+                                expression:
+                                  constant:
+                                    expression: YA_ESTABA
+                            - log:
+                                message: "El 850 de la orden ${variable.orden} ya estaba en el SFTP del socio, idéntico: es un repetido y no lo vuelvo a dejar correlacion=${variable.correlacion}"
+                      otherwise:
+                        steps:
+                          - log:
+                              loggingLevel: WARN
+                              message: "Conflicto: en el SFTP del socio ya hay un 850 de la orden ${variable.orden} con otro contenido. No lo piso correlacion=${variable.correlacion}"
+                          - removeHeaders:
+                              pattern: "*"
+                          - setHeader:
+                              name: CamelHttpResponseCode
+                              expression:
+                                constant:
+                                  expression: "409"
+                          - setBody:
+                              expression:
+                                simple:
+                                  expression: '{"canal":"socio","archivo":"850-${variable.orden}.edi","resultado":"CONFLICTO","motivo":"ya hay un 850 de esta orden con otro contenido"}'
+                          - stop: {}
+        - removeHeaders:
+            pattern: "*"
         # Qué versión del mapeo se usó: el router la anota en el intento (lección 15)
         - setHeader:
             name: X-Version-Mapeo
@@ -54,8 +120,8 @@
               constant:
                 expression: edi/850/v2
         - log:
-            message: "Dejé el 850 de la orden ${variable.orden} en el SFTP del socio correlacion=${variable.correlacion}"
+            message: "850 de la orden ${variable.orden} en el SFTP del socio: ${variable.resultado} correlacion=${variable.correlacion}"
         - setBody:
             expression:
               simple:
-                expression: '{"canal":"socio","archivo":"850-${variable.orden}.edi","resultado":"DEPOSITADO"}'
+                expression: '{"canal":"socio","archivo":"850-${variable.orden}.edi","resultado":"${variable.resultado}"}'

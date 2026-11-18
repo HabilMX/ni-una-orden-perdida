@@ -3,6 +3,14 @@
 Aquí se anota qué trae cada versión de la práctica y qué se corrigió después. La forma sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/): lo más nuevo arriba.
 
+## [Sin publicar]
+
+### Corregido
+- **Lecciones 29 y 30:** cuando int-edi leía dos veces el mismo evento, el SFTP no pisaba el 850 que ya estaba, la
+  entrega fallaba y la operación acababa en conciliación. Ahora int-edi compara el archivo que encuentra con el que
+  iba a dejar: idéntico, contesta que ya estaba; distinto, contesta `409` (conflicto). El `verifica` de la 29 lo
+  comprueba con la 4002.
+
 ## [1.0.0] — la práctica completa
 
 ### Lecciones
