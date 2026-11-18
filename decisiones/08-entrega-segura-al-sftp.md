@@ -19,7 +19,8 @@ El 850 se deposita en el SFTP del socio (SFTP: el envío de archivos cifrado sob
 - El socio lee su carpeta cuando quiere: sin el temporal podría leer un archivo a medias. Con el temporal el riesgo
   baja mucho, siempre que el socio solo recoja los `.edi`; la confirmación de que llegó bien la da su 997.
 - La misma orden siempre da el mismo nombre, así un reenvío choca en vez de duplicarse en silencio.
-- Pisar un archivo que el socio quizá ya procesó borra evidencia; que falle y alguien decida.
+- Pisar un archivo que el socio quizá ya procesó borra evidencia; que falle y alguien decida. Desde la 29, cuando el
+  canal puede entregar dos veces lo mismo, int-edi lee el que ya está: si es idéntico, es un repetido (ficha 33).
 - Sin revisar la llave, cualquiera que se haga pasar por el servidor recibiría los documentos.
 
 ## Qué descartamos

@@ -134,8 +134,9 @@ is what matters. Put it back at the end.
 
 `verifica` runs two experiments. In the first it sets the trap on `desenlaces`, sends orders 2001, 2003 and 2004, and
 removes it. In the second it stops int-rest, sends orders 2006, 2008 and 2009, makes the API slow (2.5 s per order),
-turns int-rest on and **kills** it in the middle of a delivery, to turn it on again. It is done when you see the
-seven green checks:
+turns int-rest on and **kills** it in the middle of a delivery, to turn it on again. In the third it sets the trap
+again and sends order 4002, which is a franchise order and goes to the partner. It is done when you see the nine
+green checks:
 
 ```
 ✅ Arrancaron el router, los tres canales con su puente y el sondeo
@@ -145,6 +146,8 @@ seven green checks:
 ✅ En la API se creó cada una UNA vez (3 creaciones para 3 órdenes)
 ✅ Tras matar int-rest, la API tiene las 3 y las 3 operaciones quedaron aceptadas
 ✅ Cada una se creó UNA vez en la API (…)
+✅ Control: el 850 de la 4002 ya está en el socio y el router no se enteró (su desenlace no se pudo escribir)
+✅ int-edi releyó la 4002, reconoció su 850 como el mismo y quedó aceptada: un solo 850 en el socio
 ```
 
 The third one is a **control**: before removing the trap, `verifica` checks that something really failed. If the
@@ -158,6 +161,13 @@ The last check has two forms. If the int-rest cut left an event uncommitted, int
 recognized it by its idempotency key (lesson 18): it answered `200`, not `201`, and created nothing new. If the cut
 fell right after committing, there was nothing to reread. Both are correct.
 
+The last two are the partner's, and that destination has no idempotency key: the SFTP does not overwrite a file
+that is already there (lesson 07), so the second delivery of the same 850 fails. The one that recognizes it is
+int-edi, which already comes that way in your `mio/`: if the file exists, it reads it and compares it with the one it
+was going to leave. Since the name and the content come from the order, control number included, a repeat is
+**identical**: it answers that it was already there, and the operation is accepted. If it were different, it would be a
+conflict, as in lesson 18: it answers `409` and overwrites nothing.
+
 **Not working?** `./verifica solucion` tests ours, and `diff -r mio solucion` tells you where they differ.
 
 | What you see | What to do |
@@ -167,6 +177,7 @@ fell right after committing, there was nothing to reread. Both are correct.
 | `El router se enteró de … de 6 operaciones: … se perdieron` | One of the three options from TODO 1 is missing, or the `script` is not at the end |
 | `Control: esperaba al menos 1 en la API y en el ERP y 0 enteradas en el router` | If the router did find out, the trap was not set: run `verifica` again. If the API has 0, check that the bridge is still delivering |
 | `En la API hubo … creaciones para 3 órdenes` | The API created one of them twice: did you change the key that int-rest sends it? (lesson 18) |
+| `La 4002 quedó «…» en el canal del socio` | int-edi does not recognize its own 850 when it rereads it: compare your `mio/int-edi/int-edi.camel.yaml` with the one in `solucion/` |
 | `Tras matar int-rest, la API tiene … de 3` | When it came back, int-rest did not reread what it had not committed: check the TODO 1 options in its bridge |
 | `El puerto 8080 está ocupado` | The services from another run were left up: `DONDE=mio docker compose -f compose.yaml down` |
 
@@ -182,7 +193,8 @@ with auto-commit: when it came back, Kafka gave it what had not been committed y
 event whose outcome could not be written. That is why `verifica` provokes both things.
 
 **Not losing forces you to tolerate repeats.** If an event can be read twice, whoever receives it has to recognize
-it. The idempotency key from lesson 18 is what makes this lesson work.
+it. The idempotency key from lesson 18 is what makes this lesson work. And when the destination cannot recognize a
+repeat, like a folder of files, the channel recognizes it: it compares what it finds with what it was going to leave.
 
 **Not losing has a cost.** An event that cannot be finished stops its partition. That is why the bridge leaves an
 outcome even if the channel does not answer ("unknown"): the one that retries the delivery is the router, not the

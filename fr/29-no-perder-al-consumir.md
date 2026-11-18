@@ -133,8 +133,9 @@ Remettez-le à la fin.
 
 `verifica` fait deux expériences. Dans la première, il tend le piège sur `desenlaces`, envoie la 2001, la 2003 et la 2004, puis
 le retire. Dans la seconde, il arrête int-rest, envoie la 2006, la 2008 et la 2009, rend l'API lente (2.5 s par commande),
-rallume int-rest et le **tue** au milieu d'une livraison, pour le rallumer ensuite. Elle est terminée quand vous voyez les sept
-coches vertes :
+rallume int-rest et le **tue** au milieu d'une livraison, pour le rallumer ensuite. Dans la troisième, il tend de nouveau le
+piège et envoie la 4002, qui est une commande de franchise et revient au partenaire. Elle est terminée quand vous voyez les
+neuf coches vertes :
 
 ```
 ✅ Arrancaron el router, los tres canales con su puente y el sondeo
@@ -144,6 +145,8 @@ coches vertes :
 ✅ En la API se creó cada una UNA vez (3 creaciones para 3 órdenes)
 ✅ Tras matar int-rest, la API tiene las 3 y las 3 operaciones quedaron aceptadas
 ✅ Cada una se creó UNA vez en la API (…)
+✅ Control: el 850 de la 4002 ya está en el socio y el router no se enteró (su desenlace no se pudo escribir)
+✅ int-edi releyó la 4002, reconoció su 850 como el mismo y quedó aceptada: un solo 850 en el socio
 ```
 
 La troisième est un **contrôle** : avant de retirer le piège, le verifica vérifie que quelque chose a vraiment échoué. Si le routeur
@@ -157,6 +160,12 @@ La dernière coche a deux formes. Si la coupure d'int-rest a laissé un événem
 l'API l'a reconnu à sa clé d'idempotence (la 18) : elle a répondu `200`, pas `201`, et n'a rien créé de nouveau. Si la coupure est tombée
 juste après la validation, il n'y avait rien à relire. Les deux sont correctes.
 
+Les deux dernières sont celles du partenaire, et cette destination n'a pas de clé d'idempotence : le SFTP n'écrase pas un
+fichier qui existe déjà (la 07), donc la seconde livraison du même 850 échoue. Celui qui le reconnaît, c'est int-edi, qui arrive
+déjà ainsi dans votre `mio/` : si le fichier existe, il le lit et le compare avec celui qu'il allait déposer. Comme le nom et le
+contenu viennent de la commande, numéro de contrôle compris, un doublon est **identique** : il répond qu'il y était déjà, et
+l'opération est acceptée. S'il était différent, ce serait un conflit, comme dans la 18 : il répond `409` et n'écrase rien.
+
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et `diff -r mio solucion` vous dit en quoi elles diffèrent.
 
 | Ce que vous voyez | Ce que vous faites |
@@ -166,6 +175,7 @@ juste après la validation, il n'y avait rien à relire. Les deux sont correctes
 | `El router se enteró de … de 6 operaciones: … se perdieron` | Il manque l'une des trois options du TODO 1, ou le `script` n'est pas à la fin |
 | `Control: esperaba al menos 1 en la API y en el ERP y 0 enteradas en el router` | Si le routeur a bien été informé, le piège n'a pas été posé : relancez le verifica. Si l'API en a 0, vérifiez que le pont livre toujours |
 | `En la API hubo … creaciones para 3 órdenes` | L'API en a créé une deux fois : avez-vous changé la clé qu'int-rest lui envoie ? (la 18) |
+| `La 4002 quedó «…» en el canal del socio` | int-edi ne reconnaît pas son propre 850 en le relisant : comparez votre `mio/int-edi/int-edi.camel.yaml` avec celui de `solucion/` |
 | `Tras matar int-rest, la API tiene … de 3` | Au retour, int-rest n'a pas relu ce qu'il n'avait pas validé : vérifiez les options du TODO 1 dans son pont |
 | `El puerto 8080 está ocupado` | Les services d'une autre exécution sont restés en marche : `DONDE=mio docker compose -f compose.yaml down` |
 
@@ -181,7 +191,8 @@ d'événements, même avec le commit automatique : à son retour, Kafka lui a do
 s'est bel et bien perdu, c'est l'événement dont l'issue n'a pas pu être écrite. C'est pour cela que le verifica provoque les deux.
 
 **Ne pas perdre oblige à tolérer les doublons.** Si un événement peut être lu deux fois, celui qui le reçoit doit le reconnaître.
-La clé d'idempotence de la 18 est ce qui fait que cette leçon fonctionne.
+La clé d'idempotence de la 18 est ce qui fait que cette leçon fonctionne. Et quand la destination ne sait pas reconnaître un
+doublon, comme un dossier de fichiers, c'est le canal qui le reconnaît : il compare ce qu'il trouve avec ce qu'il allait déposer.
 
 **Ne pas perdre a un coût.** Un événement qui ne peut pas être terminé arrête sa partition. C'est pour cela que le pont laisse une
 issue même si le canal ne répond pas (« on ne sait pas ») : celui qui retente la livraison est le routeur, pas le pont.

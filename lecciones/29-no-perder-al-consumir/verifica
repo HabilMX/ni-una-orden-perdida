@@ -8,6 +8,8 @@
 #   3. Tres órdenes más, y a la mitad de una entrega a int-rest se le MATA (docker compose kill: sin despedirse). Al
 #      volver, la API tiene las tres, cada una creada UNA sola vez: lo que se leyó dos veces lo reconoce la llave de
 #      idempotencia de la API (se mide en el log de la API, el destino).
+#   4. Otra vez la trampa, con la 4002 (le toca al socio). int-edi deja su 850 sin desenlace y, al quitarla, lo vuelve
+#      a entregar. El SFTP no lo pisa: int-edi reconoce que el que está es idéntico y la operación queda aceptada.
 # Uso: ./verifica [mio|solucion]   (por omisión, mio). Necesita el ambiente de la 00 arriba, y Kafka.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -126,5 +128,30 @@ if [ "$CREADAS" = "3" ] && [ -z "$DOBLES" ]; then
 else
   no "En la API: $CREADAS creaciones para 3 órdenes (dobles:${DOBLES:- ninguna})"
 fi
+
+# 4. El socio también relee: la 4002 es de franquicia (le toca el canal del socio). Con la trampa en desenlaces,
+#    int-edi deja su 850 pero no su desenlace; al quitarla, lo vuelve a leer y lo vuelve a entregar. El SFTP no pisa
+#    el archivo que ya está; el canal tiene que reconocer que es el mismo 850 y contestar que ya estaba, para que la
+#    operación quede aceptada y no en «no se sabe» (ni, agotados los reintentos, en conciliación).
+TAMANO --add-config max.message.bytes=1 || { no "No pude cambiar el tópico desenlaces en Kafka"; apagar; exit 1; }
+T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+curl -s -o /dev/null --max-time 10 -XPOST localhost:8080/ordenes -H 'Content-Type: application/json' -d @"$DATOS/ordenes/tramo-2/orden-4002.json"
+for i in $(seq 1 60); do SOCIO "test -f /home/socio/entrada/850-4002.edi" && break; sleep 1; done
+sleep 3
+EDI_4002() { EST "SELECT estado FROM operacion WHERE orden='4002' AND canal='edi' AND momento='creada'"; }
+[ "$(EDI_4002)" = "enviada" ] && SOCIO "test -f /home/socio/entrada/850-4002.edi" \
+  && si "Control: el 850 de la 4002 ya está en el socio y el router no se enteró (su desenlace no se pudo escribir)" \
+  || no "Control: esperaba el 850-4002.edi en el socio y la operación «enviada»; está «$(EDI_4002)»"
+TAMANO --delete-config max.message.bytes || { no "No pude regresar el tópico desenlaces a como estaba"; apagar; exit 1; }
+for i in $(seq 1 60); do case "$(EDI_4002)" in aceptada|confirmada) break;; esac; sleep 1; done
+E4=$(EDI_4002); N850=$(SOCIO "ls /home/socio/entrada/ | grep -c '^850-4002'")
+RELEIDA=$(SERV logs --since "$T0" int-edi 2>/dev/null | grep -c "ya estaba en el SFTP del socio")
+case "$E4" in
+  aceptada|confirmada)
+    [ "${N850:-0}" = "1" ] && [ "${RELEIDA:-0}" -ge 1 ] \
+      && si "int-edi releyó la 4002, reconoció su 850 como el mismo y quedó $E4: un solo 850 en el socio" \
+      || no "La 4002 quedó $E4, pero hay ${N850:-0} archivos 850-4002 en el socio y int-edi reconoció ${RELEIDA:-0} repetidos" ;;
+  *) no "La 4002 quedó «${E4:-sin operación}» en el canal del socio: al releerla, int-edi no reconoció su propio 850 (el SFTP no lo pisa y falla). ¿Contestas «ya estaba» cuando el archivo que encuentras es igual al que ibas a dejar?" ;;
+esac
 apagar
 exit $ok

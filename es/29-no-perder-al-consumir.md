@@ -133,8 +133,8 @@ Regrésalo al final.
 
 `verifica` hace dos experimentos. En el primero pone la trampa en `desenlaces`, manda la 2001, la 2003 y la 2004, y
 la quita. En el segundo detiene int-rest, manda la 2006, la 2008 y la 2009, pone a la API lenta (2.5 s por pedido),
-prende int-rest y lo **mata** a la mitad de una entrega, para volver a prenderlo. Está terminada cuando ves las siete
-marcas verdes:
+prende int-rest y lo **mata** a la mitad de una entrega, para volver a prenderlo. En el tercero vuelve a poner la
+trampa y manda la 4002, que es de franquicia y le toca al socio. Está terminada cuando ves las nueve marcas verdes:
 
 ```
 ✅ Arrancaron el router, los tres canales con su puente y el sondeo
@@ -144,6 +144,8 @@ marcas verdes:
 ✅ En la API se creó cada una UNA vez (3 creaciones para 3 órdenes)
 ✅ Tras matar int-rest, la API tiene las 3 y las 3 operaciones quedaron aceptadas
 ✅ Cada una se creó UNA vez en la API (…)
+✅ Control: el 850 de la 4002 ya está en el socio y el router no se enteró (su desenlace no se pudo escribir)
+✅ int-edi releyó la 4002, reconoció su 850 como el mismo y quedó aceptada: un solo 850 en el socio
 ```
 
 La tercera es un **control**: antes de quitar la trampa, la verifica comprueba que de verdad falló algo. Si el router
@@ -157,6 +159,12 @@ La última marca tiene dos formas. Si el corte de int-rest dejó un evento sin c
 API lo reconoció por su llave de idempotencia (la 18): contestó `200`, no `201`, y no creó nada nuevo. Si el corte cayó
 justo después de confirmar, no hubo nada que releer. Las dos son correctas.
 
+Las dos últimas son del socio, y ese destino no tiene llave de idempotencia: el SFTP no pisa un archivo que ya está
+(la 07), así que la segunda entrega del mismo 850 falla. Quien lo reconoce es int-edi, que ya viene así en tu
+`mio/`: si el archivo existe, lo lee y lo compara con el que iba a dejar. Como el nombre y el contenido salen de la
+orden, número de control incluido, un repetido es **idéntico**: contesta que ya estaba, y la operación queda
+aceptada. Si fuera distinto, sería un conflicto, como en la 18: contesta `409` y no pisa nada.
+
 **¿No te corre?** `./verifica solucion` prueba la nuestra, y `diff -r mio solucion` te dice en qué son distintas.
 
 | Lo que ves | Qué haces |
@@ -166,6 +174,7 @@ justo después de confirmar, no hubo nada que releer. Las dos son correctas.
 | `El router se enteró de … de 6 operaciones: … se perdieron` | Falta alguna de las tres opciones del TODO 1, o el `script` no está al final |
 | `Control: esperaba al menos 1 en la API y en el ERP y 0 enteradas en el router` | Si el router sí se enteró, la trampa no se puso: vuelve a correr la verifica. Si la API tiene 0, revisa que el puente siga entregando |
 | `En la API hubo … creaciones para 3 órdenes` | La API creó alguna dos veces: ¿cambiaste la llave que int-rest le manda? (la 18) |
+| `La 4002 quedó «…» en el canal del socio` | int-edi no reconoce su propio 850 al releerlo: compara tu `mio/int-edi/int-edi.camel.yaml` con el de `solucion/` |
 | `Tras matar int-rest, la API tiene … de 3` | Al volver, int-rest no releyó lo que no confirmó: revisa las opciones del TODO 1 en su puente |
 | `El puerto 8080 está ocupado` | Quedaron arriba los servicios de otra corrida: `DONDE=mio docker compose -f compose.yaml down` |
 
@@ -181,7 +190,8 @@ eventos ni con la confirmación automática: al volver, Kafka le dio lo que no s
 perdió fue el evento cuyo desenlace no se pudo escribir. Por eso la verifica provoca las dos cosas.
 
 **No perder obliga a tolerar repetidos.** Si un evento se puede leer dos veces, quien lo recibe tiene que reconocerlo.
-La llave de idempotencia de la 18 es lo que hace que esta lección funcione.
+La llave de idempotencia de la 18 es lo que hace que esta lección funcione. Y cuando el destino no sabe reconocer un
+repetido, como una carpeta de archivos, lo reconoce el canal: compara lo que encuentra con lo que iba a dejar.
 
 **No perder tiene un costo.** Un evento que no se puede terminar detiene su partición. Por eso el puente deja un
 desenlace aunque el canal no conteste («no se sabe»): quien reintenta la entrega es el router, no el puente.
