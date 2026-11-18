@@ -131,7 +131,7 @@ Remettez-le à la fin.
 ./verifica
 ```
 
-`verifica` fait deux expériences. Dans la première, il tend le piège sur `desenlaces`, envoie la 2001, la 2003 et la 2004, puis
+`verifica` fait trois expériences. Dans la première, il tend le piège sur `desenlaces`, envoie la 2001, la 2003 et la 2004, puis
 le retire. Dans la seconde, il arrête int-rest, envoie la 2006, la 2008 et la 2009, rend l'API lente (2.5 s par commande),
 rallume int-rest et le **tue** au milieu d'une livraison, pour le rallumer ensuite. Dans la troisième, il tend de nouveau le
 piège et envoie la 4002, qui est une commande de franchise et revient au partenaire. Elle est terminée quand vous voyez les
@@ -150,13 +150,13 @@ neuf coches vertes :
 ```
 
 La troisième est un **contrôle** : avant de retirer le piège, le verifica vérifie que quelque chose a vraiment échoué. Si le routeur
-était déjà au courant des commandes, la quatrième coche ne prouverait rien.
+était déjà au courant des commandes, la quatrième coche ne prouverait rien. La huitième est un autre contrôle, celui de la 4002.
 
 Regardez la troisième : l'API peut avoir 1, 2 ou 3 des commandes. Avec votre version, un événement qui ne peut pas être terminé
 **arrête sa partition** : Camel le retente, et ce qui le suit dans cette partition attend. C'est le coût de ne pas
 perdre.
 
-La dernière coche a deux formes. Si la coupure d'int-rest a laissé un événement non validé, int-rest l'a relu et
+La septième coche a deux formes. Si la coupure d'int-rest a laissé un événement non validé, int-rest l'a relu et
 l'API l'a reconnu à sa clé d'idempotence (la 18) : elle a répondu `200`, pas `201`, et n'a rien créé de nouveau. Si la coupure est tombée
 juste après la validation, il n'y avait rien à relire. Les deux sont correctes.
 
