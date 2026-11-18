@@ -1,7 +1,8 @@
 # Lección 07 — Al socio
 
-> **Lo que vas a lograr:** dejar el 850 de la 06 en el buzón del socio comercial con tres cuidados: que no tome un
-> archivo a medias, que la misma orden siempre tenga el mismo nombre y que un segundo envío no borre el primero.
+> **Lo que vas a lograr:** dejar el 850 de la 06 en el buzón del socio comercial con cuatro cuidados: que no tome un
+> archivo a medias, que la misma orden siempre tenga el mismo nombre, que un segundo envío no borre el primero y que
+> la ruta solo se conecte al servidor cuya llave anotaste en `known_hosts`.
 
 **Antes de empezar necesitas:** la lección 06 terminada y el ambiente de la 00 encendido:
 

@@ -191,7 +191,7 @@ Con esta lección cierras la parte 1. Una orden que la tienda crea ya hace todo 
 
 - llega al router por HTTP y el router le contesta qué dijo cada destino;
 - llega a la API una sola vez, aunque se reenvíe, gracias a su llave;
-- entra al ERP completa o no entra, y el ERP puede crecer a varias copias;
+- entra al ERP completa o no entra, e int-bd puede crecer a varias copias;
 - se vuelve un 850 que llega al socio sin pisarse ni quedar a medias, solo si la tienda es suya;
 - lleva un hilo que la sigue por todos los servicios;
 - y si un destino se cae, los demás la reciben igual.
