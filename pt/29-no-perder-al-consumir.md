@@ -131,7 +131,7 @@ Devolva-o ao fim.
 ./verifica
 ```
 
-O `verifica` faz dois experimentos. No primeiro arma a armadilha em `desenlaces`, manda o 2001, o 2003 e o 2004, e
+O `verifica` faz três experimentos. No primeiro arma a armadilha em `desenlaces`, manda o 2001, o 2003 e o 2004, e
 a tira. No segundo para o int-rest, manda o 2006, o 2008 e o 2009, deixa a API lenta (2,5 s por pedido),
 liga o int-rest e o **mata** na metade de uma entrega, para voltar a ligá-lo. No terceiro arma a armadilha de novo e
 manda o 4002, que é de franquia e cabe ao parceiro. Está concluída quando aparecem as nove marcas verdes:
@@ -149,13 +149,13 @@ manda o 4002, que é de franquia e cabe ao parceiro. Está concluída quando apa
 ```
 
 A terceira é um **controle**: antes de tirar a armadilha, o `verifica` confere que de fato algo falhou. Se o router
-já soubesse dos pedidos, a quarta marca não provaria nada.
+já soubesse dos pedidos, a quarta marca não provaria nada. A oitava é outro controle, o do 4002.
 
 Repare na terceira: a API pode ter 1, 2 ou 3 dos pedidos. Com a versão própria, um evento que não pode ser terminado
 **para a partição dele**: o Camel tenta de novo, e o que vem atrás nessa partição espera. Esse é o custo de não
 perder.
 
-A última marca tem duas formas. Se o corte do int-rest deixou um evento sem confirmar, o int-rest o leu de novo e a
+A sétima marca tem duas formas. Se o corte do int-rest deixou um evento sem confirmar, o int-rest o leu de novo e a
 API o reconheceu pela chave de idempotência (lição 18): respondeu `200`, não `201`, e não criou nada novo. Se o corte caiu
 logo depois de confirmar, não houve nada para reler. As duas estão corretas.
 

@@ -131,7 +131,7 @@ Regrésalo al final.
 ./verifica
 ```
 
-`verifica` hace dos experimentos. En el primero pone la trampa en `desenlaces`, manda la 2001, la 2003 y la 2004, y
+`verifica` hace tres experimentos. En el primero pone la trampa en `desenlaces`, manda la 2001, la 2003 y la 2004, y
 la quita. En el segundo detiene int-rest, manda la 2006, la 2008 y la 2009, pone a la API lenta (2.5 s por pedido),
 prende int-rest y lo **mata** a la mitad de una entrega, para volver a prenderlo. En el tercero vuelve a poner la
 trampa y manda la 4002, que es de franquicia y le toca al socio. Está terminada cuando ves las nueve marcas verdes:
@@ -149,13 +149,13 @@ trampa y manda la 4002, que es de franquicia y le toca al socio. Está terminada
 ```
 
 La tercera es un **control**: antes de quitar la trampa, la verifica comprueba que de verdad falló algo. Si el router
-ya supiera de las órdenes, la cuarta marca no probaría nada.
+ya supiera de las órdenes, la cuarta marca no probaría nada. La octava es otro control, el de la 4002.
 
 Fíjate en la tercera: la API puede tener 1, 2 o 3 de las órdenes. Con tu versión, un evento que no se puede terminar
 **detiene su partición**: Camel lo reintenta, y lo que viene detrás en esa partición espera. Ése es el costo de no
 perder.
 
-La última marca tiene dos formas. Si el corte de int-rest dejó un evento sin confirmar, int-rest lo volvió a leer y la
+La séptima marca tiene dos formas. Si el corte de int-rest dejó un evento sin confirmar, int-rest lo volvió a leer y la
 API lo reconoció por su llave de idempotencia (la 18): contestó `200`, no `201`, y no creó nada nuevo. Si el corte cayó
 justo después de confirmar, no hubo nada que releer. Las dos son correctas.
 

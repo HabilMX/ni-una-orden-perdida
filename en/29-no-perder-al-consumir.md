@@ -132,7 +132,7 @@ is what matters. Put it back at the end.
 ./verifica
 ```
 
-`verifica` runs two experiments. In the first it sets the trap on `desenlaces`, sends orders 2001, 2003 and 2004, and
+`verifica` runs three experiments. In the first it sets the trap on `desenlaces`, sends orders 2001, 2003 and 2004, and
 removes it. In the second it stops int-rest, sends orders 2006, 2008 and 2009, makes the API slow (2.5 s per order),
 turns int-rest on and **kills** it in the middle of a delivery, to turn it on again. In the third it sets the trap
 again and sends order 4002, which is a franchise order and goes to the partner. It is done when you see the nine
@@ -151,13 +151,13 @@ green checks:
 ```
 
 The third one is a **control**: before removing the trap, `verifica` checks that something really failed. If the
-router already knew about the orders, the fourth check would prove nothing.
+router already knew about the orders, the fourth check would prove nothing. The eighth is another control, the one for order 4002.
 
 Notice the third one: the API may have 1, 2 or 3 of the orders. With your version, an event that cannot be finished
 **stops its partition**: Camel retries it, and what comes behind it in that partition waits. That is the cost of not
 losing.
 
-The last check has two forms. If the int-rest cut left an event uncommitted, int-rest read it again and the API
+The seventh check has two forms. If the int-rest cut left an event uncommitted, int-rest read it again and the API
 recognized it by its idempotency key (lesson 18): it answered `200`, not `201`, and created nothing new. If the cut
 fell right after committing, there was nothing to reread. Both are correct.
 
