@@ -3,17 +3,17 @@
 > **Annexe facultative.** Le cours s'est terminé à la 30. Cette leçon et la 32 s'adressent à ceux qui travaillent avec Kubernetes ou
 > veulent voir jusqu'où va ce qu'ils ont fait. Elles peuvent se **lire** sans être exécutées.
 >
-> **Ce que vous allez obtenir :** porter int-rest, le même que dans la 12, du dossier du laboratoire vers une image Camel
+> **Ce que tu vas obtenir :** porter int-rest, le même que dans la 12, du dossier du laboratoire vers une image Camel
 > Quarkus, le faire tourner dans un Kubernetes de pratique et faire en sorte que **ses répliques augmentent toutes seules** quand beaucoup de commandes arrivent,
 > et diminuent quand il n'y en a plus.
 
-**Avant de commencer, vérifiez votre machine.** Nous l'avons mesuré sur un Mac avec Apple M5 et Docker avec 6 CPU et 16 GiB : la 31 a demandé
+**Avant de commencer, vérifie ta machine.** Nous l'avons mesuré sur un Mac avec Apple M5 et Docker avec 6 CPU et 16 GiB : la 31 a demandé
 environ 1.4 GiB de mémoire de plus que ce qui était déjà utilisé, 2.7 cœurs au pic et environ 4.4 GB d'images. La 32 en demande
 nettement plus. Le détail, et la façon dont cela a été mesuré, se trouve dans
 [`lecciones/31-de-laboratorio-a-kubernetes/CAPACIDAD.md`](../lecciones/31-de-laboratorio-a-kubernetes/CAPACIDAD.md).
-Ce sont les chiffres d'une seule machine : sur la vôtre, ils peuvent être différents.
+Ce sont les chiffres d'une seule machine : sur la tienne, ils peuvent être différents.
 
-**Il vous faut en outre :** la leçon 12 terminée, et deux programmes que vous n'avez pas utilisés jusqu'ici :
+**Il te faut en outre :** la leçon 12 terminée, et deux programmes que tu n'as pas utilisés jusqu'ici :
 
 | Programme | Pour quoi faire | Où il s'installe |
 |---|---|---|
@@ -21,12 +21,12 @@ Ce sont les chiffres d'une seule machine : sur la vôtre, ils peuvent être diff
 | `kubectl` | Parler à ce Kubernetes | [kubernetes.io, « Install Tools »](https://kubernetes.io/docs/tasks/tools/) |
 
 Cette leçon n'utilise **pas** l'environnement de la 00 : elle crée son propre cluster, sous le nom `ni-una-orden-perdida`, et le supprime
-à la fin, que cela se passe bien ou mal. Si vous ne connaissez pas Kubernetes, lisez d'abord
+à la fin, que cela se passe bien ou mal. Si tu ne connais pas Kubernetes, lis d'abord
 [`conceptos/antes-de-empezar/08-kubernetes.md`](../conceptos/antes-de-empezar/08-kubernetes.md).
 
 ## La nouveauté du jour, en une phrase
 
-Dans la 12, vous avez mis `replicas: 3` à la main : trois répliques en permanence, qu'il y ait beaucoup de travail ou aucun. Aujourd'hui, vous laissez cette décision à
+Dans la 12, tu as mis `replicas: 3` à la main : trois répliques en permanence, qu'il y ait beaucoup de travail ou aucun. Aujourd'hui, tu laisses cette décision à
 Kubernetes, avec un **HPA** (*HorizontalPodAutoscaler*) : une pièce qui regarde combien de CPU utilisent les répliques d'int-rest et
 en ajoute quand elles approchent de leur cible, ou en retire quand il y en a trop. Pour qu'il puisse mesurer, chaque réplique doit **réserver**
 de la CPU : le HPA mesure en pourcentage de ce qui est réservé.
@@ -38,38 +38,38 @@ l'on réserve.
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/31-de-laboratorio-a-kubernetes
 cp -R inicio mio
 ```
 
-Avant d'écrire, lisez ce qui est déjà fait :
+Avant d'écrire, lis ce qui est déjà fait :
 
-| Fichier | Ce que c'est | L'écrivez-vous ? |
+| Fichier | Ce que c'est | L'écris-tu ? |
 |---|---|---|
 | `int-rest/int-rest.camel.yaml` | La route d'int-rest de la 12, **sans une lettre de changée**, avec ses mappings et ses cas de test de référence | Non |
-| `Dockerfile` | Du dossier à une image, par étapes : `camel export` en fait un projet Camel Quarkus, il est compilé et il en sort une image pour la JVM (et une autre native, pour la 32). Tout se passe dans des conteneurs : vous n'installez ni Java ni Maven | Non, lisez-le |
+| `Dockerfile` | Du dossier à une image, par étapes : `camel export` en fait un projet Camel Quarkus, il est compilé et il en sort une image pour la JVM (et une autre native, pour la 32). Tout se passe dans des conteneurs : tu n'installes ni Java ni Maven | Non, lis-le |
 | `cluster/` | Le cluster kind, metrics-server (ce qui mesure la CPU de chaque réplique), l'API de commandes et un client qui envoie la charge | Non |
 | `mio/k8s/int-rest.yaml` | Le Deployment (les répliques) et le Service (le nom fixe qui répartit entre elles) | **Oui, TODO 1 et 2** |
 | `mio/k8s/hpa.yaml` | Le HPA | **Oui, TODO 3 et 4** |
 
-Remarquez deux choses dans le Dockerfile et dans le Deployment. La configuration ne va pas dans un `application.properties` : ce qui se
+Remarque deux choses dans le Dockerfile et dans le Deployment. La configuration ne va pas dans un `application.properties` : ce qui se
 décide à la compilation va dans le `pom.xml` et ce qui se décide à l'exécution va dans des variables d'environnement du Deployment
 (`QUARKUS_SHUTDOWN_TIMEOUT`). Et l'image n'est téléchargée d'aucun registre : `kind load` la charge sur le nœud, c'est pour cela qu'il est écrit
 `imagePullPolicy: Never`.
 
-## 2. Prédisez
+## 2. Prédis
 
-Répondez sur papier :
+Réponds sur papier :
 
 1. Si une réplique d'int-rest réserve 200 millicœurs de CPU (le cinquième d'un cœur) et en utilise 300, à quel
    pourcentage est-elle ? Avec une cible de 50 %, combien de répliques le HPA voudrait-il ?
 2. Si la réplique ne réserve **pas** de CPU, par rapport à quoi le HPA calcule-t-il le pourcentage ?
-3. La charge dure deux minutes puis s'arrête. Quand le HPA retire-t-il les répliques en trop, selon vous ?
+3. La charge dure deux minutes puis s'arrête. Quand le HPA retire-t-il les répliques en trop, selon toi ?
 
-Regardez l'état actuel (cela prend quelques minutes la première fois : il télécharge des images et construit) :
+Regarde l'état actuel (cela prend quelques minutes la première fois : il télécharge des images et construit) :
 
 ```bash
 ./verifica inicio
@@ -83,7 +83,7 @@ répliques.
 
 ### TODO 1 et 2 : ce que réserve chaque réplique, et sa limite
 
-Dans `mio/k8s/int-rest.yaml`, à l'intérieur du conteneur, ajoutez `resources` :
+Dans `mio/k8s/int-rest.yaml`, à l'intérieur du conteneur, ajoute `resources` :
 
 ```yaml
 resources:
@@ -128,29 +128,29 @@ ejemplo: 1 copia al 150 % con meta de 50 % → quiere 3
 ```
 
 Le maximum n'est pas un détail : c'est ce qui empêche une grosse charge de dévorer le nœud entier. Et le `behavior.scaleDown`
-que contient déjà le fichier fait qu'il redescend au bout de 30 secondes sans charge, pour que vous le voyiez dans le cours. Par défaut, il attend
+que contient déjà le fichier fait qu'il redescend au bout de 30 secondes sans charge, pour que tu le voies dans le cours. Par défaut, il attend
 5 minutes, pour ne pas monter et descendre à tout bout de champ.
 
-## 4. Cassez-en une exprès
+## 4. Casses-en une exprès
 
-Avec vos fichiers terminés, retirez `cpu: 200m` de `requests` (laissez la mémoire) et lancez `./verifica`.
+Avec tes fichiers terminés, retire `cpu: 200m` de `requests` (laisse la mémoire) et lance `./verifica`.
 
-Avant cela, prédisez : le HPA est bien écrit et Kubernetes l'accepte. Passe-t-il à l'échelle ?
+Avant cela, prédis : le HPA est bien écrit et Kubernetes l'accepte. Passe-t-il à l'échelle ?
 
-Non. Le verifica dit qu'int-rest ne réserve pas de CPU, puis que le HPA n'arrive pas à la lire : si vous l'interrogez vous-même
+Non. Le verifica dit qu'int-rest ne réserve pas de CPU, puis que le HPA n'arrive pas à la lire : si tu l'interroges toi-même
 (`kubectl get hpa`), la cible apparaît comme `<unknown>/50%`. Le HPA n'est pas cassé : il lui manque de quoi mesurer. **Un
-pourcentage sans base n'est pas un nombre.** Remettez la ligne.
+pourcentage sans base n'est pas un nombre.** Remets la ligne.
 
-## 5. Vérifiez
+## 5. Vérifie
 
 ```bash
 ./verifica
 ```
 
-`verifica` crée le cluster, construit int-rest, le déploie avec **vos** fichiers, envoie la commande 1001 comme contrôle,
+`verifica` crée le cluster, construit int-rest, le déploie avec **tes** fichiers, envoie la commande 1001 comme contrôle,
 puis une charge de 150 commandes par seconde pendant deux minutes. Il compte les répliques **prêtes** du Deployment (pas ce que
 dit la route), contrôle que le Service a réparti entre elles et que l'API a répondu à toutes les commandes. Ensuite, il attend qu'elles
-redescendent. Sur la machine de `CAPACIDAD.md`, cela a pris environ 4 minutes ; la vôtre le dira. Elle est terminée quand vous voyez les coches vertes :
+redescendent. Sur la machine de `CAPACIDAD.md`, cela a pris environ 4 minutes ; la tienne le dira. Elle est terminée quand tu vois les coches vertes :
 
 ```
 ✅ Clúster kind «ni-una-orden-perdida» creado (Kubernetes …)
@@ -168,29 +168,29 @@ redescendent. Sur la machine de `CAPACIDAD.md`, cela a pris environ 4 minutes ; 
 ```
 
 Dans nos exécutions, le HPA est monté à 4 répliques dans l'une et à 3 dans une autre ; c'est pour cela que le verifica demande « plus que le minimum » et non
-un nombre exact. Jusqu'où il monte dépend de votre machine.
+un nombre exact. Jusqu'où il monte dépend de ta machine.
 
-Pendant que cela tourne, vous pouvez regarder le HPA travailler dans un autre terminal. Le verifica conserve la clé du cluster dans un fichier
-temporaire, pour ne pas toucher à votre configuration de `kubectl` ; vous la demandez à kind :
+Pendant que cela tourne, tu peux regarder le HPA travailler dans un autre terminal. Le verifica conserve la clé du cluster dans un fichier
+temporaire, pour ne pas toucher à ta configuration de `kubectl` ; tu la demandes à kind :
 
 ```bash
 kubectl --kubeconfig <(kind get kubeconfig --name ni-una-orden-perdida) get hpa,deploy -w
 ```
 
-**Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et `diff -r mio solucion` vous dit en quoi elles diffèrent.
+**Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et `diff -r mio solucion` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
-| `No encuentro «kind»` ou `«kubectl»` | Installez-le avec le lien du tableau de « Avant de commencer » |
-| `kind no pudo crear el clúster` | Vérifiez que Docker est en marche et a de la mémoire libre (voir `CAPACIDAD.md`) |
-| `No se pudo construir int-rest` | La première construction télécharge des dépendances : vérifiez votre connexion. Les lignes qui suivent disent où elle s'est arrêtée |
+| `No encuentro «kind»` ou `«kubectl»` | Installe-le avec le lien du tableau de « Avant de commencer » |
+| `kind no pudo crear el clúster` | Vérifie que Docker est en marche et a de la mémoire libre (voir `CAPACIDAD.md`) |
+| `No se pudo construir int-rest` | La première construction télécharge des dépendances : vérifie ta connexion. Les lignes qui suivent disent où elle s'est arrêtée |
 | `Kubernetes rechazó mio/k8s/int-rest.yaml` | C'est une erreur de YAML ou de noms : le message de Kubernetes s'affiche en dessous |
 | `int-rest no reserva CPU (resources.requests.cpu)` | Il manque le TODO 1, ou `resources` est resté hors du conteneur |
 | `Kubernetes rechazó mio/k8s/hpa.yaml (TODO 3 y 4)` | Il manque `maxReplicas`, ou `metrics` est mal indenté |
-| `El HPA debe escalar a int-rest … con un máximo mayor que el mínimo` | Vérifiez `minReplicas`, `maxReplicas` et que la cible est de `type: Utilization` |
+| `El HPA debe escalar a int-rest … con un máximo mayor que el mínimo` | Vérifie `minReplicas`, `maxReplicas` et que la cible est de `type: Utilization` |
 | `El HPA no logra leer la CPU de int-rest` | Presque toujours, il manque `requests.cpu`. Kubernetes dit pourquoi dans le même message |
 | `Con carga, int-rest se quedó en 1 copia(s)` | La cible n'est pas un pourcentage de ce qui est réservé, ou elle est si haute qu'elle n'est jamais atteinte |
-| `Sin carga, int-rest sigue en … copias` | Vous avez changé le `behavior.scaleDown` : remettez-le comme il était |
+| `Sin carga, int-rest sigue en … copias` | Tu as changé le `behavior.scaleDown` : remets-le comme il était |
 
 ---
 
@@ -203,7 +203,7 @@ Kubernetes sans que son YAML change. Ce qui a changé, c'est la façon dont il e
 la réservation est fausse, la décision de passer à l'échelle l'est aussi.
 
 **Le maximum protège le voisin.** Sans `maxReplicas`, une grosse charge ajoute des répliques jusqu'à ce que le nœud ne tienne plus. Et
-rappelez-vous la 24 : si int-bd passait à l'échelle tout seul, le plafond vers l'ERP devrait être pensé avec le **maximum** de répliques, pas avec
+rappelle-toi la 24 : si int-bd passait à l'échelle tout seul, le plafond vers l'ERP devrait être pensé avec le **maximum** de répliques, pas avec
 celles d'aujourd'hui.
 
 **Passer à l'échelle sans perdre se conçoit, et se teste.** Dans cette exécution, toutes les commandes de la charge ont reçu une réponse
@@ -216,8 +216,8 @@ de la charge, avec les durées réelles de chaque service.
 
 1. Sur papier : avec `requests.cpu: 200m`, une cible de 50 % et un maximum de 4, combien de répliques le HPA veut-il si 2 répliques sont à
    180 % ? Et si elles sont à 20 % ?
-2. Passez la cible à 80 % et lancez `./verifica`. Est-il monté à moins de répliques ? Combien de temps a-t-il mis à redescendre ?
-3. Si demain vous vouliez faire passer int-bd à l'échelle de cette façon, que devriez-vous recalculer de la leçon 24, et avec quel nombre : le minimum
+2. Passe la cible à 80 % et lance `./verifica`. Est-il monté à moins de répliques ? Combien de temps a-t-il mis à redescendre ?
+3. Si demain tu voulais faire passer int-bd à l'échelle de cette façon, que devrais-tu recalculer de la leçon 24, et avec quel nombre : le minimum
    ou le maximum de répliques ?
 
 ---
@@ -236,7 +236,7 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
 2. Quelle différence y a-t-il entre `requests` et `limits` ?
 3. À quoi sert `maxReplicas` ?
 4. Pourquoi le verifica compte-t-il les répliques prêtes du Deployment et non ce que dit la route ?
-5. **La question de clôture :** le HPA dit `<unknown>/50%`. Expliquez pourquoi, et ce qui manque au Deployment.
+5. **La question de clôture :** le HPA dit `<unknown>/50%`. Explique pourquoi, et ce qui manque au Deployment.
 
-**Suite :** dans la leçon 32, le même int-rest est aussi compilé en natif, et vous mesurez sur votre machine ce qui change :
+**Suite :** dans la leçon 32, le même int-rest est aussi compilé en natif, et tu mesures sur ta machine ce qui change :
 le temps qu'il met à se construire, à démarrer, et la mémoire qu'il utilise.

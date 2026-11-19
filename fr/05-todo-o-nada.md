@@ -1,9 +1,9 @@
 # Leçon 05 — Tout ou rien
 
-> **Ce que vous allez obtenir :** que, lorsqu'une ligne de la commande est fausse, l'ERP ne garde pas une commande à moitié faite :
-> soit tout est enregistré, soit rien ne l'est. Vous y arrivez en ajoutant **une seule étape** à la route de la 04.
+> **Ce que tu vas obtenir :** que, lorsqu'une ligne de la commande est fausse, l'ERP ne garde pas une commande à moitié faite :
+> soit tout est enregistré, soit rien ne l'est. Tu y arrives en ajoutant **une seule étape** à la route de la 04.
 
-**Avant de commencer, il vous faut :** la leçon 04 terminée et l'environnement de la 00 allumé :
+**Avant de commencer, il te faut :** la leçon 04 terminée et l'environnement de la 00 allumé :
 
 ```bash
 docker compose -f infra/compose.yaml up -d --wait     # desde la carpeta raíz de la práctica
@@ -11,8 +11,8 @@ docker compose -f infra/compose.yaml up -d --wait     # desde la carpeta raíz d
 
 ## La nouveauté du jour, en une phrase
 
-Dans la 04, votre route écrit dans l'ERP en plusieurs étapes : l'en-tête, puis chaque ligne et, à la fin, la procédure.
-Si une étape du milieu échoue, les précédentes **sont déjà écrites**. Aujourd'hui, vous enveloppez toutes ces étapes dans une
+Dans la 04, ta route écrit dans l'ERP en plusieurs étapes : l'en-tête, puis chaque ligne et, à la fin, la procédure.
+Si une étape du milieu échoue, les précédentes **sont déjà écrites**. Aujourd'hui, tu enveloppes toutes ces étapes dans une
 **transaction** : un paquet que l'ERP valide en entier ou annule en entier.
 
 **L'image :** un virement bancaire. On retire d'un compte et on ajoute à l'autre. Si la banque faisait le
@@ -27,7 +27,7 @@ aucune ne passe.
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/05-todo-o-nada
@@ -36,9 +36,9 @@ cp -R inicio mio
 
 `inicio/` est la route de la 04 déjà terminée, split et `CALL` compris, plus trois pièces nouvelles fournies toutes faites.
 
-## 2. Faites connaissance avec la commande qui va échouer
+## 2. Fais connaissance avec la commande qui va échouer
 
-Ouvrez `datos/ordenes/orden-1004-renglon-invalido.json`, dans le dossier racine du cours. Elle a deux lignes :
+Ouvre `datos/ordenes/orden-1004-renglon-invalido.json`, dans le dossier racine du cours. Elle a deux lignes :
 
 | Ligne de commande | Produit | Quantité | Prix |
 |---|---|---|---|
@@ -48,30 +48,30 @@ Ouvrez `datos/ordenes/orden-1004-renglon-invalido.json`, dans le dossier racine 
 L'ERP n'accepte pas une quantité de 0 : la table `pedido_detalle` a une règle (`CHECK (cantidad > 0)`) qui rejette cette
 ligne. C'est comme un système réel, qui ne laisse pas enregistrer « zéro nappe ».
 
-## 3. Prédisez
+## 3. Prédis
 
-Votre route écrit d'abord l'en-tête, puis la ligne 1, puis la ligne 2. Répondez sur papier :
+Ta route écrit d'abord l'en-tête, puis la ligne 1, puis la ligne 2. Réponds sur papier :
 
 1. Quand la commande 1004 arrive, à quelle étape la route échoue-t-elle ?
 2. À la fin, que reste-t-il dans `pedido_cabecera` et que reste-t-il dans `pedido_detalle` pour la commande 1004 ?
 3. Avec quel statut l'en-tête reste-t-il ?
 
-## 4. Vérifiez-le
+## 4. Vérifie-le
 
-Lancez `verifica` avec la route telle qu'elle est fournie, sans rien changer :
+Lance `verifica` avec la route telle qu'elle est fournie, sans rien changer :
 
 ```bash
 ./verifica
 ```
 
-Vous allez voir **deux marques rouges** :
+Tu vas voir **deux marques rouges** :
 
 ```
 ❌ Quedó la cabecera de la 1004 sin su detalle completo: falta la transacción
 ❌ Quedaron renglones sueltos de la 1004
 ```
 
-Demandez à l'ERP ce qu'il a gardé :
+Demande à l'ERP ce qu'il a gardé :
 
 ```bash
 docker compose -f ../../infra/compose.yaml exec erp \
@@ -82,24 +82,24 @@ L'en-tête de la 1004 est là, en `RECIBIDO`, avec un total de 89.50, et il a **
 n'est jamais entrée et la procédure n'a jamais tourné. C'est une commande dont l'ERP croit qu'elle existe, que personne ne préparera et que
 quelqu'un devra retrouver et effacer à la main.
 
-Aviez-vous vu juste ? Remarquez que la boutique, elle, a bien été informée de l'erreur (la route lui a répondu un 500), mais cela ne nettoie pas ce qui
+Avais-tu vu juste ? Remarque que la boutique, elle, a bien été informée de l'erreur (la route lui a répondu un 500), mais cela ne nettoie pas ce qui
 avait déjà été écrit.
 
-## 5. Lisez les pièces nouvelles
+## 5. Lis les pièces nouvelles
 
-Ouvrez `mio/orden-al-erp.camel.yaml`. En haut, à côté de la connexion `erp` que vous connaissez déjà, il y a deux nouveaux beans :
+Ouvre `mio/orden-al-erp.camel.yaml`. En haut, à côté de la connexion `erp` que tu connais déjà, il y a deux nouveaux beans :
 
 | Bean | Ce qu'il fait | Dans l'image de la banque |
 |---|---|---|
 | `transacciones` (un `DataSourceTransactionManager`) | Ouvre, valide ou annule la transaction sur la connexion `erp` | Le guichetier qui mène l'opération |
-| `todoONada` (une `SpringTransactionPolicy`) | La règle que vous allez utiliser dans la route : « s'il y a déjà une transaction ouverte, rejoins-la ; sinon, ouvres-en une » (`PROPAGATION_REQUIRED`) | La politique de la banque : les deux opérations vont ensemble |
+| `todoONada` (une `SpringTransactionPolicy`) | La règle que tu vas utiliser dans la route : « s'il y a déjà une transaction ouverte, rejoins-la ; sinon, ouvres-en une » (`PROPAGATION_REQUIRED`) | La politique de la banque : les deux opérations vont ensemble |
 
 Et dans `mio/dependencias.txt`, il y a deux pièces de plus que Camel télécharge au démarrage : `camel-spring` et `spring-jdbc`. Ce sont
-elles qui savent gérer les transactions. Vous n'écrivez pas de Java : tout se déclare dans le YAML.
+elles qui savent gérer les transactions. Tu n'écris pas de Java : tout se déclare dans le YAML.
 
-## 6. Ajoutez l'étape
+## 6. Ajoute l'étape
 
-Cherchez dans la route le commentaire qui dit **TE TOCA** (« à vous »). Une seule étape y prend place :
+Cherche dans la route le commentaire qui dit **TE TOCA** (« à toi »). Une seule étape y prend place :
 
 ```yaml
 - transacted:
@@ -109,13 +109,13 @@ Cherchez dans la route le commentaire qui dit **TE TOCA** (« à vous »). Une s
 `transacted` veut dire : **d'ici jusqu'à la fin de la route, tout se passe dans une transaction**, avec la
 règle `todoONada`. Si n'importe quelle étape en dessous échoue, tout ce qui a été écrit depuis ce point est annulé.
 
-Regardez **où** elle se place : avant l'écriture de l'en-tête. Que se passerait-il si vous la mettiez après l'`INSERT` de
+Regarde **où** elle se place : avant l'écriture de l'en-tête. Que se passerait-il si tu la mettais après l'`INSERT` de
 l'en-tête ?
 
 Ce patron a un nom dans les EIP : **Transactional Client**. La route ne se contente pas d'envoyer des messages : elle demande à la destination
 de traiter plusieurs écritures comme une seule.
 
-## 7. Vérifiez
+## 7. Vérifie
 
 ```bash
 ./verifica
@@ -123,7 +123,7 @@ de traiter plusieurs écritures comme une seule.
 
 ⚠️ Comme dans la 04, `verifica` **vide les tables de l'ERP** avant de tester.
 
-Elle est terminée quand vous voyez les six coches vertes :
+Elle est terminée quand tu vois les six coches vertes :
 
 ```
 ✅ El mapeo al ERP pasa sus casos dorados
@@ -136,16 +136,16 @@ Elle est terminée quand vous voyez les six coches vertes :
 
 La dernière compte autant que les autres : la transaction ne doit pas gêner les bonnes commandes.
 
-Interrogez de nouveau l'ERP comme à l'étape 4. De la 1004, il ne reste maintenant rien : ni en-tête, ni tasse.
+Interroge de nouveau l'ERP comme à l'étape 4. De la 1004, il ne reste maintenant rien : ni en-tête, ni tasse.
 
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et
-`diff mio/orden-al-erp.camel.yaml solucion/orden-al-erp.camel.yaml` vous dit en quoi elles diffèrent.
+`diff mio/orden-al-erp.camel.yaml solucion/orden-al-erp.camel.yaml` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
 | Les deux mêmes marques rouges qu'à l'étape 4 | L'étape `transacted` est absente, ou placée après l'en-tête |
-| `La ruta no arrancó` | Vérifiez l'indentation de l'étape : `transacted` se place au même niveau que les autres étapes |
-| `El puerto 8080 está ocupado` | Une route tourne encore : arrêtez-la avec `Ctrl+C` |
+| `La ruta no arrancó` | Vérifie l'indentation de l'étape : `transacted` se place au même niveau que les autres étapes |
+| `El puerto 8080 está ocupado` | Une route tourne encore : arrête-la avec `Ctrl+C` |
 
 ---
 
@@ -162,7 +162,7 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
 3. Pourquoi l'étape `transacted` se place-t-elle avant l'`INSERT` de l'en-tête ?
 4. À quoi sert chacun des deux nouveaux beans ?
 5. La boutique a reçu un 500. Que devrait-elle faire de cette commande ? *(Pas encore de réponse : dans la troisième partie du
-   cours, « Que rien n'échoue », vous déciderez ce qui se retente et ce qui s'écarte.)*
+   cours, « Que rien n'échoue », tu décideras ce qui se retente et ce qui s'écarte.)*
 
 **Suite :** dans la leçon 06, la commande part vers le partenaire commercial, qui ne reçoit ni JSON ni tables : il reçoit un fichier
 EDI, un format texte que les entreprises utilisent depuis des décennies pour se parler.

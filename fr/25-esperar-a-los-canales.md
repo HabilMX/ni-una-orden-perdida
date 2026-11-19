@@ -1,17 +1,17 @@
 # Leçon 25 — Attendre les canaux
 
-> **Ce que vous allez obtenir :** savoir quand une commande est **complète** : quand chaque canal qui la concerne est arrivé à ce que l'on
+> **Ce que tu vas obtenir :** savoir quand une commande est **complète** : quand chaque canal qui la concerne est arrivé à ce que l'on
 > attend de lui, y compris le 997 du partenaire. Et qu'un canal qui tarde trop fasse l'objet d'une **alerte** sans que la commande soit tenue pour
 > close, pour que ce qui arrive en retard la complète encore, même si le routeur a redémarré entre-temps.
 
-**Avant de commencer, il vous faut :** les leçons 21 et 22 terminées et l'environnement de la 00 allumé.
+**Avant de commencer, il te faut :** les leçons 21 et 22 terminées et l'environnement de la 00 allumé.
 
 ## La nouveauté du jour, en une phrase
 
 Depuis la 10, le routeur **disperse** : il envoie chaque événement du cycle de vie de la commande à ses canaux. Il ne **rassemble** jamais : il n'y a aucun
-endroit qui dise « cette commande est terminée ». Et dans la 21, vous avez vu que « terminer » ne veut pas dire la même chose pour tous : l'API et l'ERP
+endroit qui dise « cette commande est terminée ». Et dans la 21, tu as vu que « terminer » ne veut pas dire la même chose pour tous : l'API et l'ERP
 terminent quand ils acceptent, le partenaire quand il envoie son 997. Disperser puis rassembler les réponses est un patron qui a un
-nom, *Scatter-Gather*, et la partie qui rassemble s'appelle *Aggregator*. Aujourd'hui, vous le construisez, avec une idée qui vient de
+nom, *Scatter-Gather*, et la partie qui rassemble s'appelle *Aggregator*. Aujourd'hui, tu le construis, avec une idée qui vient de
 la 15 : **ce qu'il faut rassembler est déjà dans la base.**
 
 **L'image :** organiser le dîner du réveillon avec trois cousins qui apportent chacun quelque chose. La tante ne tient pas le dîner pour prêt quand
@@ -22,14 +22,14 @@ là, avec ce qui est déjà arrivé.
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/25-esperar-a-los-canales
 cp -R inicio mio
 ```
 
-Ouvrez d'abord `mio/orden-router/reglas/maquina-de-estados.yaml` et cherchez la section `completa`. On y trouve ce que l'on
+Ouvre d'abord `mio/orden-router/reglas/maquina-de-estados.yaml` et cherche la section `completa`. On y trouve ce que l'on
 attend de chaque canal et combien de temps on l'attend :
 
 | Canal | `llega_a` | `plazo_s` | Pourquoi |
@@ -38,7 +38,7 @@ attend de chaque canal et combien de temps on l'attend :
 | `bd` (l'ERP) | `aceptada` | 10 | De même |
 | `edi` (le partenaire) | `confirmada` | 20 | Son « oui » est le 997, et il arrive plus tard (la 21) |
 
-Ouvrez maintenant `mio/orden-router/juntar.camel.yaml`. En haut, il y a un schéma de la 4001 à mi-chemin : l'API et l'ERP sont déjà
+Ouvre maintenant `mio/orden-router/juntar.camel.yaml`. En haut, il y a un schéma de la 4001 à mi-chemin : l'API et l'ERP sont déjà
 arrivés, le partenaire pas encore. Et il y a une route, `vigilar`, déjà faite : une **horloge** (`timer`) qui, toutes les 2 secondes, lit
 les règles et appelle deux routes :
 
@@ -50,21 +50,21 @@ les règles et appelle deux routes :
 Pourquoi une horloge, plutôt que d'attendre que quelque chose prévienne ? Parce que **ce qui n'arrive pas ne prévient pas**. Un 997 qui ne vient jamais ne
 déclenche aucun événement. Quelqu'un doit regarder l'horloge.
 
-Remarquez ce qu'il n'y a pas : il n'y a pas d'agrégateur qui garde dans la mémoire du routeur quels canaux ont déjà répondu. Chaque
+Remarque ce qu'il n'y a pas : il n'y a pas d'agrégateur qui garde dans la mémoire du routeur quels canaux ont déjà répondu. Chaque
 opération et son état vivent dans la table `operacion` depuis la 15. **Rassembler, c'est interroger la base.**
 
-## 2. Prédisez
+## 2. Prédis
 
-Répondez sur papier :
+Réponds sur papier :
 
 1. L'API et l'ERP ont accepté la 4001, et le 850 est déposé. Le partenaire n'a pas envoyé le 997. La commande est-elle
    complète ?
 2. La 3001 vient d'une boutique en propre : elle n'a pas d'EDI (la 11). Quand est-elle complète ?
 3. 20 secondes passent et le 997 de la 4002 n'arrive pas. Que vaut-il mieux : tenir la commande pour complète pour qu'elle cesse de
    gêner, ou alerter et la laisser ouverte ? Que se passe-t-il dans chaque cas si le 997 arrive au bout de 30 secondes ?
-4. Vous redémarrez le routeur pendant que la 4002 attend son 997. Perd-on ce qui était déjà rassemblé ?
+4. Tu redémarres le routeur pendant que la 4002 attend son 997. Perd-on ce qui était déjà rassemblé ?
 
-Regardez l'état actuel :
+Regarde l'état actuel :
 
 ```bash
 ./verifica inicio
@@ -74,7 +74,7 @@ Cela se passe mal dès la première coche : la 4001 reste COMPLETA **avant** son
 complet un événement dès qu'aucun canal n'est plus `pendiente`, et qu'un 850 déposé est `aceptada`. Et la 4002, à l'échéance,
 est clôturée de force : elle reste complète sans que le partenaire ait répondu quoi que ce soit.
 
-## 3. Rassemblez et surveillez
+## 3. Rassemble et surveille
 
 Dans `juntar.camel.yaml`, il y a deux TODO, un dans chaque route. Les deux sont une requête SQL déjà presque entière.
 
@@ -103,7 +103,7 @@ Elle se lit ainsi :
 | `HAVING bool_and(…)` | L'événement ne passe que si la condition est vraie **pour toutes** ses opérations |
 | `ON CONFLICT DO NOTHING` | Un événement n'est complété qu'une seule fois |
 
-Votre travail est la condition du `HAVING`. Aujourd'hui, elle dit « aucune n'est encore en attente ni garée ». Elle doit dire **« chacune
+Ton travail est la condition du `HAVING`. Aujourd'hui, elle dit « aucune n'est encore en attente ni garée ». Elle doit dire **« chacune
 est dans un état de son `llega_a` »** :
 
 ```sql
@@ -113,45 +113,45 @@ HAVING bool_and(jsonb_contains(r.regla -> 'llega_a', to_jsonb(p.estado)))
 `r.regla -> 'llega_a'` est la liste de la règle, par exemple `["confirmada"]` ; `to_jsonb(p.estado)` est l'état de
 l'opération comme valeur JSON ; `jsonb_contains` demande si le second figure dans la première.
 
-Remarquez une chose qui vient gratuitement : **la 3001 n'a pas d'opération `edi`**, parce qu'elle vient d'une boutique en propre. Comme elle n'a pas
+Remarque une chose qui vient gratuitement : **la 3001 n'a pas d'opération `edi`**, parce qu'elle vient d'une boutique en propre. Comme elle n'a pas
 de ligne, elle ne compte pas : personne n'attend un 997 qui ne la concerne pas.
 
 ### TODO 2 : un délai dépassé alerte et ne clôture pas
 
-La requête de `vencidos` **écrit aujourd'hui dans `completitud`** : elle clôture l'événement à l'échéance. Changez-la pour qu'elle écrive une
+La requête de `vencidos` **écrit aujourd'hui dans `completitud`** : elle clôture l'événement à l'échéance. Change-la pour qu'elle écrive une
 alerte dans `alerta`, une fois par canal :
 
-| Changement | Ce que vous écrivez |
+| Changement | Ce que tu écris |
 |---|---|
 | Vers où | `INSERT INTO alerta (orden, momento, canal, tipo, estado, espera)` |
 | Quoi | `SELECT p.orden, p.momento, p.canal, 'vencido', p.estado, r.regla ->> 'llega_a'` (sans le `DISTINCT`) |
-| Lesquels | Ajoutez au `WHERE` : `NOT jsonb_contains(r.regla -> 'llega_a', to_jsonb(p.estado))`, pour n'alerter que sur les canaux qui ne sont **pas** arrivés |
-| Une fois | Laissez le `ON CONFLICT DO NOTHING` : la table `alerta` a une `UNIQUE (orden, momento, canal, tipo)` |
-| Pour le journal | Ajoutez `RETURNING orden, momento, canal, estado, espera` et `outputType: SelectList` |
+| Lesquels | Ajoute au `WHERE` : `NOT jsonb_contains(r.regla -> 'llega_a', to_jsonb(p.estado))`, pour n'alerter que sur les canaux qui ne sont **pas** arrivés |
+| Une fois | Laisse le `ON CONFLICT DO NOTHING` : la table `alerta` a une `UNIQUE (orden, momento, canal, tipo)` |
+| Pour le journal | Ajoute `RETURNING orden, momento, canal, estado, espera` et `outputType: SelectList` |
 
 Et après la requête, un `split` sur `${body}` avec un `log` en `WARN` pour chaque nouvelle alerte, comme le `split` de
 `juntar`. Le message commence par `VENCIDO orden ${body[orden]} momento ${body[momento]} canal ${body[canal]}`.
 
-## 4. Cassez-en une exprès
+## 4. Casses-en une exprès
 
-Une fois tout terminé, retirez du `WHERE` de `vencidos` la condition `NOT jsonb_contains(…)`. Lancez `./verifica`.
+Une fois tout terminé, retire du `WHERE` de `vencidos` la condition `NOT jsonb_contains(…)`. Lance `./verifica`.
 
-Avant cela, prédisez : la 4002 attend son 997 plus de 20 secondes. L'API et l'ERP l'ont acceptée au bout de quelques secondes. Combien
-d'alertes attendez-vous ?
+Avant cela, prédis : la 4002 attend son 997 plus de 20 secondes. L'API et l'ERP l'ont acceptée au bout de quelques secondes. Combien
+d'alertes attends-tu ?
 
 Trois au lieu d'une. Sans cette condition, l'horloge alerte sur **tout** canal qui a dépassé son délai, qu'il soit arrivé ou non :
 l'API et l'ERP, qui ont déjà accepté, sortent eux aussi comme en dépassement. La coche de l'alerte de la 4002 sort en rouge. Une alerte
-qui se déclenche sur ce qui va bien apprend aux gens à ignorer les alertes, et celle qui compte se perd alors. Remettez la
+qui se déclenche sur ce qui va bien apprend aux gens à ignorer les alertes, et celle qui compte se perd alors. Remets la
 condition.
 
-## 5. Vérifiez
+## 5. Vérifie
 
 ```bash
 ./verifica
 ```
 
 `verifica` envoie une commande de boutique en propre et une de franchise, attend le 997 ; puis il éteint le système du partenaire et
-envoie la 4002, attend que le délai soit dépassé, **redémarre le routeur** et rallume le partenaire. Elle est terminée quand vous voyez les
+envoie la 4002, attend que le délai soit dépassé, **redémarre le routeur** et rallume le partenaire. Elle est terminée quand tu vois les
 sept coches vertes :
 
 ```
@@ -164,11 +164,11 @@ sept coches vertes :
 ✅ Tras reiniciar el router, el 997 tardío confirmó al socio y la 4002 quedó COMPLETA, con su único aviso como historia
 ```
 
-Lisez la dernière calmement. Le routeur a redémarré **en pleine attente**, et la 4002 s'est complétée quand même. Vous n'avez rien écrit
+Lis la dernière calmement. Le routeur a redémarré **en pleine attente**, et la 4002 s'est complétée quand même. Tu n'as rien écrit
 pour cela : ce qui était en train d'être rassemblé n'a jamais vécu dans la mémoire du routeur, cela vivait dans la base. À son retour, l'horloge
 a demandé de nouveau et a trouvé la même chose, plus le 997 qui venait d'arriver.
 
-Regardez les deux tables :
+Regarde les deux tables :
 
 ```bash
 docker compose -f ../../infra/compose.yaml exec estado psql -U router -d estado \
@@ -176,16 +176,16 @@ docker compose -f ../../infra/compose.yaml exec estado psql -U router -d estado 
 ```
 
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et
-`diff mio/orden-router/juntar.camel.yaml solucion/orden-router/juntar.camel.yaml` vous dit en quoi elles diffèrent.
+`diff mio/orden-router/juntar.camel.yaml solucion/orden-router/juntar.camel.yaml` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
-| `La 4001 con el socio en «aceptada» ya quedó COMPLETA` | Le `HAVING` garde la condition d'`inicio/` : remplacez-la par le `jsonb_contains` |
-| `La 3001 (tienda propia) no quedó COMPLETA` | Le `JOIN` avec les règles est absent, ou vous avez remplacé `bool_and` par autre chose |
+| `La 4001 con el socio en «aceptada» ya quedó COMPLETA` | Le `HAVING` garde la condition d'`inicio/` : remplace-la par le `jsonb_contains` |
+| `La 3001 (tienda propia) no quedó COMPLETA` | Le `JOIN` avec les règles est absent, ou tu as remplacé `bool_and` par autre chose |
 | `La 4002 sin 997: hay 0 avisos` et `completa=1` | `vencidos` écrit encore dans `completitud` : c'est dans `alerta` |
 | `La 4002 sin 997: hay 3 avisos` | Il manque le `NOT jsonb_contains(…)` dans le `WHERE` de `vencidos` |
 | `no está el WARN del vencido de la 4002` | Il manque le `RETURNING` avec `outputType: SelectList`, ou le `split` avec son `log` en `WARN` |
-| `No está arriba socio-bot` | Démarrez l'environnement : `docker compose -f infra/compose.yaml up -d --wait` |
+| `No está arriba socio-bot` | Démarre l'environnement : `docker compose -f infra/compose.yaml up -d --wait` |
 | `El puerto 8080 está ocupado` | Les services d'une autre exécution sont restés en marche : `DONDE=mio docker compose -f compose.yaml down` |
 
 ---
@@ -202,17 +202,17 @@ qui regarde l'horloge et qui demande.
 **Alerter n'est pas clôturer.** Clôturer de force à l'échéance dit « terminé » de quelque chose qui ne l'est pas, et si ce qui manquait arrive
 en retard, cela ne change plus rien. Alerter laisse une personne décider, et laisse ce qui arrive tard compter encore.
 
-**Si l'état vit hors du processus, le redémarrage n'est pas un problème.** Nous l'avons dit dans la 15 comme une théorie ; aujourd'hui, vous l'avez vu :
+**Si l'état vit hors du processus, le redémarrage n'est pas un problème.** Nous l'avons dit dans la 15 comme une théorie ; aujourd'hui, tu l'as vu :
 le routeur a redémarré en pleine attente et n'a rien perdu, sans une ligne de code de plus.
 
 ## Exercice : le dîner du réveillon
 
-1. Avant de lancer quoi que ce soit, écrivez sur papier votre prédiction pour la question 4 ci-dessus : perd-on ce qui est rassemblé en
-   redémarrant ? Après avoir lancé `./verifica`, comparez-la avec ce qui s'est passé et écrivez où vivait ce qui était rassemblé.
-2. Dans les règles, passez le `plazo_s` du partenaire à `5` et lancez `./verifica`. Quelles coches changent, et pourquoi ? Qu'arriverait-il
-   aux personnes qui traitent les alertes si le délai était aussi court dans la vie réelle ? Remettez-le à `20`.
-3. Imaginez que le routeur ait trois répliques, chacune avec son horloge. Une commande serait-elle complétée trois fois ? Alerterait-on
-   trois fois pour un délai dépassé ? (Indice : cherchez les deux `UNIQUE` et le `ON CONFLICT`.)
+1. Avant de lancer quoi que ce soit, écris sur papier ta prédiction pour la question 4 ci-dessus : perd-on ce qui est rassemblé en
+   redémarrant ? Après avoir lancé `./verifica`, compare-la avec ce qui s'est passé et écris où vivait ce qui était rassemblé.
+2. Dans les règles, passe le `plazo_s` du partenaire à `5` et lance `./verifica`. Quelles coches changent, et pourquoi ? Qu'arriverait-il
+   aux personnes qui traitent les alertes si le délai était aussi court dans la vie réelle ? Remets-le à `20`.
+3. Imagine que le routeur ait trois répliques, chacune avec son horloge. Une commande serait-elle complétée trois fois ? Alerterait-on
+   trois fois pour un délai dépassé ? (Indice : cherche les deux `UNIQUE` et le `ON CONFLICT`.)
 
 ---
 
@@ -229,7 +229,7 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
 3. Pourquoi faut-il une horloge pour rassembler ?
 4. Pourquoi la 3001 est-elle complète sans 997 ?
 5. **La question de clôture :** quand le délai du partenaire est dépassé, le routeur alerte et laisse la commande ouverte. Pourquoi la clôturer
-   de force serait-il pire ? Servez-vous du 997 tardif de la 4002 dans votre réponse.
+   de force serait-il pire ? Sers-toi du 997 tardif de la 4002 dans ta réponse.
 
-**Suite :** dans la leçon 26, un client dit que sa commande n'est pas arrivée. Vous avez la base, le journal et les destinations. Que
-consultez-vous d'abord, et comment reconstituez-vous le voyage complet d'une commande ?
+**Suite :** dans la leçon 26, un client dit que sa commande n'est pas arrivée. Tu as la base, le journal et les destinations. Que
+consultes-tu d'abord, et comment reconstitues-tu le voyage complet d'une commande ?

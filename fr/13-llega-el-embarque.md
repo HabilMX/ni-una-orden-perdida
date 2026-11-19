@@ -1,11 +1,11 @@
 # Leçon 13 — L'expédition arrive
 
-> **Ce que vous allez obtenir :** recevoir le fichier que dépose l'entrepôt quand une commande part, sans le prendre à moitié écrit, sans
+> **Ce que tu vas obtenir :** recevoir le fichier que dépose l'entrepôt quand une commande part, sans le prendre à moitié écrit, sans
 > le prendre deux fois et sans perdre celui qui arrive abîmé. Ce fichier devient un 856 pour le partenaire et le statut
 > EMBARCADO dans l'API et dans l'ERP.
 
-**Avant de commencer, il vous faut :** la leçon 12 terminée et l'environnement de la 00 allumé. Cette leçon utilise deux
-nouvelles tables de l'ERP, `embarque` et `entrega`. Si votre ERP date d'avant, recréez-le une fois :
+**Avant de commencer, il te faut :** la leçon 12 terminée et l'environnement de la 00 allumé. Cette leçon utilise deux
+nouvelles tables de l'ERP, `embarque` et `entrega`. Si ton ERP date d'avant, recrée-le une fois :
 
 ```bash
 docker compose -f infra/compose.yaml up -d --wait --build --force-recreate -V
@@ -13,9 +13,9 @@ docker compose -f infra/compose.yaml up -d --wait --build --force-recreate -V
 
 ## La nouveauté du jour, en une phrase
 
-Jusqu'ici, la commande **arrivait** à votre intégration : la boutique appelait le routeur. Avec l'expédition, c'est l'inverse :
+Jusqu'ici, la commande **arrivait** à ton intégration : la boutique appelait le routeur. Avec l'expédition, c'est l'inverse :
 l'entrepôt n'appelle personne, il **dépose un fichier dans un dossier** et s'en va. Quelqu'un doit aller voir s'il y a du nouveau.
-Cela s'appelle scruter (*Polling Consumer*), et aujourd'hui vous le configurez.
+Cela s'appelle scruter (*Polling Consumer*), et aujourd'hui tu le configures.
 
 **L'image :** la boîte aux lettres d'un immeuble. Le facteur dépose les lettres et ne sonne pas. Le concierge descend de temps en temps
 vérifier, n'emporte que les enveloppes fermées (pas la lettre que quelqu'un est encore en train d'écrire sur la table), écarte ce qu'il
@@ -27,42 +27,42 @@ Voici la partie 2 : la commande est déjà créée ; maintenant elle sort de l'e
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/13-llega-el-embarque
 cp -R inicio mio
 ```
 
-Aujourd'hui, il y a un nouveau service, `sondeo-bodega`. Regardez le dossier `buzon/` de la leçon, qui, dans le `compose.yaml`, est
-monté à l'intérieur du conteneur de scrutation. Tout votre travail tient dans **un seul fichier** :
+Aujourd'hui, il y a un nouveau service, `sondeo-bodega`. Regarde le dossier `buzon/` de la leçon, qui, dans le `compose.yaml`, est
+monté à l'intérieur du conteneur de scrutation. Tout ton travail tient dans **un seul fichier** :
 `mio/sondeo-bodega/sondeo-bodega.camel.yaml`, et à l'intérieur, uniquement dans les paramètres du `from`.
 
-Ouvrez aussi une expédition d'exemple, `datos/embarques/embarque-4001.json` : elle contient la commande, le transporteur, le
+Ouvre aussi une expédition d'exemple, `datos/embarques/embarque-4001.json` : elle contient la commande, le transporteur, le
 **numéro de suivi** (le numéro avec lequel le transporteur suit le colis) et les lignes de commande qui sont parties.
 
-## 2. Prédisez
+## 2. Prédis
 
-Répondez sur papier avant de lancer quoi que ce soit :
+Réponds sur papier avant de lancer quoi que ce soit :
 
-1. Dans la 12, vous avez appris à faire tourner trois répliques d'un service. Si trois répliques surveillaient le même dossier, que pourrait-il
+1. Dans la 12, tu as appris à faire tourner trois répliques d'un service. Si trois répliques surveillaient le même dossier, que pourrait-il
    arriver à un fichier ?
 2. L'entrepôt écrit le fichier petit à petit. Que se passe-t-il si la scrutation le prend alors qu'il en est à la moitié ?
 3. Un fichier abîmé arrive, qui n'est pas du JSON valide. Que devrait-il lui arriver : être effacé, rester où il est ou
    être écarté ?
 
-Regardez l'état actuel :
+Regarde l'état actuel :
 
 ```bash
 ./verifica inicio
 ```
 
-Plusieurs marques sortent en rouge. Lisez-les : chacune vous dit quelle précaution manque à la scrutation. La scrutation de `inicio/` lit
+Plusieurs marques sortent en rouge. Lis-les : chacune te dit quelle précaution manque à la scrutation. La scrutation de `inicio/` lit
 tout ce qu'il y a dans `buzon/` et n'écarte rien (`noop: true` laisse chaque fichier où il était).
 
 ## 3. Ce qui est déjà fait : les canaux se réutilisent
 
-Avant d'écrire, regardez ce que vous n'avez pas à écrire. Ouvrez `mio/orden-router/orden-router.camel.yaml` et cherchez
+Avant d'écrire, regarde ce que tu n'as pas à écrire. Ouvre `mio/orden-router/orden-router.camel.yaml` et cherche
 `platform-http:/embarques`. C'est la porte par laquelle la scrutation remet chaque expédition au routeur. Plus bas se trouve le
 même `multicast` que dans la 10, avec les trois mêmes canaux : `direct:canal-api`, `direct:canal-erp` et
 `direct:canal-socio`. La seule différence est l'**étape** : avant, chaque canal appelait `/integrar` ; maintenant, il appelle
@@ -79,8 +79,8 @@ T-502.
 
 ## 4. Les quatre précautions de la scrutation
 
-Le composant `file` de Camel sait déjà scruter. Votre travail est de lui dire **quelles précautions prendre**, avec quatre paramètres.
-Chaque TODO du fichier vous dit lequel :
+Le composant `file` de Camel sait déjà scruter. Ton travail est de lui dire **quelles précautions prendre**, avec quatre paramètres.
+Chaque TODO du fichier te dit lequel :
 
 | TODO | Paramètre | La précaution | Dans la boîte aux lettres de l'immeuble |
 |---|---|---|---|
@@ -93,30 +93,30 @@ Deux indices :
 
 - `include` est une **expression régulière** sur le nom du fichier. Le point de `.json` doit être échappé, et en
   YAML entre guillemets doubles la barre oblique inverse s'écrit deux fois : `\\.`
-- Pour le nom du fichier écarté, utilisez `${file:name}` : ainsi `embarque-4001.json` devient
+- Pour le nom du fichier écarté, utilise `${file:name}` : ainsi `embarque-4001.json` devient
   `.camel/embarque-4001.json`.
 
-Remarquez ce que vous ne faites **pas** : vous n'écrivez pas de boucle, vous ne lisez pas le dossier vous-même, vous n'effacez rien. Les quatre précautions sont
+Remarque ce que tu ne fais **pas** : tu n'écris pas de boucle, tu ne lis pas le dossier toi-même, tu n'effaces rien. Les quatre précautions sont
 de la configuration, et le composant fait le reste.
 
-## 5. Cassez-en une exprès
+## 5. Casses-en une exprès
 
-Avec votre scrutation terminée, retirez la ligne de `moveFailed` et lancez `./verifica`. Avant cela, prédisez : où va le
-fichier abîmé si vous ne lui dites pas où l'envoyer ?
+Avec ta scrutation terminée, retire la ligne de `moveFailed` et lance `./verifica`. Avant cela, prédis : où va le
+fichier abîmé si tu ne lui dis pas où l'envoyer ?
 
 `Buzón: el embarque roto no está en .error/` sort en rouge. Le fichier reste dans `buzon/`, et dans le journal de la scrutation
-vous le verrez échouer encore et encore : sans `moveFailed`, Camel le laisse où il était et le retente au
+tu le verras échouer encore et encore : sans `moveFailed`, Camel le laisse où il était et le retente au
 tour suivant. Un fichier abîmé que l'on retente pour toujours ne se perd pas, mais il ne prévient pas non plus : il remplit le journal et
-cache les erreurs des autres. Remettez la ligne.
+cache les erreurs des autres. Remets la ligne.
 
-## 6. Vérifiez
+## 6. Vérifie
 
 ```bash
 ./verifica
 ```
 
 `verifica` crée les commandes 4001 et 4002 dans les trois destinations, puis dépose trois choses dans la boîte aux lettres : l'expédition de la
-4001, terminée ; celle de la 4002, encore en `.tmp` ; et une abîmée. Elle est terminée quand vous voyez les dix coches vertes :
+4001, terminée ; celle de la 4002, encore en `.tmp` ; et une abîmée. Elle est terminée quand tu vois les dix coches vertes :
 
 ```
 ✅ Arrancaron el router, los tres canales y el sondeo de la bodega
@@ -131,19 +131,19 @@ cache les erreurs des autres. Remettez la ligne.
 ✅ Buzón: el .tmp que la bodega aún escribía no se tocó (la 4002 sigue CREADO)
 ```
 
-Regardez la preuve dans le dossier lui-même : `ls -A buzon buzon/.camel buzon/.error`. Et ouvrez le 856 arrivé chez le partenaire,
-`mio/salida/856-4001.edi` : cherchez le numéro de suivi dans le segment `REF*CN` et la commande dans `PRF`.
+Regarde la preuve dans le dossier lui-même : `ls -A buzon buzon/.camel buzon/.error`. Et ouvre le 856 arrivé chez le partenaire,
+`mio/salida/856-4001.edi` : cherche le numéro de suivi dans le segment `REF*CN` et la commande dans `PRF`.
 
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et
-`diff mio/sondeo-bodega solucion/sondeo-bodega` vous dit en quoi elles diffèrent.
+`diff mio/sondeo-bodega solucion/sondeo-bodega` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
 | `el sondeo tomó el .tmp` | Le motif de `include` ne se termine pas par `\\.json` : avec `embarque-.*` tout court, `embarque-4002.json.tmp` entre aussi. Ou bien il manque l'`include` |
 | `el embarque de la 4001 no está en .camel/` | `noop: true` est resté, ou le `move` ne porte pas `${file:name}` |
 | `el embarque roto no está en .error/` | Il manque `moveFailed` |
-| `le faltan las tablas embarque y entrega` | Votre ERP date d'avant cette leçon : recréez-le comme l'indique « Avant de commencer » |
-| `El puerto 8080 está ocupado` | Vous avez laissé tourner les services d'une autre leçon : `docker compose … down` dans son dossier |
+| `le faltan las tablas embarque y entrega` | Ton ERP date d'avant cette leçon : recrée-le comme l'indique « Avant de commencer » |
+| `El puerto 8080 está ocupado` | Tu as laissé tourner les services d'une autre leçon : `docker compose … down` dans son dossier |
 
 ---
 
@@ -162,14 +162,14 @@ revoir, sans ouvrir un journal.
 
 ## Exercice : le deuxième événement du cycle de vie, sans nouvelles routes
 
-Avec votre version terminée :
+Avec ta version terminée :
 
 1. Dans le routeur, combien de routes de canal y a-t-il pour l'expédition et combien pour la création ? Qu'est-ce qui change entre un
-   appel et l'autre ? (Indice : cherchez `${variable.paso}`.)
-2. Passez le `delay` à 10000 et lancez `./verifica`. Combien de temps faut-il maintenant pour que l'EMBARCADO apparaisse ? Que gagnez-vous et que
-   perdez-vous avec une scrutation plus lente ? Revenez à 2000.
-3. Ouvrez le `compose.yaml` de la leçon. Quel service porte `replicas: 1` ? Que deviendrait l'expédition de la 4001
-   si vous lui mettiez 3 ? Pensez à l'API, à l'ERP et au partenaire séparément : qui le remarquerait et qui non ? (Indice : la
+   appel et l'autre ? (Indice : cherche `${variable.paso}`.)
+2. Passe le `delay` à 10000 et lance `./verifica`. Combien de temps faut-il maintenant pour que l'EMBARCADO apparaisse ? Que gagnes-tu et que
+   perds-tu avec une scrutation plus lente ? Reviens à 2000.
+3. Ouvre le `compose.yaml` de la leçon. Quel service porte `replicas: 1` ? Que deviendrait l'expédition de la 4001
+   si tu lui mettais 3 ? Pense à l'API, à l'ERP et au partenaire séparément : qui le remarquerait et qui non ? (Indice : la
    clé de l'API.)
 
 ---
@@ -190,4 +190,4 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
    tourner en plusieurs ? Que se passerait-il si toutes les répliques le faisaient ?
 
 **Suite :** dans la leçon 14, l'entrepôt n'envoie plus un fichier par commande : il en envoie un avec tout ce qui est parti dans la
-matinée. Un fichier, plusieurs commandes. Combien de 856 attendez-vous ?
+matinée. Un fichier, plusieurs commandes. Combien de 856 attends-tu ?

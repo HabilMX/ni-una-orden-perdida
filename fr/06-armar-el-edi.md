@@ -1,9 +1,9 @@
 # Leçon 06 — Construire l'EDI
 
-> **Ce que vous allez obtenir :** convertir la commande dans le document qu'attend le partenaire commercial, un **X12 850**, et
+> **Ce que tu vas obtenir :** convertir la commande dans le document qu'attend le partenaire commercial, un **X12 850**, et
 > vérifier avec un lecteur en espagnol qu'il est bien construit. Aujourd'hui, l'environnement n'est pas nécessaire : Docker suffit.
 
-**Avant de commencer, il vous faut :** la leçon 03 terminée. Cette leçon reprend la même idée de mapping et de cas de test de référence.
+**Avant de commencer, il te faut :** la leçon 03 terminée. Cette leçon reprend la même idée de mapping et de cas de test de référence.
 
 ## La nouveauté du jour, en une phrase
 
@@ -29,28 +29,28 @@ GE*1*1001~
 IEA*1*000001001~
 ```
 
-Il n'a pas de noms de champs comme le JSON : **chaque donnée vaut par sa position**. Il paraît illisible, mais aujourd'hui vous allez
+Il n'a pas de noms de champs comme le JSON : **chaque donnée vaut par sa position**. Il paraît illisible, mais aujourd'hui tu vas
 apprendre à le lire.
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/06-armar-el-edi
 cp -R inicio mio
 ```
 
-## 2. Prédisez
+## 2. Prédis
 
-Regardez le 850 ci-dessus. Sans rien chercher, répondez sur papier :
+Regarde le 850 ci-dessus. Sans rien chercher, réponds sur papier :
 
-1. Il y a un `*` et un `~` sur chaque ligne. Que sépare chacun, selon vous ?
-2. Sur quelle ligne se trouve, selon vous, le numéro de la commande (1001) ? Et les lignes de commande ?
+1. Il y a un `*` et un `~` sur chaque ligne. Que sépare chacun, selon toi ?
+2. Sur quelle ligne se trouve, selon toi, le numéro de la commande (1001) ? Et les lignes de commande ?
 3. Les mots `TIENDANORTE` et `SOCIO01` apparaissent deux fois. Sur la première ligne, ils portent des espaces en trop à la fin, et
-   sur la deuxième non. Pourquoi, selon vous ?
+   sur la deuxième non. Pourquoi, selon toi ?
 
-## 3. Lisez-le avec le lecteur
+## 3. Lis-le avec le lecteur
 
 Le cours fournit un lecteur qui explique un X12 en espagnol. Depuis le dossier de la leçon :
 
@@ -58,7 +58,7 @@ Le cours fournit un lecteur qui explique un X12 en espagnol. Depuis le dossier d
 ../../herramientas/leer-x12 ../../datos/edi/850-ejemplo.edi
 ```
 
-Comparez avec votre prédiction :
+Compare avec ta prédiction :
 
 - **`~` ferme un segment.** Un segment est comme une ligne du document, et son nom, ce sont les premières lettres
   (`ISA`, `BEG`, `PO1`…).
@@ -90,9 +90,9 @@ La route `mio/orden-a-edi.camel.yaml` construit le 850 en deux étapes, chacune 
 | Pièce | Son travail | Où elle vit |
 |---|---|---|
 | **Le mapping** (JSONata, comme dans la 03) | **Calcule** tout : les remplissages à 15, le contrôle à 9 chiffres (1001 → `000001001`), les dates, les prix à deux décimales, le compte du `SE` et le texte nettoyé | `mio/mappings/edi/850/v1/` · fourni tout fait |
-| **Le gabarit** (Mustache) | **Met en place** ce qui arrive déjà calculé, à son endroit dans le document. Il ne calcule rien | `mio/templates/edi/850/v1/850.mustache` · **à vous** |
+| **Le gabarit** (Mustache) | **Met en place** ce qui arrive déjà calculé, à son endroit dans le document. Il ne calcule rien | `mio/templates/edi/850/v1/850.mustache` · **à toi** |
 
-Testez-le comme dans la 03, et ouvrez `mio/mappings/edi/850/v1/cases/dos-renglones/esperado.json` pour voir quelles données
+Teste-le comme dans la 03, et ouvre `mio/mappings/edi/850/v1/cases/dos-renglones/esperado.json` pour voir quelles données
 arrivent au gabarit :
 
 ```bash
@@ -100,12 +100,12 @@ arrivent au gabarit :
 ```
 
 **Pourquoi séparer les deux travaux ?** Parce que chacun se teste de son côté. Le calcul a ses cas de test de référence ; le
-gabarit n'a qu'à poser chaque donnée à sa place. Si vous mêliez les calculs au gabarit, il n'y aurait aucun
+gabarit n'a qu'à poser chaque donnée à sa place. Si tu mêlais les calculs au gabarit, il n'y aurait aucun
 moyen de les tester.
 
-## 5. Terminez le gabarit
+## 5. Termine le gabarit
 
-Ouvrez `mio/templates/edi/850/v1/850.mustache`. Il contient déjà l'enveloppe, le début du document et le destinataire :
+Ouvre `mio/templates/edi/850/v1/850.mustache`. Il contient déjà l'enveloppe, le début du document et le destinataire :
 
 ```
 ISA*00*          *00*          *ZZ*{{{body.isa.emisor}}}*ZZ*{{{body.isa.receptor}}}*…~
@@ -115,10 +115,10 @@ BEG*00*SA*{{{body.beg.orden}}}**{{{body.beg.fecha}}}~
 N1*ST*{{{body.tienda.nombre}}}*92*{{{body.tienda.clave}}}~
 ```
 
-Chaque `{{{ … }}}` est un emplacement que Mustache remplit avec une donnée du mapping. Il vous manque deux parties. Les instructions
+Chaque `{{{ … }}}` est un emplacement que Mustache remplit avec une donnée du mapping. Il te manque deux parties. Les instructions
 complètes sont dans `LEEME.md`, à côté du gabarit.
 
-**Les lignes.** Il vous faut un `PO1` et un `PID` pour chaque ligne de commande, et les lignes se trouvent dans `body.lineas`. Dans Mustache,
+**Les lignes.** Il te faut un `PO1` et un `PID` pour chaque ligne de commande, et les lignes se trouvent dans `body.lineas`. Dans Mustache,
 une **section** répète ce qu'elle contient une fois par élément d'une liste :
 
 ```
@@ -127,7 +127,7 @@ une **section** répète ce qu'elle contient une fois par élément d'une liste 
 {{/body.lineas}}
 ```
 
-À l'intérieur de la section, vous êtes déjà placé sur une ligne, comme à l'intérieur de `renglones.{ … }` en JSONata. Servez-vous du 850
+À l'intérieur de la section, tu es déjà placé sur une ligne, comme à l'intérieur de `renglones.{ … }` en JSONata. Sers-toi du 850
 d'exemple et du lecteur pour savoir à quelle position va chaque donnée.
 
 **La clôture.** Après les lignes : `CTT` (combien de lignes), `SE` (le compte des segments et le contrôle du
@@ -135,13 +135,13 @@ d'exemple et du lecteur pour savoir à quelle position va chaque donnée.
 
 Deux règles :
 
-- **N'écrivez pas de commentaires dans le gabarit :** là où il y avait un commentaire, Mustache laisse une ligne vide, et une
+- **N'écris pas de commentaires dans le gabarit :** là où il y avait un commentaire, Mustache laisse une ligne vide, et une
   ligne vide est une erreur dans un X12.
-- **Utilisez des accolades triples `{{{ }}}`.** À l'étape 7, vous verrez pourquoi.
+- **Utilise des accolades triples `{{{ }}}`.** À l'étape 7, tu verras pourquoi.
 
-## 6. Lancez-la et lisez le résultat
+## 6. Lance-la et lis le résultat
 
-Depuis `mio/`, mettez deux commandes dans `entrada/` et démarrez la route :
+Depuis `mio/`, mets deux commandes dans `entrada/` et démarre la route :
 
 ```bash
 cd mio
@@ -150,18 +150,18 @@ cp ../../../datos/ordenes/orden-1001.json ../../../datos/ordenes/orden-1005-cara
 ../../../herramientas/camel run orden-a-edi.camel.yaml
 ```
 
-Quand vous voyez `Generé el 850 de la orden 1005`, arrêtez-la avec `Ctrl+C` et lisez ce qui est sorti :
+Quand tu vois `Generé el 850 de la orden 1005`, arrête-la avec `Ctrl+C` et lis ce qui est sorti :
 
 ```bash
 ../../../herramientas/leer-x12 salida/850-1001.edi
 diff salida/850-1001.edi ../../../datos/edi/850-ejemplo.edi
 ```
 
-Si le lecteur donne les six coches vertes et que `diff` n'imprime rien, votre 850 de la commande 1001 est identique à celui d'exemple.
+Si le lecteur donne les six coches vertes et que `diff` n'imprime rien, ton 850 de la commande 1001 est identique à celui d'exemple.
 
 ## 7. Les caractères qui cassent un document
 
-Ouvrez `datos/ordenes/orden-1005-caracteres.json`, dans le dossier racine du cours. Ses deux produits ont des noms
+Ouvre `datos/ordenes/orden-1005-caracteres.json`, dans le dossier racine du cours. Ses deux produits ont des noms
 gênants :
 
 | Produit dans la commande | Comment il sort dans le 850 |
@@ -169,7 +169,7 @@ gênants :
 | `Taza & plato` | `Taza & plato` |
 | `Juego 4*6 ~ cristal` | `Juego 4 6   cristal` |
 
-**Prédisez :** pourquoi le second nom a-t-il changé ? Pensez à ce que ferait le partenaire en lisant `PID*F****Juego 4*6 ~ cristal~`.
+**Prédis :** pourquoi le second nom a-t-il changé ? Pense à ce que ferait le partenaire en lisant `PID*F****Juego 4*6 ~ cristal~`.
 
 Le `*` et le `~` sont les séparateurs du document, et le `>` aussi : l'`ISA` les déclare (le `>` est son dernier
 élément). S'ils se trouvent à l'intérieur d'une donnée, le partenaire lirait un élément de trop et un segment coupé en deux. C'est pour cela que le
@@ -177,8 +177,8 @@ mapping les remplace par des espaces avant qu'ils n'arrivent au gabarit, et que 
 de test de référence `caracteres-especiales` vérifie qu'il le fait.
 
 Maintenant, le `&`. **Ce n'est pas un séparateur** : X12 l'accepte à l'intérieur d'une donnée, et le partenaire le lirait bien. Son risque est ailleurs, et
-il vient du gabarit. Remplacez **seulement** `{{{descripcion}}}` par `{{descripcion}}`, avec des accolades doubles, et relancez la
-route. Regardez le `PID` de la commande 1005 :
+il vient du gabarit. Remplace **seulement** `{{{descripcion}}}` par `{{descripcion}}`, avec des accolades doubles, et relance la
+route. Regarde le `PID` de la commande 1005 :
 
 ```
 PID*F****Taza &amp; plato~
@@ -186,9 +186,9 @@ PID*F****Taza &amp; plato~
 
 Mustache est né pour faire des pages web, et avec des accolades doubles il « protège » le texte comme si c'était du HTML : le `&` se
 transforme en `&amp;`. Dans une page web, c'est ce qu'il faut. Dans un X12, le partenaire recevrait un produit qui s'appelle
-« `Taza &amp; plato` ». Les accolades triples disent à Mustache : **pose la donnée telle quelle**. Remettez les accolades triples.
+« `Taza &amp; plato` ». Les accolades triples disent à Mustache : **pose la donnée telle quelle**. Remets les accolades triples.
 
-## 8. Vérifiez
+## 8. Vérifie
 
 Depuis le dossier de la leçon :
 
@@ -198,7 +198,7 @@ cd ..
 ```
 
 `verifica` vide `mio/entrada/` et `mio/salida/`, génère le 850 des commandes 1001 et 1005, et les contrôle avec le
-lecteur. Elle est terminée quand vous voyez les cinq coches vertes :
+lecteur. Elle est terminée quand tu vois les cinq coches vertes :
 
 ```
 ✅ El mapeo del 850 pasa sus casos dorados
@@ -209,19 +209,19 @@ lecteur. Elle est terminée quand vous voyez les cinq coches vertes :
 ```
 
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et
-`diff mio/templates/edi/850/v1/850.mustache solucion/templates/edi/850/v1/850.mustache` vous dit en quoi elles diffèrent.
+`diff mio/templates/edi/850/v1/850.mustache solucion/templates/edi/850/v1/850.mustache` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
-| `trae &amp;: usa llaves TRIPLES` | Une accolade est restée double : revenez à l'étape 7 |
-| `no pasa la revisión del lector` | Lancez `leer-x12` sur ce fichier : le contrôle en rouge dit ce qui manque (presque toujours la clôture) |
-| `no es idéntico al de ejemplo` | Comparez-les avec `diff` : c'est en général un élément à une autre position ou un `*` en moins |
+| `trae &amp;: usa llaves TRIPLES` | Une accolade est restée double : reviens à l'étape 7 |
+| `no pasa la revisión del lector` | Lance `leer-x12` sur ce fichier : le contrôle en rouge dit ce qui manque (presque toujours la clôture) |
+| `no es idéntico al de ejemplo` | Compare-les avec `diff` : c'est en général un élément à une autre position ou un `*` en moins |
 
 ---
 
 ## Ce que nous avons appris en construisant cette leçon
 
-Deux erreurs réelles apparues pendant sa construction, et pourquoi elles ne sont pas arrivées jusqu'à vous :
+Deux erreurs réelles apparues pendant sa construction, et pourquoi elles ne sont pas arrivées jusqu'à toi :
 
 - **Une fonction qui « nettoie » peut casser la largeur fixe.** JSONata a `$trim`, qui retire les espaces. Elle réunit aussi
   les espaces répétés en un seul, et cela aurait effacé le remplissage de l'`ISA`. C'est pour cela que le mapping utilise `$pad`, qui
@@ -243,7 +243,7 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
 2. Quelles sont les trois enveloppes du document, et quel segment ouvre et ferme chacune ?
 3. Pourquoi l'`ISA` porte-t-il des espaces de remplissage ?
 4. Que fait le mapping et que fait le gabarit ? Pourquoi vaut-il mieux ne pas les mêler ?
-5. Pourquoi un `*` ne peut-il pas figurer dans le nom d'un produit, et qu'arrive-t-il à un `&` si vous utilisez des accolades doubles ?
+5. Pourquoi un `*` ne peut-il pas figurer dans le nom d'un produit, et qu'arrive-t-il à un `&` si tu utilises des accolades doubles ?
 
 **Suite :** dans la leçon 07, le 850 ne reste plus dans `salida/` : il part vers la boîte aux lettres SFTP du partenaire, en veillant à ce
 qu'il ne prenne pas un fichier à moitié écrit.
