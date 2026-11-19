@@ -1,26 +1,26 @@
 # Leçon 26 — Suivre une commande
 
-> **Ce que vous allez obtenir :** répondre à « qu'est-il arrivé à la commande 4006 ? » avec une seule requête : chaque canal, chaque tentative,
+> **Ce que tu vas obtenir :** répondre à « qu'est-il arrivé à la commande 4006 ? » avec une seule requête : chaque canal, chaque tentative,
 > ce qui est parti dans chacune, en entier, ce qu'a répondu le partenaire et si la commande est complète. Et servir cette réponse
 > par HTTP, en cherchant par le numéro de commande.
 
-**Avant de commencer, il vous faut :** les leçons 15 et 25 terminées et l'environnement de la 00 allumé.
+**Avant de commencer, il te faut :** les leçons 15 et 25 terminées et l'environnement de la 00 allumé.
 
 ## La nouveauté du jour, en une phrase
 
-Cela fait onze leçons que vous enregistrez des choses dans la base d'état : la commande (15), chaque opération et chaque tentative (15), les
+Cela fait onze leçons que tu enregistres des choses dans la base d'état : la commande (15), chaque opération et chaque tentative (15), les
 conflits (18), les accusés de réception du partenaire (21), les alertes et ce qui est complet (25). Chaque pièce répond à une petite question.
-Aujourd'hui, vous les réunissez pour répondre à la grande, celle que pose un client ou quelqu'un du support : **« ma commande n'est pas arrivée, que lui
-est-il arrivé ? »**. Et vous y répondez par la **clé métier**, le numéro de commande, qui est la seule chose qu'apporte celui qui demande.
+Aujourd'hui, tu les réunis pour répondre à la grande, celle que pose un client ou quelqu'un du support : **« ma commande n'est pas arrivée, que lui
+est-il arrivé ? »**. Et tu y réponds par la **clé métier**, le numéro de commande, qui est la seule chose qu'apporte celui qui demande.
 
-**L'image :** le suivi d'un colis sur la page d'un transporteur. Vous saisissez le numéro de suivi et vous voyez l'histoire
-complète : reçu en agence, en transit, tentative de livraison échouée parce qu'il n'y avait personne, livré. Vous ne voyez pas seulement
-l'état d'aujourd'hui : vous voyez **chaque étape**, avec son heure. S'il disait seulement « livré », vous ne sauriez pas qu'il y a eu une tentative échouée,
+**L'image :** le suivi d'un colis sur la page d'un transporteur. Tu saisis le numéro de suivi et tu vois l'histoire
+complète : reçu en agence, en transit, tentative de livraison échouée parce qu'il n'y avait personne, livré. Tu ne vois pas seulement
+l'état d'aujourd'hui : tu vois **chaque étape**, avec son heure. S'il disait seulement « livré », tu ne saurais pas qu'il y a eu une tentative échouée,
 ni pourquoi il a mis deux jours.
 
 ---
 
-## 1. Préparez votre dossier
+## 1. Prépare ton dossier
 
 ```bash
 cd lecciones/26-seguir-una-orden
@@ -29,32 +29,32 @@ cp -R inicio mio
 
 Le routeur a deux nouveaux fichiers :
 
-| Fichier | Ce que c'est | L'écrivez-vous ? |
+| Fichier | Ce que c'est | L'écris-tu ? |
 |---|---|---|
-| `orden-router/recorrido.camel.yaml` | Au démarrage, il déclare la vue avec ce que dit `recorrido.sql`. Et il sert `GET /ordenes/{orden}/recorrido` | Non, lisez-le |
+| `orden-router/recorrido.camel.yaml` | Au démarrage, il déclare la vue avec ce que dit `recorrido.sql`. Et il sert `GET /ordenes/{orden}/recorrido` | Non, lis-le |
 | `orden-router/recorrido.sql` | La vue `recorrido` de la base d'état | **Oui** |
 
-Une **vue** est une requête enregistrée sous un nom. Elle se lit comme une table (`SELECT * FROM recorrido WHERE orden = '4006'`), mais elle ne conserve rien en propre : chaque fois que vous la lisez, elle rassemble de nouveau les vraies tables. C'est pour cela
+Une **vue** est une requête enregistrée sous un nom. Elle se lit comme une table (`SELECT * FROM recorrido WHERE orden = '4006'`), mais elle ne conserve rien en propre : chaque fois que tu la lis, elle rassemble de nouveau les vraies tables. C'est pour cela
 qu'elle ne devient jamais périmée.
 
 Et il y a une nouvelle table depuis aujourd'hui, `payload`. Chaque tentative conserve dans `intento` son **empreinte** (`sha256`) et sa
 **taille**, et le corps complet de ce qui est parti vit dans `payload`, une fois par empreinte. Si deux tentatives ont envoyé la
 même chose, elles partagent la ligne.
 
-Ouvrez `infra/postgres/01-estado.sql` et repérez les tables que vous allez réunir : `operacion`, `intento`, `payload`, `acuse`,
+Ouvre `infra/postgres/01-estado.sql` et repère les tables que tu vas réunir : `operacion`, `intento`, `payload`, `acuse`,
 `alerta` et `completitud`.
 
-## 2. Prédisez
+## 2. Prédis
 
-Répondez sur papier :
+Réponds sur papier :
 
-1. Un client dit que la 4006 n'est pas arrivée. Que consultez-vous d'abord : le journal du routeur, l'API, l'ERP ou la base
+1. Un client dit que la 4006 n'est pas arrivée. Que consultes-tu d'abord : le journal du routeur, l'API, l'ERP ou la base
    d'état ? Pourquoi ?
 2. L'API était en panne quand la 4006 est arrivée ; ensuite, quelqu'un a fait un rerun. Si la vue ne montre que la dernière
    tentative de chaque canal, quelle partie de l'histoire se perd ?
 3. La 4007 contient 150 lignes de commande. Le journal du routeur la montre-t-il en entier ?
 
-Regardez l'état actuel :
+Regarde l'état actuel :
 
 ```bash
 ./verifica inicio
@@ -64,12 +64,12 @@ La vue existe et le `GET` répond, mais c'est un **tableau de bord du jour** : u
 du canal rest de la 4006 apparaît comme un seul `aceptada`, sans la première tentative dont on n'a pas su l'issue ni l'auteur du
 rerun. Et la colonne `cuerpo` sort vide : elle ne dit pas ce qui est parti.
 
-## 3. Construisez le parcours
+## 3. Construis le parcours
 
-Ouvrez `mio/orden-router/recorrido.sql`. C'est un `CREATE VIEW` avec un `SELECT` qui contient déjà les colonnes sous leur nom
+Ouvre `mio/orden-router/recorrido.sql`. C'est un `CREATE VIEW` avec un `SELECT` qui contient déjà les colonnes sous leur nom
 final ; certaines sortent en `NULL` pour l'instant. Il a trois TODO :
 
-| TODO | Ce que vous changez | Pour quoi faire |
+| TODO | Ce que tu changes | Pour quoi faire |
 |---|---|---|
 | 1 | Le `LEFT JOIN LATERAL (… LIMIT 1) u` par un `LEFT JOIN intento i ON i.operacion = p.id`, et les colonnes `u.` par `i.` | Une ligne pour **chaque** tentative, pas seulement la dernière |
 | 2 | Un `LEFT JOIN payload d ON d.sha256 = i.sha256`, et `cuerpo` vient de `d.cuerpo` | Ce qui est parti dans chaque tentative, en entier |
@@ -93,20 +93,20 @@ Et pourquoi des sous-requêtes pour les accusés et les alertes, et non d'autres
 opération **multiplie** les lignes : chaque tentative sortirait une fois par accusé. La sous-requête les réunit dans une seule
 cellule.
 
-Laissez les noms des colonnes tels qu'ils sont : le `GET` les utilise.
+Laisse les noms des colonnes tels qu'ils sont : le `GET` les utilise.
 
-## 4. Cassez-en une exprès
+## 4. Casses-en une exprès
 
-Avec votre vue terminée, retirez le `LEFT JOIN completitud` et laissez `completa` en `CAST(NULL AS timestamptz)`. Lancez
+Avec ta vue terminée, retire le `LEFT JOIN completitud` et laisse `completa` en `CAST(NULL AS timestamptz)`. Lance
 `./verifica`.
 
-Avant cela, prédisez : la 4007 a été complétée. Que dit le parcours ?
+Avant cela, prédis : la 4007 a été complétée. Que dit le parcours ?
 
 Que non. La dernière coche sort en rouge : la vue dit que **ni** la 4007 **ni** la 4006 ne sont complètes. Rien n'a échoué :
 la vue ne regardait tout simplement pas cette table, et une cellule vide se lit comme « cela ne s'est pas passé ». **Un parcours qui ne montre pas quelque chose
-ne prouve pas que cela ne s'est pas passé.** C'est pour cela qu'il se construit avec des `LEFT JOIN` contre tout ce que la base sait. Remettez la ligne.
+ne prouve pas que cela ne s'est pas passé.** C'est pour cela qu'il se construit avec des `LEFT JOIN` contre tout ce que la base sait. Remets la ligne.
 
-## 5. Vérifiez
+## 5. Vérifie
 
 ```bash
 ./verifica
@@ -114,7 +114,7 @@ ne prouve pas que cela ne s'est pas passé.** C'est pour cela qu'il se construit
 
 `verifica` éteint l'API, envoie la 4006 (qui demande un produit que le partenaire ne connaît pas) et la 4007 (grosse, avec 150
 lignes de commande) ; il rallume l'API, fait un rerun du canal rest pour les deux et demande le parcours. Elle est terminée
-quand vous voyez les huit coches vertes :
+quand tu vois les huit coches vertes :
 
 ```
 ✅ Arrancaron el router (con su GET /ordenes/{orden}/recorrido), los tres canales y el sondeo
@@ -127,26 +127,26 @@ quand vous voyez les huit coches vertes :
 ✅ El recorrido dice que la 4007 quedó COMPLETA y la 4006 no
 ```
 
-Demandez vous-même le parcours :
+Demande toi-même le parcours :
 
 ```bash
 curl -s localhost:8080/ordenes/4006/recorrido | python3 -m json.tool | less
 ```
 
 **Ça ne tourne pas ?** `./verifica solucion` teste la nôtre, et
-`diff mio/orden-router/recorrido.sql solucion/orden-router/recorrido.sql` vous dit en quoi elles diffèrent.
+`diff mio/orden-router/recorrido.sql solucion/orden-router/recorrido.sql` te dit en quoi elles diffèrent.
 
-| Ce que vous voyez | Ce que vous faites |
+| Ce que tu vois | Ce que tu fais |
 |---|---|
-| `No existe la vista recorrido` | Votre `recorrido.sql` contient une erreur de SQL : le routeur le dit dans le journal, sous cette coche |
+| `No existe la vista recorrido` | Ton `recorrido.sql` contient une erreur de SQL : le routeur le dit dans le journal, sous cette coche |
 | `la vista tiene … y la 4006 tiene … intentos` | Le `LATERAL … LIMIT 1` est toujours là, ou le `JOIN` d'un accusé a multiplié les lignes |
-| `El canal rest de la 4006 en el recorrido: «aceptada/manual»` sans ce qui précède | Vous ne voyez que la dernière tentative : il manque le TODO 1 |
+| `El canal rest de la 4006 en el recorrido: «aceptada/manual»` sans ce qui précède | Tu ne vois que la dernière tentative : il manque le TODO 1 |
 | `intentos del recorrido sin su cuerpo` | Il manque le `LEFT JOIN payload`, ou il joint sur une autre colonne : c'est `sha256` |
 | `El canal del socio de la 4006 … (esperaba «rechazada R»)` | La colonne `acuses` est restée à `NULL` |
 | `Completa en el recorrido` | Il manque le `LEFT JOIN completitud` |
 | `El puerto 8080 está ocupado` | Les services d'une autre exécution sont restés en marche : `DONDE=mio docker compose -f compose.yaml down` |
 
-Si vous modifiez `recorrido.sql` avec les services en marche, redémarrez le routeur : la vue est déclarée au démarrage.
+Si tu modifies `recorrido.sql` avec les services en marche, redémarre le routeur : la vue est déclarée au démarrage.
 
 ---
 
@@ -168,15 +168,15 @@ une réponse fraîche sans une seconde source de vérité.
 
 ## Exercice : la commande à problème
 
-Avec votre version terminée, lancez `./verifica`, puis :
+Avec ta version terminée, lance `./verifica`, puis :
 
-1. Demandez le parcours de la 4006 et, **avec lui seul**, écrivez un paragraphe pour le client qui dit que sa commande « n'est pas
+1. Demande le parcours de la 4006 et, **avec lui seul**, écris un paragraphe pour le client qui dit que sa commande « n'est pas
    arrivée ». Est-elle arrivée à l'API ? À l'ERP ? Au partenaire ? Que s'est-il passé avec le partenaire, sur quelle ligne de commande et avec quel produit ? (Indice :
    le corps de la tentative du partenaire et le 997 de la 21.)
-2. Cherchez la 4007 dans le journal du routeur : `DONDE=mio docker compose -f compose.yaml logs orden-router | grep 4007`. Voyez-vous
-   ses 150 lignes de commande ? Comparez avec la colonne `tamano` du parcours.
-3. Écrivez la requête que vous donneriez à quelqu'un du support pour voir **seulement les canaux qui ne se sont pas bien terminés** pour une
-   commande, avec leur dernière issue. Commencez par `SELECT canal, estado_canal, …  FROM recorrido WHERE orden = '4006'`.
+2. Cherche la 4007 dans le journal du routeur : `DONDE=mio docker compose -f compose.yaml logs orden-router | grep 4007`. Vois-tu
+   ses 150 lignes de commande ? Compare avec la colonne `tamano` du parcours.
+3. Écris la requête que tu donnerais à quelqu'un du support pour voir **seulement les canaux qui ne se sont pas bien terminés** pour une
+   commande, avec leur dernière issue. Commence par `SELECT canal, estado_canal, …  FROM recorrido WHERE orden = '4006'`.
 
 ---
 
@@ -192,8 +192,8 @@ Ce que nous avons décidé dans cette leçon, avec ce que nous avons écarté et
 2. Pourquoi le parcours se cherche-t-il par le numéro de commande ?
 3. Que conserve la table `payload`, et comment se joint-elle à chaque tentative ?
 4. Pourquoi `LEFT JOIN` et non `JOIN` ? Pourquoi des sous-requêtes pour les accusés ?
-5. **La question de clôture :** un client dit que sa commande n'est pas arrivée. Que consultez-vous d'abord, et pourquoi le parcours et
+5. **La question de clôture :** un client dit que sa commande n'est pas arrivée. Que consultes-tu d'abord, et pourquoi le parcours et
    non le journal ?
 
-**Suite :** dans la leçon 27, regardez de nouveau le parcours de la 4008. Il contient le nom, l'adresse, le téléphone et le
+**Suite :** dans la leçon 27, regarde de nouveau le parcours de la 4008. Il contient le nom, l'adresse, le téléphone et le
 courriel d'une personne. Qui devrait pouvoir les voir ?

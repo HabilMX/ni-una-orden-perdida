@@ -5,22 +5,22 @@
 **À qui il s'adresse :** à celles et ceux qui utilisent déjà le terminal et git, lisent du JSON et connaissent les bases de SQL, et qui veulent apprendre l'intégration de
 systèmes. Inutile de connaître Java ou Camel : les routes sont en YAML et s'apprennent ici.
 
-**Ce que vous saurez faire à la fin :** obtenir, de vos propres mains, qu'aucune commande ne se perde, que tout soit traçable, qu'une
+**Ce que tu sauras faire à la fin :** obtenir, de tes propres mains, qu'aucune commande ne se perde, que tout soit traçable, qu'une
 nouvelle tentative ne crée pas de doublon et qu'une destination en panne ne fasse pas tomber les autres.
 
-**Ce qu'il vous faut avant de commencer :** le terminal et git, savoir lire du JSON et un SQL de base, et Docker avec Compose. De Docker, il suffit de
+**Ce qu'il te faut avant de commencer :** le terminal et git, savoir lire du JSON et un SQL de base, et Docker avec Compose. De Docker, il suffit de
 connaître `docker compose up` et `down` ; le reste est écrit dans les leçons. Le cours fonctionne sous Linux, macOS et Windows avec WSL.
 
 ## Le projet
 
 Une boutique inventée vend, et chaque commande doit arriver dans trois systèmes qui ne se ressemblent pas : une API REST, un
-ERP sous MariaDB et un partenaire commercial qui reçoit des documents EDI X12 par SFTP. Tout tourne sur votre machine avec Docker. C'est un
+ERP sous MariaDB et un partenaire commercial qui reçoit des documents EDI X12 par SFTP. Tout tourne sur ta machine avec Docker. C'est un
 cours pratique, ouvert et gratuit, d'intégration de systèmes avec [Apache Camel](https://camel.apache.org/).
 
 ## Les leçons
 
 Il y a 31 leçons, de la 00 à la 30, toutes sous Docker Compose, plus une annexe facultative en lecture seule. Elles se suivent dans
-l'ordre : chacune part de ce que la précédente a laissé. Commencez par la [00](00-ambiente.md), qui démarre l'environnement.
+l'ordre : chacune part de ce que la précédente a laissé. Commence par la [00](00-ambiente.md), qui démarre l'environnement.
 
 ### Partie 1 — Qu'elle arrive
 
