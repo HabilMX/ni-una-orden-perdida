@@ -9,6 +9,13 @@ MariaDB y un socio comercial que recibe documentos EDI X12 por SFTP. Todo corre 
 Lo que se aprende con las manos: que no se pierda ninguna orden, que todo deje rastro, que un reintento no duplique y
 que un destino caído no tumbe a los demás.
 
+Las lecciones también se leen en la página de Hábil:
+[español](https://www.habil.mx/es/cursos/ni-una-orden-perdida/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_es) ·
+[English](https://www.habil.mx/en/courses/ni-una-orden-perdida/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_en) ·
+[français](https://www.habil.mx/fr/cours/ni-una-orden-perdida/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_fr) ·
+[português](https://www.habil.mx/pt/cursos/ni-una-orden-perdida/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_pt) ·
+[български](https://www.habil.mx/bg/courses/ni-una-orden-perdida/?utm_source=github&utm_medium=referral&utm_campaign=2026-11_ni-una-orden-perdida_bg).
+
 ## Antes de empezar
 
 - Terminal y git, leer JSON y SQL básico.
