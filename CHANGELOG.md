@@ -5,6 +5,9 @@ Aquí se anota qué trae cada versión de la práctica y qué se corrigió despu
 
 ## [Sin publicar]
 
+### Agregado
+- **README:** liga a las lecciones en la página de Hábil, en los cinco idiomas.
+
 ### Corregido
 - **Lecciones 29 y 30:** cuando int-edi leía dos veces el mismo evento, el SFTP no pisaba el 850 que ya estaba, la
   entrega fallaba y la operación acababa en conciliación. Ahora int-edi compara el archivo que encuentra con el que
